@@ -5,7 +5,7 @@ import { add, canvasTexture, fitText, PALETTE } from "@/engine/materials";
 import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { ease, seeded } from "@/engine/util";
-import { prepare } from "@/engine/voice";
+import { prepare, warmVoice } from "@/engine/voice";
 import { fold, type LoggedEvent, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, scaffold, type Wave } from "@/director/next";
 import { classifyError, radarChoices } from "@/rig/errors";
@@ -151,7 +151,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   // ---- Nova ----
   let voiceUntil = 0, captionTimer = 0;
   const lineText = (id: string) => audio.text(id) || (BATTLE_LINES as Record<string, string>)[id] || "";
-  const readTime = (text: string) => 0.9 + text.split(/\s+/).length * 0.3;
+  const readTime = (text: string) => 0.7 + text.split(/\s+/).length * 0.24; // captions-only pace when no voice is ready
   /**
    * One Nova (or Captain) line. Never cuts off a line that is still being spoken: a reaction that
    * arrives while she talks is dropped (the HUD already shows the outcome); `queue` waits instead.
@@ -173,6 +173,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
   /** A live line (lesson beats with this fleet's numbers): a baked clip if the words match, else Phonon, else captions paced on reading time. */
   const liveCache = new Map<string, Promise<AudioBuffer | null>>();
+  let liveSlow = false;
   const live = (text: string) => { if (!liveCache.has(text)) liveCache.set(text, prepare(text, "Zoey")); return liveCache.get(text)!; };
   async function speak(text: string) {
     const baked = Object.entries(audio.manifest).find(([k, c]) => k.startsWith("nova") && norm(c.text) === norm(text))?.[0];
@@ -181,7 +182,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (now < voiceUntil) await wait(voiceUntil - now);
     overlay.caption("Nova", text);
     window.clearTimeout(captionTimer);
-    const buf = await Promise.race([live(text), wait(1800).then(() => null)]);
+    // wait a moment for live speech, but once it has missed a line, don't keep making the cadet wait
+    const buf = await Promise.race([live(text), wait(liveSlow ? 150 : 1200).then(() => null)]);
+    liveSlow = !buf;
     const len = buf ? audio.spokenLength(buf) : readTime(text);
     if (buf) void audio.play(buf);
     voiceUntil = performance.now() + len * 1000 + 550;
@@ -610,9 +613,12 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const misses = attempts, sc = scaffold(misses, w.a, w.b, n);
     const mash = errorType === "wild_guess" && wild.length >= 3 && latency < 4000;
     if (mash) wild = [];
+    // predictive pre-fetch (SPEC §6): a miss makes Show Me How likely, so voice its beats now
+    if (misses === 1) try { lesson(w.a, w.b, state().seenTricks).beats.forEach((b) => void live(b.say)); } catch { /* no lesson for this fleet */ }
     const radar = sc.radar ? radarChoices(w.a, w.b, seeded(mix(seed, w.a, w.b, attempts))) : null;
     setUi({ radar: radar ?? ui.radar, invite: sc.invite });
-    void say(mash ? "nova_hold_fire" : sc.invite ? "nova_invite" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under");
+    // the calming line matters more than a reaction, so it waits its turn instead of being dropped
+    void say(mash ? "nova_hold_fire" : sc.invite ? "nova_invite" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: mash });
     await after(1.05);
     restore();
     await after(0.4);
@@ -810,6 +816,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       if (started) return;
       started = true;
       audio.unlock();
+      void warmVoice(); // live speech for Show Me How warms in the background
       audio.mood("battle");
       setUi({ started: true });
       void startWave();
