@@ -10,7 +10,11 @@ export type Sfx = "dive" | "chime" | "knock" | "door" | "blip_ok" | "blip_close"
 
 class SoundEngine {
   manifest: Record<string, Clip> = {};
-  muted = false;
+  /**
+   * Silent when NEXT_PUBLIC_MW_MUTE=1 (a dev-only env flag, e.g. in .env.development.local),
+   * when the URL has ?mute, or when localStorage "mw:mute" is "1". Everything still runs; nothing is heard.
+   */
+  muted = typeof window !== "undefined" && (process.env.NEXT_PUBLIC_MW_MUTE === "1" || /[?&]mute\b/.test(location.search) || localStorage.getItem("mw:mute") === "1");
   speaking = false;
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -32,6 +36,7 @@ class SoundEngine {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 1; // mood beds and SFX go through master too
       this.master.connect(this.ctx.destination);
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 256;
