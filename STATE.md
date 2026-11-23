@@ -47,3 +47,4 @@ _Updated 24 Nov 2026, final integration pass_
   - The X-Ray's "this session" is since the page opened.
   - The local `MW_ADMIN_KEY` in the gitignored `.env.development.local`.
   - The history rewrite for owner names before going public.
+- **Hint wording (found in the final play-test):** 40 on 5 × 9 (5 squads of 9 on screen) gets "So close! One squad off." The cadet is really one fighter short in *each* squad, which is only "one squad" if the fleet is flipped. The fix is in `rig/errors.ts`: an off-by-`a` miss should get its own line, and that line needs baking.
