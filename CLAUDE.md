@@ -20,5 +20,6 @@ Read in this exact order before making changes:
 - **Client-only Gradium Phonon (`phonon-tts`).** Never import `phonon-tts` in Server Components, SSR, or Vercel API routes. Pre-bake static intro/briefing audio into `public/vo/` and run `phonon-tts` exclusively inside a browser Web Worker.
 - **Zero private leaks.** This repository is public and shareable. Keep secrets, API keys, personal notes, and paths outside `mathworld/` completely out of files, comments, and commits.
 - **Do not import from `design/lookbook/`.** Lookbook HTML files are static visual reference only.
+- **UI controls use `@ui-sdk/react` + `@ui-sdk/core`.** Before building any UI control (buttons, dialogs, drawers, popovers, tabs, toolbars, radio groups, toasts), follow the installed `ui-sdk` skill and read `node_modules/@ui-sdk/react/docs/llms.txt` (and search `core.md` by heading only when defining a custom primitive). Name every control cleanly so `createAgent` / WebMCP works out of the box.
 - **Verify by playing it.** Open the live routes in a browser, test desktop keyboard AND mobile touch (`inputMode="none"`), test `0` as a valid answer, test undershoot/overshoot, test `Show Me How` repeat shortening, and check console errors.
 - Before ending any session, update `STATE.md`.
