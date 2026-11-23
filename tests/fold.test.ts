@@ -129,9 +129,9 @@ describe("fold", () => {
     expect(fold(log).cleared).toEqual([7]);
   });
 
-  it("counts orbs and equips upgrades", () => {
+  it("counts orbs and equips upgrades at the catalogue price (Solar Gold is 30, whatever the client sends)", () => {
     const s = fold([
-      { type: "orb_earned", payload: { amount: 30, reason: "wave" } },
+      { type: "orb_earned", payload: { amount: 40, reason: "wave" } },
       { type: "upgrade_purchased", payload: { slot: "hull", itemId: "solar-gold", cost: 20 } },
     ]);
     expect(s.orbs).toBe(10);

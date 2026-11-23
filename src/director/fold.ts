@@ -7,6 +7,7 @@ import {
 import { classifyError } from "@/rig/errors";
 import { factKey, MAX_TIER, tierOf, tierOfPlanet, type Fact } from "@/rig/pools";
 import { selectTrick, type TrickId } from "@/rig/tricks";
+import { priceFor } from "./hangar";
 
 /** An event as folded: the contract shape plus an optional timestamp (ms) for the anti-mash rule. */
 export type LoggedEvent = EventInput & { at?: number };
@@ -26,6 +27,10 @@ export interface PlayerState {
   seenTricks: Partial<Record<TrickId, number>>;
   orbs: number;
   equipped: Partial<Record<(typeof UPGRADE_SLOTS)[number], string>>;
+  /** Hangar items bought so far, as "slot:id" (re-equipping one is free). */
+  owned: string[];
+  /** Mercury and Venus warm-up answers (telemetry: they never move multiplication mastery). */
+  warmups: { answered: number; correct: number };
   waves: number;
   history: WaveRecord[];
   mission: { n: number; waves: number; inTier: number; solved: number; passed: boolean };
@@ -44,7 +49,7 @@ export interface PlayerState {
 const freshMission = (n: number) => ({ n, waves: 0, inTier: 0, solved: 0, passed: false });
 
 export const initialState = (): PlayerState => ({
-  introCompleted: false, tier: 0, unlocked: 0, cleared: [], aceCleared: [], facts: {}, seenTricks: {}, orbs: 0, equipped: {},
+  introCompleted: false, tier: 0, unlocked: 0, cleared: [], aceCleared: [], facts: {}, seenTricks: {}, orbs: 0, equipped: {}, owned: [], warmups: { answered: 0, correct: 0 },
   waves: 0, history: [], mission: freshMission(0), goldStreak: 0, probePassed: false, struggleStreak: 0, lastStruggle: null,
   transferQueue: [], transfer: { checks: 0, passes: 0 }, antiMashNudges: 0, open: null,
   offers: { hyperJumpTo: null, cushion: false, clear: false },
@@ -160,7 +165,15 @@ export function fold(events: LoggedEvent[]): PlayerState {
         break;
       }
       case "orb_earned": s.orbs += e.payload.amount; break;
-      case "upgrade_purchased": s.orbs -= e.payload.cost; s.equipped[e.payload.slot] = e.payload.itemId; break;
+      case "upgrade_purchased": {
+        // the catalogue sets the price (whatever the client sent); Orbs never go below zero
+        const { slot, itemId } = e.payload, cost = priceFor(slot, itemId, s.owned);
+        if (cost === null || cost > s.orbs) break;
+        s.orbs -= cost;
+        if (!s.owned.includes(`${slot}:${itemId}`)) s.owned.push(`${slot}:${itemId}`);
+        s.equipped[slot] = itemId;
+        break;
+      }
       case "flashcard_answered": {
         // A gentle mastery nudge only: never a mission wave, a planet clear or a Hyper-Jump streak.
         const p = e.payload;
@@ -169,6 +182,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
         s.facts[key] = { m: Math.max(f.m, ewma(f.m, FLASHCARD_OBS, FLASHCARD_ALPHA)), seen: f.seen + 1, fastWins: f.fastWins + 1 };
         break;
       }
+      case "warmup_answered": { const p = e.payload; s.warmups.answered++; if (p.guess === (p.op === "add" ? p.a + p.b : p.a - p.b)) s.warmups.correct++; break; }
       default: break; // explanation_started: telemetry only
     }
   }

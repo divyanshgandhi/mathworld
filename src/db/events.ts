@@ -38,6 +38,8 @@ export const EventInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("hyper_jump_taken"), payload: z.object({ fromPlanet: planet, toPlanet: planet }) }),
   z.object({ type: z.literal("orb_earned"), payload: z.object({ amount: z.number().int().min(1), reason: z.string().max(64) }) }),
   z.object({ type: z.literal("upgrade_purchased"), payload: z.object({ slot: z.enum(UPGRADE_SLOTS), itemId: z.string().regex(/^[a-z0-9-]{1,40}$/), cost: count }) }),
+  /** Mercury (addition) and Venus (subtraction) warm-ups, up to 20. */
+  z.object({ type: z.literal("warmup_answered"), payload: z.object({ op: z.enum(["add", "sub"]), a: z.number().int().min(0).max(20), b: z.number().int().min(0).max(20), guess: z.number().int().min(0).max(1e6), correct: z.boolean().optional(), latencyMs: count }) }),
   z.object({ type: z.literal("flashcard_answered"), payload: z.object({ a: factor, b: factor, correct: z.boolean().optional(), latencyMs: count, guess: z.number().int().min(0).max(1e10) }) }),
 ]);
 export type EventInput = z.infer<typeof EventInput>;
@@ -50,6 +52,10 @@ export const EventBody = z.union([EventInput, z.object({ events: z.array(EventIn
 export function normalize(e: EventInput): EventInput {
   if (e.type === "attempt_submitted" || e.type === "flashcard_answered") {
     return { ...e, payload: { ...e.payload, correct: e.payload.guess === e.payload.a * e.payload.b } } as EventInput;
+  }
+  if (e.type === "warmup_answered") {
+    const p = e.payload;
+    return { ...e, payload: { ...p, correct: p.guess === (p.op === "add" ? p.a + p.b : p.a - p.b) } };
   }
   return e;
 }
