@@ -57,8 +57,9 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
     if (!arena) return;
     const measure = () => {
       const phone = window.innerWidth < 768, plate = plateRef.current?.getBoundingClientRect(), dock = dockRef.current?.getBoundingClientRect();
+      // the top keeps the plate and its chip row (outcome, Show Me How) clear of the fleet;
       // phones: Nova's caption floats just above the keypad, over the rocket, never over the fleet
-      arena.setSafe({ top: (plate?.bottom ?? 130) + 6, right: !phone && dock ? window.innerWidth - dock.left + 8 : 0, bottom: phone && dock ? window.innerHeight - dock.top + 4 : 0, left: 0 });
+      arena.setSafe({ top: (plate?.bottom ?? 130) + 50, right: !phone && dock ? window.innerWidth - dock.left + 8 : 0, bottom: phone && dock ? window.innerHeight - dock.top + 4 : 0, left: 0 });
       arena.captionAt(phone && dock ? window.innerHeight - dock.top + 8 : 22);
     };
     measure();
@@ -88,12 +89,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
               <b className="text-white">{fmt(ra)}</b> {plural(ra, "squad", "squads")} · <b className="text-white">{fmt(rb)}</b> {noun} each{w.flipped ? " · flipped" : ""}
             </p>
           </div>
+          {/* the outcome chip sits in a row under the plate that the stage keeps clear of the fleet */}
           {o && (
-            <div role="status" className={`rounded-full px-5 py-1.5 font-mono text-lg font-semibold tabular-nums shadow-lg ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
+            <div role="status" className={`rounded-full px-5 py-1 font-mono text-lg font-semibold tabular-nums shadow-lg ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
               {o.kind === "exact" ? `✓ Dead on · +${o.orbs} orbs` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
             </div>
           )}
-          {ui.lesson && <div className="rounded-full bg-sky-300/90 px-4 py-1 font-mono text-xs font-semibold tracking-wider text-[#06202b]">SHOW ME HOW · {ui.lesson.card.toUpperCase()}</div>}
         </div>
       )}
 
@@ -126,7 +127,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
               {ui.lockTotal !== null && <p className="mt-1.5 text-center font-mono text-xs text-amber-200">Plasma lock: {ui.sectors.map((s) => fmt(s.value ?? 0)).join(" + ")} = {fmt(ui.lockTotal)}</p>}
             </div>
           )}
-          {ui.lesson?.prompt && <p className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center text-sm text-sky-100 md:mb-2">{ui.lesson.prompt}</p>}
+          {ui.lesson && (
+            <div className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center md:mb-2">
+              <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-sky-200">SHOW ME HOW · {ui.lesson.card.toUpperCase()}</p>
+              {ui.lesson.prompt && <p className="mt-0.5 text-sm text-sky-50">{ui.lesson.prompt}</p>}
+            </div>
+          )}
           <div className="mb-1.5 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1 md:mb-2 md:py-2">
             <span className="text-[11px] uppercase tracking-wider text-white/50">{sectorActive ? `Sector ${sectorActive.label}` : "Plasma balls"}</span>
             <output aria-live="polite" aria-label="Plasma balls loaded" className="font-mono text-3xl tabular-nums text-lime-200 md:text-4xl">{entry || "0"}</output>

@@ -214,6 +214,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const W = colW.length ? colX[colX.length - 1] + colW[colW.length - 1].span : 0, H = rowH.length ? rowY[rowY.length - 1] + rowH[rowH.length - 1].span : 0;
     scale = Math.min(1.55, 11 / Math.max(W, 1), 6.6 / Math.max(H, 1));
     fw = Math.max(W * scale, 3); fh = Math.max(H * scale, 2);
+    // an empty fleet still has a size: the zero ring (and its empty lanes), so the axis labels sit outside it
+    if (a === 0 || b === 0) { const ring = 2 * 1.4 * scale + 0.5; fw = Math.max(fw, ring, a > 0 ? 5.4 : 0); fh = Math.max(fh, ring, Math.min(a, 10) * 0.7 + 0.4); }
     formation.scale.setScalar(scale);
     const slotsBefore = (parts: number[], i: number) => parts.slice(0, i).reduce((s, p) => s + p / 10 ** (String(p).length - 1), 0);
     const stagger = Math.min(0.025, 0.5 / Math.max(1, f.ships.length));

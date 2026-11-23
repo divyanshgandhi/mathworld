@@ -169,6 +169,8 @@ describe("tricks", () => {
 
   it("knows which Power-Ups fit a problem", () => {
     expect(powerUpFits("borrow-take-back", 3, 4)).toBe(false);
+    for (const t of ["easy-5-10", "half-double", "double-it", "borrow-take-back", "flip-it"] as const) expect(powerUpFits(t, 5, 0) || powerUpFits(t, 0, 10) || powerUpFits(t, 4, 0) || powerUpFits(t, 0, 9)).toBe(false);
+    expect(powerUpFits("empty-mirror", 0, 7)).toBe(true);
     expect(powerUpFits("borrow-take-back", 7, 9)).toBe(true);
     expect(powerUpFits("big-small-split", 6, 24)).toBe(true);
     expect(placeParts(4053)).toEqual([4000, 50, 3]);

@@ -70,6 +70,7 @@ export const shouldFlip = (a: number, b: number) => a > b && a <= 12 && b >= 2;
 /** Whether firing a Power-Up at a × b makes sense (for Nova's strategy coaching). */
 export function powerUpFits(t: TrickId, a: number, b: number): boolean {
   const lo = Math.min(a, b), hi = Math.max(a, b), has = (n: number) => a === n || b === n;
+  if (lo === 0) return t === "empty-mirror"; // an empty fleet: only Empty & Mirror has anything to show
   switch (t) {
     case "empty-mirror": return lo <= 1;
     case "fast-adding": return lo >= 2 && hi <= 10;
