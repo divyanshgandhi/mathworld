@@ -59,6 +59,8 @@ export function makeRocket(M: Materials, style: RocketStyle = {}) {
   flameOut.rotation.x = flameIn.rotation.x = Math.PI;
   return {
     group: rocket,
+    /** The two flame materials (additive, HDR): battle dims them under the bloom threshold. */
+    flames: [outer, inner] as const,
     /** Where shots leave from, in world space. */
     muzzle: () => rocket.localToWorld(new THREE.Vector3(0, 1.6, 0)),
     flicker(T: number, power = 1) {

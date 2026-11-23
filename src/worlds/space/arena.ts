@@ -117,6 +117,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   const blaster = BLASTERS[(s0.equipped.blaster ?? "plasma-ball") as keyof typeof BLASTERS] ?? BLASTERS["plasma-ball"];
   rocket.group.rotation.set(-1.05, 0, 0);
   rocket.group.scale.setScalar(0.55);
+  // no halo in battle: the flame keeps its colour, but its two additive cones together stay under
+  // the bloom threshold (1.4) instead of blooming into a disc around the rocket
+  rocket.flames.forEach((m, i) => m.color.multiplyScalar((i ? 0.75 : 0.55) / Math.max(m.color.r, m.color.g, m.color.b)));
   root.add(rocket.group);
 
   // the fleet lives in `formation` (it can turn for Flip It!); labels stay upright outside it
