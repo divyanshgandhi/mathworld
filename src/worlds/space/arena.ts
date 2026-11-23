@@ -276,11 +276,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
   const TONE = { cyan: 0x2fb7d6, amber: 0xf0a13a, gold: 0xf2c14e, coral: 0xff8f70, lime: 0xbef264 } as const;
   /** A translucent plate behind a set of ships (in formation space, offsets included). */
-  function plate(sel: ShipView[], tone: keyof typeof TONE, extra: THREE.Vector3[] = []) {
+  function plate(sel: ShipView[], tone: keyof typeof TONE, extra: THREE.Object3D[] = []) {
     if (!sel.length && !extra.length) return null;
     const box = new THREE.Box2();
     for (const v of sel) { const c = v.home.clone().add(v.offset); box.expandByPoint(new THREE.Vector2(c.x - v.size.x / 2, c.y - v.size.y / 2)); box.expandByPoint(new THREE.Vector2(c.x + v.size.x / 2, c.y + v.size.y / 2)); }
-    for (const p of extra) { box.expandByPoint(new THREE.Vector2(p.x - 0.5, p.y - 0.5)); box.expandByPoint(new THREE.Vector2(p.x + 0.5, p.y + 0.5)); }
+    for (const g of extra) { const p = g.position, h = g.userData.half as THREE.Vector2; box.expandByPoint(new THREE.Vector2(p.x - h.x, p.y - h.y)); box.expandByPoint(new THREE.Vector2(p.x + h.x, p.y + h.y)); }
     const size = box.getSize(new THREE.Vector2()).addScalar(0.3), c = box.getCenter(new THREE.Vector2());
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size.x, size.y), new THREE.MeshBasicMaterial({ color: TONE[tone], transparent: true, opacity: 0.26, depthWrite: false }));
     m.position.set(c.x, c.y, -0.55);
@@ -289,9 +289,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     visuals.add(m);
     return m;
   }
-  function tag(text: string, at: THREE.Vector3, color = "#fde68a") {
+  /** A label in the fleet. `right`: it starts at `at` (labels right of the fleet never overlap it). */
+  function tag(text: string, at: THREE.Vector3, color = "#fde68a", right = false) {
     const t = textPlane(text, 0.55 / scale, color);
     t.position.copy(at).setZ(0.6);
+    if (right) t.position.x += (t.geometry as THREE.PlaneGeometry).parameters.width / 2;
     t.userData.upright = true;
     visuals.add(t);
     return t;
@@ -303,11 +305,18 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     m.userData.grow = { t0: stage.time, axis: x !== null ? "y" : "x" };
     visuals.add(m);
   }
-  function ghostAt(p: THREE.Vector3) {
-    const g = makeGhost();
+  function ghostAt(p: THREE.Vector3, like?: ShipView) {
+    let g: THREE.Object3D;
+    if (!like || like.kind === "fighter") { g = makeGhost(); g.scale.setScalar(0.78); g.userData.upright = true; }
+    else {
+      // a ghost pod / carrier: the dashed outline of the ship it stands in for, so its worth reads the same
+      const box = new THREE.PlaneGeometry(like.size.x * 0.94, like.size.y * 0.7);
+      const line = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineDashedMaterial({ color: 0x9fe8ff, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.9 }));
+      line.computeLineDistances();
+      g = new THREE.Group().add(new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.12, depthWrite: false })), line);
+    }
     g.position.copy(p);
-    g.scale.setScalar(0.78);
-    g.userData.upright = true;
+    g.userData.half = like ? like.size.clone().multiplyScalar(0.5) : new THREE.Vector2(0.5, 0.5);
     formation.add(g);
     ghosts.push(g);
     return p;
@@ -372,7 +381,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         const axis = b >= a ? "col" : "row", big = Math.max(a, b);
         const { first, rest } = split(axis, 5);
         if (axis === "col") { tag("5", new THREE.Vector3(meanX(first), axisTop(), 0)); tag(String(big - 5), new THREE.Vector3(meanX(rest), axisTop(), 0)); }
-        else { tag("5", new THREE.Vector3(axisLeft(), meanY(first), 0)); tag(String(big - 5), new THREE.Vector3(axisLeft(), meanY(rest), 0)); }
+        else { tag("5", new THREE.Vector3(axisLeft(), meanY(first), 0), undefined, true); tag(String(big - 5), new THREE.Vector3(axisLeft(), meanY(rest), 0), undefined, true); }
         break;
       }
       case "jump-one-more": {
@@ -381,28 +390,21 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         break;
       }
       case "borrow-take-back": {
-        const extra: THREE.Vector3[] = [];
+        // one ghost after the last ship of the 9s band, in every row (or column), the same class as
+        // the ship beside it: each squad (or each column) becomes a round number, 19 × 24 → 20 × 24 − 24
+        const f = fleet;
         if (b % 10 === 9) {
-          // one ghost per squad at the end of the 9s, so every squad reads as a round number
-          const unitsBand = fleet.colParts.length - 1;
-          for (let r = 0; r < (a <= 9 ? a : 0); r++) {
-            const row = views.filter((v) => v.gRow === r && fleet!.sectors[v.ship.sector].colBand === unitsBand);
-            if (!row.length) continue;
-            const last = row.reduce((m, v) => (v.home.x > m.home.x ? v : m));
-            extra.push(ghostAt(last.home.clone().add(new THREE.Vector3(pitch, 0, 0))));
-          }
+          const unitsBand = f.colParts.length - 1, inBand = views.filter((v) => f.sectors[v.ship.sector].colBand === unitsBand);
+          const lastCol = Math.max(...inBand.map((v) => v.ship.col));
+          for (const v of inBand.filter((x) => x.ship.col === lastCol)) ghostAt(v.home.clone().add(new THREE.Vector3(v.size.x + GAP, 0, 0)), v);
           tag(`${fmt(b + 1)} each`, new THREE.Vector3(0, axisTop(), 0), "#a5f3fc");
         } else {
-          const unitsBand = fleet.rowParts.length - 1;
-          for (let c = 0; c < (b <= 9 ? b : 0); c++) {
-            const col = views.filter((v) => v.gCol === c && fleet!.sectors[v.ship.sector].rowBand === unitsBand);
-            if (!col.length) continue;
-            const last = col.reduce((m, v) => (v.home.y < m.home.y ? v : m));
-            extra.push(ghostAt(last.home.clone().add(new THREE.Vector3(0, -pitch, 0))));
-          }
-          tag(`${fmt(a + 1)} squads`, new THREE.Vector3(axisLeft() + 0.4, 0, 0), "#a5f3fc");
+          const unitsBand = f.rowParts.length - 1, inBand = views.filter((v) => f.sectors[v.ship.sector].rowBand === unitsBand);
+          const lastRow = Math.max(...inBand.map((v) => v.ship.row));
+          for (const v of inBand.filter((x) => x.ship.row === lastRow)) ghostAt(v.home.clone().add(new THREE.Vector3(0, -(v.size.y + GAP), 0)), v);
+          tag(`${fmt(a + 1)} squads`, new THREE.Vector3(axisLeft(), 0, 0), "#a5f3fc", true);
         }
-        plate(views, "cyan", extra);
+        plate(views, "cyan", ghosts);
         break;
       }
       case "easy-5-10": {
@@ -413,10 +415,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
           break;
         }
         // ×5: project the twin 5 as ghosts, so each squad reads as half of a 10
-        const extra: THREE.Vector3[] = [];
-        if (b === 5) for (const v of views.filter((x) => x.gCol === 4)) for (let c = 1; c <= 5; c++) extra.push(ghostAt(v.home.clone().add(new THREE.Vector3(c * pitch, 0, 0))));
-        else for (const v of views.filter((x) => x.gRow === 4)) for (let r = 1; r <= 5; r++) extra.push(ghostAt(v.home.clone().add(new THREE.Vector3(0, -r * pitch, 0))));
-        plate(views, "cyan");
+        if (b === 5) for (const v of views.filter((x) => x.gCol === 4)) for (let c = 1; c <= 5; c++) ghostAt(v.home.clone().add(new THREE.Vector3(c * pitch, 0, 0)));
+        else for (const v of views.filter((x) => x.gRow === 4)) for (let r = 1; r <= 5; r++) ghostAt(v.home.clone().add(new THREE.Vector3(0, -r * pitch, 0)));
+        plate(views, "cyan", ghosts);
         tag("half of 10", new THREE.Vector3(0, axisTop(), 0), "#a5f3fc");
         break;
       }
@@ -428,7 +429,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         const tones: (keyof typeof TONE)[] = ["cyan", "amber", "coral", "lime", "gold"];
         for (const s of fleet.sectors) plate(views.filter((v) => v.ship.sector === s.i), tones[(s.rowBand + s.colBand) % tones.length]);
         fleet.colParts.forEach((c, i) => { const vs = views.filter((v) => fleet!.sectors[v.ship.sector].colBand === i); if (vs.length && bands > 1) tag(fmt(c), new THREE.Vector3(meanX(vs), axisTop() - 0.2, 0)); });
-        fleet.rowParts.forEach((r, i) => { const vs = views.filter((v) => fleet!.sectors[v.ship.sector].rowBand === i); if (vs.length && rows > 1) tag(fmt(r), new THREE.Vector3(axisLeft() + 0.4, meanY(vs), 0)); });
+        fleet.rowParts.forEach((r, i) => { const vs = views.filter((v) => fleet!.sectors[v.ship.sector].rowBand === i); if (vs.length && rows > 1) tag(fmt(r), new THREE.Vector3(axisLeft(), meanY(vs), 0), undefined, true); });
         if (wave.sectorLock && t === "big-small-split" && lockMode) enterSectorLock();
         break;
       }
@@ -690,6 +691,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   // ---- Radar, Power-Ups, Show Me How ----
   function powerUp(t: TrickId) {
     if (!wave || !ui.canFire) return;
+    if (sectorMode && t === "big-small-split") return; // already cracking sectors: keep the locks made so far
     const fits = visualFits(t, wave.a, wave.b);
     emit({ type: "powerup_used", payload: { trickId: t, a: wave.a, b: wave.b, valid: fits } });
     lastActivity = performance.now();
@@ -795,7 +797,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     // frame what is actually there: ships with their trick offsets, plus any ghosts
     let ex = fw / scale / 2, ey = fh / scale / 2;
     for (const v of views) { ex = Math.max(ex, Math.abs(v.home.x + v.offset.x) + v.size.x / 2); ey = Math.max(ey, Math.abs(v.home.y + v.offset.y) + v.size.y / 2); }
-    for (const g of ghosts) { ex = Math.max(ex, Math.abs(g.position.x) + 0.5); ey = Math.max(ey, Math.abs(g.position.y) + 0.5); }
+    for (const g of ghosts) { const hs = g.userData.half as THREE.Vector2; ex = Math.max(ex, Math.abs(g.position.x) + hs.x); ey = Math.max(ey, Math.abs(g.position.y) + hs.y); }
     const h = (flipped ? ex : ey) * 2 * scale, w = (flipped ? ey : ex) * 2 * scale;
     const bottom = 4.2 - h / 2;
     rocket.group.position.set(Math.sin(T * 0.9) * 0.12, bottom - 2.1 + Math.sin(T * 1.6) * 0.06, 1.8);
