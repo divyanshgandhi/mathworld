@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@ui-sdk/react/button";
 import { Toolbar, ToolbarButton } from "@ui-sdk/react/toolbar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { PLANET_NAMES } from "@/worlds/space/lines";
@@ -16,7 +16,15 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
  * centred `a × b` plate naming both axes. The cockpit keypad docks right on desktop and along the
  * bottom on phones; it reports its footprint so the stage frames the fleet in the free space.
  */
-export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { arena: Arena | null; ui: ArenaUi | null; onFly?: (to: PlanetId) => void; dev?: boolean; drone?: boolean }) {
+export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneActions, launch = true, menu }: {
+  arena: Arena | null; ui: ArenaUi | null; onFly?: (to: PlanetId) => void; dev?: boolean; drone?: boolean;
+  /** Buttons for the end-of-mission card (default: fly to the next planet). */
+  doneActions?: (done: NonNullable<ArenaUi["done"]>) => ReactNode;
+  /** Show the "Launch (sound on)" card before the first wave. */
+  launch?: boolean;
+  /** The pause menu button (top-left). */
+  menu?: ReactNode;
+}) {
   const [entry, setEntry] = useState("");
   const plateRef = useRef<HTMLDivElement>(null), dockRef = useRef<HTMLDivElement>(null);
   const w = ui?.wave, sectorActive = ui?.sectors?.find((s) => s.active) ?? null;
@@ -41,7 +49,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest?.("input, textarea")) return;
+      if ((e.target as HTMLElement)?.closest?.("input, textarea, dialog") || document.querySelector("dialog[open]")) return;
       if (ui && !ui.started && e.key === "Enter") { e.preventDefault(); arena?.start(); return; }
       if (!ui?.wave) return;
       if (/^\d$/.test(e.key)) press(e.key);
@@ -81,7 +89,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
       {w && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">
           <div ref={plateRef} className={`${glass} px-5 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="font-mono text-[11px] tracking-[0.3em] text-lime-200/80">{ui.planetName.toUpperCase()} · {ui.mode === "practice" ? "PRACTICE" : "WAVE"} {Math.min(w.index + 1, w.of)}/{w.of}</p>
+            <p className="font-mono text-[11px] tracking-[0.3em] text-lime-200/80">{ui.planetName.toUpperCase()} · {ui.mode === "academy" ? "TRICK FILM" : `${ui.mode === "practice" ? "PRACTICE" : "WAVE"} ${Math.min(w.index + 1, w.of)}/${w.of}`}</p>
             <p className="mt-0.5 font-mono text-5xl font-semibold tabular-nums md:mt-1 md:text-7xl">
               {fmt(ra)}<span className="mx-3 text-lime-300">×</span>{fmt(rb)}
             </p>
@@ -104,15 +112,16 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
           )}
           {o && (
             <div role="status" className={`rounded-full px-5 py-1 font-mono text-lg font-semibold tabular-nums shadow-lg ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
-              {o.kind === "exact" ? `✓ Dead on · +${o.orbs} orbs` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
+              {o.kind === "exact" ? `✓ Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
             </div>
           )}
         </div>
       )}
 
       <div className="pointer-events-none absolute right-3 top-3 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {ui.orbs} orbs</div>
+      {menu && <div className="absolute left-3 top-3 z-20">{menu}</div>}
       {dev && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 font-mono text-[11px] text-white/60">
+        <div className="pointer-events-none absolute left-3 top-16 z-10 font-mono text-[11px] text-white/60">
           <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
           <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
         </div>
@@ -184,7 +193,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
         </div>
       )}
 
-      {!ui.started && !ui.done && (
+      {launch && !ui.started && !ui.done && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-fit flex-col items-center gap-3 p-6 text-center`}>
           <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{ui.planetName.toUpperCase()}{ui.mode === "practice" ? " · PRACTICE" : ""}</p>
           <p className="text-white/80">Squadrons on the scanner, cadet.</p>
@@ -208,7 +217,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
           <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{ui.planetName.toUpperCase()}</p>
           <p className="text-3xl font-semibold tracking-wide">{ui.done.title}</p>
           <p className="text-white/75">{ui.done.sub} · ✦ {ui.orbs} orbs</p>
-          {ui.done.next && <Button className={`${lime} px-6 py-3 text-base`} onClick={() => onFly?.(ui.done!.next!)}>🚀 Fly to {PLANET_NAMES[ui.done.next]}</Button>}
+          {doneActions ? <div className="flex flex-wrap justify-center gap-3">{doneActions(ui.done)}</div>
+            : ui.done.next && <Button className={`${lime} px-6 py-3 text-base`} onClick={() => onFly?.(ui.done!.next!)}>🚀 Fly to {PLANET_NAMES[ui.done.next]}</Button>}
         </div>
       )}
     </>

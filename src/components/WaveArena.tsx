@@ -1,12 +1,17 @@
 "use client";
+import { Button } from "@ui-sdk/react/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushed, history, post } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
 import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
+import { fold } from "@/director/fold";
+import { canLaunch } from "@/director/hub";
+import { PLANET_NAMES } from "@/worlds/space/lines";
 import { BattleHud } from "./battle/BattleHud";
-import { CadetSignUp, type Cadet } from "./battle/ui";
+import { PauseMenu } from "./battle/PauseMenu";
+import { CadetSignUp, ghost, lime, type Cadet } from "./battle/ui";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -29,7 +34,14 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
   const query = useSyncExternalStore(() => () => {}, readQuery, () => JSON.stringify({ dev: false, force: null }));
   const { dev, force } = JSON.parse(query) as { dev: boolean; force: { a: number; b: number } | null };
 
-  useEffect(() => { fetch("/api/player").then((r) => r.json()).then((j) => setCadet(j.player)).catch(() => setCadet(null)); }, []);
+  const router = useRouter();
+  useEffect(() => {
+    fetch("/api/player").then((r) => r.json()).then((j) => {
+      // no cadet on this device: the Title signs them up (dev drills sign up right here)
+      if (!j.player && !new URLSearchParams(location.search).has("dev")) return router.replace("/");
+      setCadet(j.player);
+    }).catch(() => setCadet(null));
+  }, [router]);
 
   useEffect(() => {
     if (!cadet) return;
@@ -37,6 +49,8 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     (async () => {
       const [{ createStage }, { mountArena }, log] = await Promise.all([import("@/engine/stage"), import("@/worlds/space/arena"), history()]);
       if (gone || !box.current) return;
+      // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere)
+      if (!dev && !canLaunch(fold(log), planet)) return router.replace("/map");
       const stage = createStage(box.current, { fill: true });
       const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
       const { audio } = await import("@/engine/audio");
@@ -49,14 +63,20 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     return () => { gone = true; cleanup(); };
   }, [cadet, planet, dev, force?.a, force?.b]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const router = useRouter();
   const fly = async (to: PlanetId) => { await flushed(); router.push(`/play/${to}${dev ? "?dev" : ""}`); };
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#030612] text-white">
       <div ref={box} className="absolute inset-0" />
       {cadet === null && <CadetSignUp cta="▶ Enlist" onDone={setCadet} />}
-      <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} />
+      <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />}
+        doneActions={(d) => (
+          <>
+            {d.next && <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void fly(d.next!)}>🚀 Fly to {PLANET_NAMES[d.next]}</Button>}
+            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Solar map</Button>
+            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
+          </>
+        )} />
     </div>
   );
 }

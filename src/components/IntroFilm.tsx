@@ -6,6 +6,7 @@ import { flushed, history, post } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
 import type { Bay, BayUi } from "@/worlds/space/cadetBay";
 import type { Chapter, Film, FilmUi } from "@/worlds/space/intro";
+import { PLANET_NAMES } from "@/worlds/space/lines";
 import { BattleHud } from "./battle/BattleHud";
 import { CadetSignUp, ghost, glass, lime } from "./battle/ui";
 
@@ -19,6 +20,9 @@ export function IntroFilm() {
   const box = useRef<HTMLDivElement>(null);
   const stage = useRef<Stage | null>(null), film = useRef<Film | null>(null), bay = useRef<Bay | null>(null);
   const [player, setPlayer] = useState<{ name: string; avatar: string } | null | undefined>(undefined);
+  /** The cadet already fought in Cadet Bay (a refresh after the film): carry on there, no film replay. */
+  const [inBay, setInBay] = useState(false);
+  const [filmReady, setFilmReady] = useState(false);
   const [phase, setPhase] = useState<"gate" | "film" | "bay">("gate");
   const [ui, setUi] = useState<FilmUi | null>(null);
   const [bayUi, setBayUi] = useState<BayUi | null>(null);
@@ -46,14 +50,29 @@ export function IntroFilm() {
       stage.current = s;
       film.current = mountIntro(s, { onUi: setUi, onEnd: () => void startBay() });
       window.__mw = { stage: s, film: film.current };
+      setFilmReady(true);
       cleanup = () => { film.current?.dispose(); bay.current?.dispose(); s.dispose(); };
     })();
-    fetch("/api/player").then((r) => r.json()).then((j) => setPlayer(j.player)).catch(() => setPlayer(null));
+    const devMode = new URLSearchParams(location.search).has("dev");
+    (async () => {
+      const j = await fetch("/api/player").then((r) => r.json()).catch(() => ({ player: null }));
+      // the Title owns sign-up; a cadet who has finished the intro never sees it again
+      if (!j.player && !devMode) return router.replace("/");
+      if (j.introCompleted && !devMode) return router.replace("/bay");
+      if (j.player) setInBay((await history()).some((e) => e.type === "attempt_submitted" && e.payload.planetId === "earth"));
+      setPlayer(j.player);
+    })();
     return () => { gone = true; cleanup(); };
-  }, [startBay]);
+  }, [startBay, router]);
 
-  const begin = (n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); };
-  const switchCadet = async () => { await fetch("/api/player", { method: "DELETE" }); setPlayer(null); };
+  const begin = useCallback((n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); }, []);
+  const go = useCallback(() => { if (!player) return; if (inBay) void startBay(); else begin(player.name); }, [player, inBay, startBay, begin]);
+
+  // straight from Start Game on the Title: sound is already unlocked, so the film rolls at once
+  useEffect(() => {
+    if (phase !== "gate" || !player || !filmReady) return;
+    void import("@/engine/audio").then(({ audio }) => { if (audio.context?.state === "running") go(); });
+  }, [phase, player, filmReady, go]);
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-black text-white">
@@ -71,9 +90,8 @@ export function IntroFilm() {
       {phase === "gate" && player === null && <CadetSignUp onDone={(p) => { setPlayer(p); begin(p.name); }} />}
       {phase === "gate" && player && (
         <div className={`${glass} absolute inset-0 z-10 m-auto flex h-fit w-fit flex-col items-center gap-3 p-6`}>
-          <p className="text-white/80">Welcome back, <b className="text-white">{player.name}</b></p>
-          <Button className={`${lime} px-6 py-3 text-base`} onClick={() => begin(player.name)}>▶ Play (sound on)</Button>
-          <Button className="text-sm text-white/50 underline-offset-4 hover:underline" onClick={() => void switchCadet()}>Not you? Switch cadet</Button>
+          <p className="text-white/80">{inBay ? "Back to Cadet Bay," : "Ready,"} <b className="text-white">{player.name}</b>?</p>
+          <Button className={`${lime} px-6 py-3 text-base`} disabled={!filmReady} onClick={go}>▶ {inBay ? "Continue" : "Play"} (sound on)</Button>
         </div>
       )}
 
@@ -101,7 +119,15 @@ export function IntroFilm() {
         </div>
       )}
 
-      {phase === "bay" && <BattleHud arena={bayArena} ui={bayUi} drone onFly={(to) => void flushed().then(() => router.push(`/play/${to}`))} />}
+      {phase === "bay" && (
+        <BattleHud arena={bayArena} ui={bayUi} drone launch={false}
+          doneActions={(d) => (
+            <>
+              <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/bay"))}>Enter the Resting Bay</Button>
+              {d.next && <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push(`/play/${d.next}`))}>🚀 Fly to {PLANET_NAMES[d.next]}</Button>}
+            </>
+          )} />
+      )}
     </div>
   );
 }

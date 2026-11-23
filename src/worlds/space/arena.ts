@@ -30,7 +30,7 @@ import { mountSky } from "./skies";
 export interface ArenaUi {
   planet: PlanetId;
   planetName: string;
-  mode: "campaign" | "practice";
+  mode: "campaign" | "practice" | "academy";
   started: boolean;
   wave: { a: number; b: number; role: string; index: number; of: number; flipped: boolean; sectorLock: boolean } | null;
   canFire: boolean;
@@ -67,6 +67,11 @@ export interface ArenaOpts {
   force?: { a: number; b: number } | null;
   /** Cadet Bay: its own opening line and closing line. */
   lines?: { intro?: string; clear?: string };
+  /**
+   * The Academy: one forced fleet (`force`), its Trick Film spoken in full as soon as the fleet is in
+   * (`film`), and no next wave: a solved fleet ends with `onSolved` and the HUD's done card.
+   */
+  academy?: { film: boolean; onSolved?: () => void };
 }
 
 type Kind = "fighter" | "pod" | "carrier" | "dread";
@@ -149,7 +154,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   let novaX = -40;
 
   // ---- state ----
-  let mode: "campaign" | "practice" = opts.force || s0.tier !== tier ? "practice" : "campaign";
+  let mode: ArenaUi["mode"] = opts.academy ? "academy" : opts.force || s0.tier !== tier ? "practice" : "campaign";
   let practiceK = 0, declinedAt = -1, started = false, disposed = false;
   let wave: Wave | null = null, fleet: Fleet | null = null, views: ShipView[] = [], ghosts: THREE.Object3D[] = [];
   let attempts = 0, shownAt = 0, lastActivity = 0, shotStart = 0, scale = 1, fw = 8, fh = 5;
@@ -158,7 +163,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   let locked: Map<number, number> = new Map(), activeSector: number | null = null, sectorMode = false;
   let wild: number[] = [];
   let ui: ArenaUi = {
-    planet, planetName: PLANET_NAMES[planet], mode, started: false, wave: null, canFire: false, outcome: null, radar: null, invite: false,
+    planet, planetName: opts.academy ? "The Academy" : PLANET_NAMES[planet], mode, started: false, wave: null, canFire: false, outcome: null, radar: null, invite: false,
     belt: [], sectors: null, lockTotal: null, lesson: null, unlock: null, offer: null, done: null, orbs: s0.orbs, shots: [], lessons: [],
   };
   const setUi = (p: Partial<ArenaUi>) => { ui = { ...ui, ...p }; opts.onUi?.(ui); };
@@ -469,7 +474,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (!wave || !fleet) return;
     const { a, b } = wave, sh = st.show, t = p.trick, f = fleet, has = (n: number) => a === n || b === n;
     // the lesson's squads: a turned lesson (8 × 3 taught as 3 squads of 8) counts the fleet's columns, top first
-    const turned = p.silentFlip, perSquad = turned ? a : b;
+    const turned = p.silentFlip || p.lesson.flipBeats > 0, perSquad = turned ? a : b;
     const squad = (v: ShipView) => (turned ? b - 1 - v.gCol : v.gRow);
     const rightOf = (vs: ShipView[]) => {
       // just right of a squad as the cadet sees it (the formation may be turned a quarter)
@@ -715,9 +720,10 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     audio.sfx("flyby");
     prefetchLesson(false); // Beat 1 of this fleet's Show Me How, while the cadet thinks
     if (s.waves === 0 && mode === "campaign" && opts.lines?.intro) await say(opts.lines.intro, { queue: true });
-    else if (index === 0) void say("nova_incoming_short");
+    else if (index === 0 && mode !== "academy") void say("nova_incoming_short");
     await after(0.75); // the fleet flies in
     ready();
+    if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });
   }
 
   /** End of a shot: record fire → ready (the 5–10 s rule). */
@@ -726,6 +732,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     markShot();
     shownAt = lastActivity = performance.now();
     setUi({ canFire: true });
+  }
+
+  /** The Academy: the fleet is solved; the HUD offers the next step (a sister fleet, another film). */
+  function academyDone(w: Wave) {
+    clearFleet();
+    zeroRing.visible = false;
+    wave = null;
+    setUi({ wave: null, canFire: false, outcome: null, radar: null, lesson: null, done: { title: "NAILED IT", sub: `${fmt(w.a)} × ${fmt(w.b)} = ${fmt(w.a * w.b)}`, next: null } });
+    opts.academy?.onSolved?.();
   }
 
   async function finish(kind: "clear" | "practice") {
@@ -771,7 +786,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       }
     }
     const errorType = classifyError(w.a, w.b, n);
-    emit({ type: "attempt_submitted", payload: { a: w.a, b: w.b, planetId: planet, guess: n, latencyMs: latency, errorType, attemptIndex: attempts, usedRadar, powerUpUsed: active, isTransferCheck: w.isTransferCheck, waveRole: mode === "practice" ? "practice" : w.role } });
+    emit({ type: "attempt_submitted", payload: { a: w.a, b: w.b, planetId: planet, guess: n, latencyMs: latency, errorType, attemptIndex: attempts, usedRadar, powerUpUsed: active, isTransferCheck: w.isTransferCheck, waveRole: mode === "campaign" ? w.role : "practice" } });
 
     // the volley: every ball pops exactly its ship's worth; the whole thing takes at most ~1.5 s
     const plan = volley(f, n), extras = Math.min(plan.extra, 14), count = plan.hits.length + extras;
@@ -793,11 +808,13 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
 
     if (n === p) {
       audio.sfx("clear");
-      const orbs = attempts === 1 ? 5 : 3;
-      emit({ type: "orb_earned", payload: { amount: orbs, reason: "wave_clear" } });
+      // the Academy is for learning, not farming: Orbs come from battles, warm-ups and flashcards
+      const orbs = mode === "academy" ? 0 : attempts === 1 ? 5 : 3;
+      if (orbs) emit({ type: "orb_earned", payload: { amount: orbs, reason: "wave_clear" } });
       setUi({ outcome: { kind: "exact", value: p, orbs }, radar: null, invite: false, sectors: null, lockTotal: null });
       void say(unlocked.length ? unlockLine(unlocked[unlocked.length - 1]) : EXACT_LINES[(state().waves + attempts) % EXACT_LINES.length]);
       await after(0.9);
+      if (mode === "academy") return academyDone(w);
       if (mode === "practice") practiceK++;
       return startWave();
     }
@@ -900,11 +917,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
    * the whole time: firing at any moment ends the lesson cleanly (the shot budget, SPEC §4.1).
    * `fallback`: the early-level safety net, Fast Adding.
    */
-  async function showMeHow({ auto = false, fallback = false } = {}) {
+  async function showMeHow({ auto = false, fallback = false, film = false } = {}) {
     if (!wave || lessonOn || (!auto && !ui.canFire)) return;
     const w = wave, s = state();
     let p: Plan;
-    try { p = planShowMeHow(w.a, w.b, s.seenTricks, { fallback }); } catch { return; }
+    try { p = planShowMeHow(w.a, w.b, film ? {} : s.seenTricks, { fallback, film }); } catch { return; }
     const id = ++lessonId;
     lessonOn = true; pendingLesson = p; lessonsThisWave++; fallbackUsed ||= fallback;
     if (sectorMode) { sectorMode = false; locked = new Map(); activeSector = null; sectorPlate = null; }

@@ -3,7 +3,7 @@ import { Button } from "@ui-sdk/react/button";
 import { Field, FieldLabel } from "@ui-sdk/react/field";
 import { Input } from "@ui-sdk/react/input";
 import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** The game's shared look: dark glass panels, lime accent, chunky buttons. */
 export const btn = "rounded-xl px-4 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40";
@@ -50,3 +50,54 @@ export function CadetSignUp({ onDone, cta = "▶ Start (sound on)" }: { onDone: 
     </form>
   );
 }
+
+const PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
+
+/**
+ * The cockpit keypad on its own (warm-ups, Quick Flashcards): a readout and twelve keys, with the
+ * physical keyboard too (digits, Backspace, Enter). `0` is a fine answer. Battles use BattleHud's.
+ */
+export function Keypad({ onFire, disabled = false, label = "Plasma balls", fire = "Fire", className = "" }: { onFire: (n: number) => void; disabled?: boolean; label?: string; fire?: string; className?: string }) {
+  const [entry, setEntryState] = useState("");
+  // the latest entry, so keys pressed faster than a render (or typed by a script) never get lost
+  const live = useRef("");
+  const setEntry = (v: string) => { live.current = v; setEntryState(v); };
+  const press = (k: string) => {
+    const v = live.current;
+    if (k === "Fire") { if (v === "" || disabled) return; onFire(Number(v)); setEntry(""); return; }
+    if (k === "⌫") return setEntry(v.slice(0, -1));
+    setEntry(v === "0" ? k : (v + k).slice(0, 6));
+  };
+  const pressRef = useRef(press);
+  useEffect(() => { pressRef.current = press; });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest?.("input, textarea") || document.querySelector("dialog[open]:not([data-keypad])")) return;
+      if (/^\d$/.test(e.key)) pressRef.current(e.key);
+      else if (e.key === "Backspace") pressRef.current("⌫");
+      else if (e.key === "Enter") { e.preventDefault(); pressRef.current("Fire"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <div className={className}>
+      <div className="mb-2 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1.5 md:py-2">
+        <span className="text-[11px] uppercase tracking-wider text-white/50">{label}</span>
+        <output aria-live="polite" aria-label={label} className="font-mono text-3xl tabular-nums text-lime-200 md:text-4xl">{entry || "0"}</output>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
+        {PAD.map((k) => (
+          <Button key={k} aria-label={k === "⌫" ? "Delete" : k === "Fire" ? fire : k} disabled={k === "Fire" && (entry === "" || disabled)}
+            className={k === "Fire" ? `${lime} py-2 text-lg font-semibold md:py-3` : `${ghost} bg-white/[.04] py-2 text-lg md:py-3`} onClick={() => press(k)}>
+            {k === "Fire" ? fire : k}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Dialog parts render in the top layer: pin the backdrop to the whole screen and centre the box. */
+export const backdrop = "fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-black/55 p-0";
+export const dialogBox = `${glass} fixed left-1/2 top-1/2 m-0 max-h-[92dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto text-white`;
