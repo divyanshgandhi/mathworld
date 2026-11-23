@@ -102,6 +102,23 @@ describe("tricks", () => {
     for (const [a, b, t] of cases) expect(selectTrick(a, b), `${a}×${b}`).toBe(t);
   });
 
+  it("keeps Double It to ×2 and ×4, and gives the hard facts to Split & Add and Jump One More", () => {
+    for (const [a, b] of [[3, 8], [8, 3], [7, 7], [8, 8]]) expect(selectTrick(a, b), `${a}×${b}`).toBe("split-and-add");
+    for (const [a, b] of [[6, 7], [7, 6], [7, 8], [8, 7], [6, 8], [8, 6], [3, 6], [3, 7], [6, 6]]) expect(selectTrick(a, b), `${a}×${b}`).toBe("jump-one-more");
+    for (const [a, b] of [[2, 7], [4, 7], [4, 8], [8, 2], [4, 6]]) expect(selectTrick(a, b), `${a}×${b}`).toBe("double-it");
+    for (let a = 0; a <= 10; a++) for (let b = 0; b <= 10; b++) {
+      const t = selectTrick(a, b);
+      if (t === "double-it") expect([a, b].some((x) => x === 2 || x === 4), `${a}×${b}`).toBe(true);
+      if (t === "split-and-add") expect([[3, 8], [7, 7], [8, 8]].some(([x, y]) => Math.min(a, b) === x && Math.max(a, b) === y), `${a}×${b}`).toBe(true);
+      if (t === "jump-one-more") expect(a === 6 || b === 6 || Math.abs(a - b) === 1 || (Math.min(a, b) === 3 && Math.max(a, b) <= 7), `${a}×${b}`).toBe(true);
+    }
+    expect(lesson(3, 8).parts).toEqual([15, 9]);
+    expect(lesson(7, 8).parts).toEqual([49, 7]);
+    expect(lesson(6, 8).parts).toEqual([40, 8]);
+    expect(lesson(8, 8).parts).toEqual([40, 24]);
+    expect(powerUpFits("double-it", 8, 7)).toBe(false);
+  });
+
   it("compiles every problem up to 99 × 99 and samples to 5-digit × 3-digit: parts add up and the We-Do is a × b", () => {
     const check = (a: number, b: number) => {
       for (const seen of [{}, { "flip-it": 1, "fast-adding": 1, "double-it": 1, "easy-5-10": 1, "jump-one-more": 1, "split-and-add": 1, "borrow-take-back": 1, "big-small-split": 1, "half-double": 1, "empty-mirror": 1 }]) {

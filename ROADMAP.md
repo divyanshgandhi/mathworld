@@ -47,7 +47,7 @@ Commit cleanly after every completed phase (`bun run check` green before each co
   - Per-fact EWMA mastery over canonical commutative pairs (`min(a,b)xMax(a,b)`).
   - Tier-scaled silent speed thresholds (`You Do` Gold vs. `We Do` Mint vs. `I Do` Practice).
   - 5-Wave **Problem-String Mission** generator (Anchor → Discovery → Application → Adaptive/Transfer → Boss).
-  - **Hyper-Jump** (3 consecutive unassisted Gold shots offers jump `+2` planets for fast kids/adults) + **Gentle Cushion** (2 consecutive misses injects anchor shield-recharge wave).
+  - **Hyper-Jump** (2 in-tier Golds, then a Gold probe of the planet being skipped, offers jump `+2` planets for fast kids/adults; see SPEC §5.4) + **Gentle Cushion** (2 consecutive misses injects anchor shield-recharge wave).
 - Build `src/rig/tricks.ts`: Deterministic trick router & beat compiler implementing all tricks in [docs/tricks.md](./docs/tricks.md) (`empty-mirror`, `fast-adding`, `flip-it`, `double-it`, `easy-5-10`, `jump-one-more`, `split-and-add`, `borrow-take-back`, `big-small-split`, `half-double`). Assert every trick's partial products equal `a × b` across `0–999 × 0–99` fuzz tests.
 - Build `tests/rig.test.ts` + generate `docs/levelling-proof.md`: simulate 5 bot profiles (`struggling-3rd-grader`, `average-5th-grader`, `adult-speedrunner`, `random-masher`, `trick-learner`) and assert placement within ≤ 15 questions.
 - **Done when:** All unit tests + 5-bot simulation harness pass in Vitest and `docs/levelling-proof.md` is generated.

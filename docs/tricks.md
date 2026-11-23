@@ -17,11 +17,11 @@ First matching rule wins:
 1. `a === 0 || b === 0` or `a === 1 || b === 1` → **`empty-mirror`**
 2. Either factor is `≥ 11` (multi-digit: `2d×1d`, `2d×2d`, `3d×2d`+) → **`big-small-split`** *(or **`borrow-take-back`** if a factor is `19`, `29`, `99`, `199`, or **`half-double`** if one factor is even and the other ends in `5` at `T5+`)*
 3. Both factors `≤ 4` and small (`a * b <= 12`, or fallback after a miss on small facts) → **`fast-adding`**
-4. Either factor is `2`, `4`, or `8` (and other `≤ 10`, not `5` or `9` or `10`) → **`double-it`**
+4. Either factor is `2` or `4` (and the other is not `5`, `9` or `10`) → **`double-it`**
 5. Either factor is `5` or `10` → **`easy-5-10`**
 6. Either factor is `9` → **`borrow-take-back`**
-7. Adjacent single-digits (`|a − b| === 1`, e.g., `6 × 7`, `7 × 8`) or `3 × n` / `6 × n` → **`jump-one-more`**
-8. Remaining hard single-digits (e.g., `3 × 8`, `7 × 4`, `7 × 6`) → **`split-and-add`**
+7. Either factor is `6` (`6 × 6`, `6 × 8`), near squares (`|a − b| === 1`: `6 × 7`, `7 × 8`), or `3 × n` with `n ≤ 7` (`3 × 6`, `3 × 7`) → **`jump-one-more`**
+8. What is left: `3 × 8`, `7 × 7`, `8 × 8` → **`split-and-add`**
 9. *Modifier (`flip-it`):* Whenever `a > b` makes the visual/mental grouping awkward (e.g., `8 × 3`), offer **`[Flip It!]`** to rotate 90° into `3 × 8` first!
 
 ---
@@ -67,8 +67,8 @@ First matching rule wins:
 
 ## 3. Double It! (`double-it`)
 - **Card Name:** `Double It!`
-- **Power-Up Action:** Splits `×4` into two twin halves (`2 × n` + `2 × n`) or `×8` into twin `×4` waves.
-- **When:** `×2` (double once), `×4` (double, then double again), `×8` (double three times).
+- **Power-Up Action:** Splits `×4` into two twin halves (`2 × n` + `2 × n`).
+- **When:** `×2` (double once) and `×4` (double, then double again) only. `×8` goes to Split & Add (`3 × 8`, `8 × 8`) or Jump One More (`6 × 8`, `7 × 8`).
 - **Frames & Lines (example `4 × 7`):**
   1. *Highlight `4 squads of 7`.* → `"Multiplying by 4? Just Double It — twice!"`
   2. *Top 2 rows glow cyan (`2 × 7 = 14`).* → `"First double 7: 7 plus 7 makes 14."`
@@ -94,7 +94,7 @@ First matching rule wins:
 ## 5. Jump One More (`jump-one-more`)
 - **Card Name:** `Jump One More`
 - **Power-Up Action:** Highlights the easy anchor block (`×2`, `×5`, or Perfect Square `n × n`) in cyan and pulls the **1 extra row** out in glowing amber!
-- **When:** `×3` (from `×2`), `×6` (from `×5`), and Near Squares (`6 × 7` from `6 × 6`, `7 × 8` from `7 × 7`).
+- **When:** `×6` (from `×5`: `6 × 8` from `5 × 8`), Near Squares (`6 × 7` from `6 × 6`, `7 × 8` from `7 × 7`), and `3 × n` up to `3 × 7` (from `×2`).
 - **Frames & Lines (example `7 × 8` via square `7 × 7`, or `6 × 8` via `5 × 8`):**
   1. *Show full fleet `6 × 8`.* → `"6 is just 1 more than easy 5! Let's Jump One More."`
   2. *First 5 rows glow cyan (`5 × 8 = 40`).* → `"Start with what you know: 5 squads of 8 is 40."`
@@ -107,7 +107,7 @@ First matching rule wins:
 ## 6. Split & Add (`split-and-add`)
 - **Card Name:** `Split & Add`
 - **Power-Up Action:** Fires a golden laser splitter down column 5, physically separating every row into **5 cyan fighters** + **remainder amber fighters**!
-- **When:** Hard single-digit facts like `3 × 8`, `4 × 7`, `7 × 8`, `7 × 6` (any factor `6–8`).
+- **When:** The hard single-digit facts no friendlier trick catches: `3 × 8`, `7 × 7`, `8 × 8`.
 - **Frames & Lines (example `3 × 8`):**
   1. *Show `3 squads of 8` with clear labels.* → `"8 in a row feels big — let's use Split & Add!"`
   2. *Golden laser slices column 5 → rows slide apart into `5` and `3`.* → `"Why split 8 into 5 and 3? Because times 5 is super fast!"`

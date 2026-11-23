@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fold, transferRate, type LoggedEvent, type WaveRole } from "@/director/fold";
 import { acceptHyperJump, housekeeping, nextWave, scaffold } from "@/director/next";
-import { tierOf } from "@/rig/pools";
+import { band, ewma } from "@/rig/adaptive";
+import { deepSpaceSector, factKey, tierOf } from "@/rig/pools";
 
 const planets = ["earth", "moon", "mars", "asteroid-belt", "jupiter", "saturn", "uranus", "deep-space"] as const;
 let clock = 0;
@@ -78,6 +79,46 @@ describe("fold", () => {
     clock = 0;
     const s = fold([shot(3, 4, 90, { ms: 400 }), shot(3, 4, 0, { ms: 400, i: 2 }), shot(3, 4, 70, { ms: 400, i: 3 })]);
     expect(s.antiMashNudges).toBe(1);
+  });
+
+  it("lets a fast, correct flashcard polish a Mint fact to Gold without touching missions or streaks", () => {
+    const card = (a: number, b: number, guess: number, latencyMs: number): LoggedEvent => ({ type: "flashcard_answered", payload: { a, b, guess, latencyMs } });
+    const careful = Array.from({ length: 7 }, () => right(7, 8, { tier: 3, ms: 9000 }));
+    const before = fold(careful);
+    expect(before.facts["7x8"].m).toBeGreaterThanOrEqual(0.82);
+    expect(band(before.facts["7x8"])).toBe("understood"); // Mint: careful, never fast
+    const after = fold([...careful, card(8, 7, 56, 1500)]);
+    expect(band(after.facts["7x8"])).toBe("gold");
+    expect(after.facts["7x8"].m).toBe(before.facts["7x8"].m); // a correct card never lowers mastery
+    expect({ ...after, facts: null }).toEqual({ ...before, facts: null }); // no mission wave, clear, Hyper-Jump streak or history
+    // Below the observation it is a gentle step: alpha 0.18 toward 0.78.
+    const low = fold([right(6, 7, { tier: 3, ms: 9000 }), card(6, 7, 42, 1000)]);
+    expect(low.facts["6x7"].m).toBeCloseTo(ewma(ewma(0.25, 0.85), 0.78, 0.18));
+    // Slow or wrong cards change nothing.
+    expect(fold([...careful, card(7, 8, 56, 9000)]).facts["7x8"]).toEqual(before.facts["7x8"]);
+    expect(fold([...careful, card(7, 8, 54, 1000)]).facts["7x8"]).toEqual(before.facts["7x8"]);
+  });
+
+  it("keeps Deep Space moving: every mission there is new and the sectors ramp", () => {
+    let log: LoggedEvent[] = [{ type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "deep-space" } }];
+    const goals: string[] = [], anchors: string[] = [], sectors: (number | null)[] = [], applied: (number | null)[] = [], ns: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      let s = fold(log);
+      const hk = housekeeping(s);
+      if (hk.length) { log = [...log, ...hk]; s = fold(log); }
+      const w = nextWave(s, 7);
+      expect(w.tier).toBe(7);
+      if (w.role === "anchor") { anchors.push(factKey(w.a, w.b)); ns.push(s.mission.n); }
+      if (w.role === "discovery") { goals.push(factKey(w.a, w.b)); sectors.push(deepSpaceSector(Math.min(w.a, w.b), Math.max(w.a, w.b))); }
+      if (w.role === "application") applied.push(deepSpaceSector(Math.min(w.a, w.b), Math.max(w.a, w.b)));
+      log = [...log, right(w.a, w.b, { tier: 7, role: w.role, ms: 5000 })];
+    }
+    expect(ns).toEqual([0, 1, 2, 3, 4]);
+    expect(new Set(goals).size).toBe(goals.length);
+    expect(new Set(anchors).size).toBe(anchors.length);
+    expect(sectors).toEqual([0, 1, 2, 3, 3]); // 3d×3d → 4d×2d → 4d×3d → 5d×3d onward
+    expect(applied).toEqual(sectors);
+    expect(fold(log).cleared).toEqual([7]);
   });
 
   it("counts orbs and equips upgrades", () => {

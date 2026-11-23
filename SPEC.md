@@ -67,7 +67,7 @@ Returning players always land in their cozy Starfleet cabin overlooking the Sola
    - Clicking any poster inspects that table cleanly.
 2. **Desk Surface — Collected Trick Cards & Quick Flashcards:**
    - **Trick Cards:** Every named trick the cadet has visited/unlocked sits on the desk; tapping any card opens its Imbibe trick walkthrough.
-   - **Quick Flashcards:** A low-pressure 5-card recall deck pulled from the cadet's recently learned / shaky facts (earns bonus Orbs, builds instant recall without timers or streak loss).
+   - **Quick Flashcards:** A low-pressure 5-card recall deck pulled from the cadet's recently learned / shaky facts (earns bonus Orbs, builds instant recall without timers or streak loss). A fast, correct card gives the fact a gentle mastery nudge (§5.3), so a Mint fact can polish to Gold; cards never count toward missions, planet clears or Hyper-Jumps.
 3. **Three Doors / Navigation Exits:**
    - **Launch to Space (`/map` → `/play/[planet]`):** Opens the **Scrollable Solar System Level Selector**.
    - **The Hangar (`/hangar`):** Spend collected **Orbs** on live-rendered ship upgrades.
@@ -196,6 +196,7 @@ Each planet mission consists of **5 waves (~2–3 minutes)**:
   - Solved via 4-choice Radar: `0.45`
   - Needed **`Show Me How` (`I Do`)**: `0.20` *(queues sister Transfer Check for `+2` waves)*
 - **EWMA update:** `m_new = m_old + 0.35 * (obs - m_old)` (default `m_0 = 0.25`).
+- **Resting Bay flashcards (gentle nudge):** a correct card answered within the fact's `tierFastMs` moves mastery with `alpha = 0.18` toward `obs = 0.78`, never lowering it: `m_new = max(m_old, m_old + 0.18 * (0.78 - m_old))`, and it counts as the fast unassisted solve Gold needs. So a Mint fact already at `m ≥ 0.82` (careful solves, never fast) turns Gold on one fast card; below that, cards lift it gently toward `0.78` and battle waves do the rest. Slow or wrong cards change nothing. A card is never a mission wave, never counts toward a planet clear, and never extends or resets the Hyper-Jump Gold streak.
 - **Silent tier-scaled fast thresholds:** `T0–T1: 3500ms`, `T2–T3: 5000ms`, `T4: 10000ms`, `T5: 22000ms`, `T6+: 45000ms`.
 - **Error classifier (`classifyError(a, b, guess)`):**
   - `added_instead`: `guess === a + b`
@@ -205,8 +206,10 @@ Each planet mission consists of **5 waves (~2–3 minutes)**:
   - `undershoot_close` / `overshoot_close` (`≤ 25%`) / `wild_guess` (`> 35%`)
 
 ### 5.4 Two-Speed Leveling (Kids & Adults)
-- **Hyper-Jump Upward:** **3 consecutive unassisted Gold shots** triggers a Captain radio offer: *"Ace telemetry! Hyper-Jump straight to [Planet + 2]?"* One tap jumps older kids & adults from Moon → Asteroid Belt → Saturn → Deep Space within ~25 seconds (marking skipped planets as *Ace Cleared*).
-- **Gentle Cushion Downward:** 2 consecutive misses or `Show Me How`s silently injects a confidence-rebuilding anchor wave (*"Shield Recharge!"*) next—never a harsh demotion screen. Planet unlocks next tier once ≥ 3 of 5 waves are solved without `Show Me How` (or transfer check passes).
+- **Hyper-Jump Upward:** after **2 consecutive in-tier Gold shots** (fast, unassisted, first try; anchor and Shield Recharge waves don't count), the next wave is a **probe** from the next planet, the one the jump would skip. A **third Gold, on that probe**, triggers the Captain radio offer: *"Ace telemetry! Hyper-Jump straight to [Planet + 2]?"* One tap jumps older kids & adults from Moon → Asteroid Belt → Saturn → Deep Space within ~25 seconds (marking skipped planets as *Ace Cleared*). A probe that is not Gold resets the streak; probes never count as mission waves or struggles. Deep Space has no jump.
+- **Gentle Cushion Downward:** 2 consecutive misses or `Show Me How`s silently injects a confidence-rebuilding anchor wave (*"Shield Recharge!"*) next—never a harsh demotion screen.
+- **Planet clear:** a mission is the anchor warm-up plus 4 in-tier waves, and the planet clears when **≥ 3 of those 4 in-tier waves are the cadet's own first-try answers** (fast, thoughtful, or via a Power-Up). Radar picks and `Show Me How` do not count; the anchor does not count. Earth's tutorial clears on 2 of its 3 waves. A mission that falls short starts a fresh mission on the same planet.
+- **Deep Space keeps growing:** every completed Deep Space mission (cleared or not) advances the mission counter, so no anchor or discovery problem repeats and the sectors ramp `3d×3d` → `4d×2d` → `4d×3d` → `5d×3d` onward.
 
 ### 5.5 Simulated-Learner Harness (`tests/rig.test.ts` + `docs/levelling-proof.md`)
 Simulate **5 bot profiles** over 20–30 questions each and assert exact placement within ≤ 15 questions:

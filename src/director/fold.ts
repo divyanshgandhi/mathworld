@@ -1,7 +1,7 @@
 import type { EventInput, UPGRADE_SLOTS, WAVE_ROLES } from "@/db/events";
 import {
-  GOLD_STREAK_FOR_JUMP, JUMP, M0, OBS, STRUGGLES_FOR_CUSHION, TRANSFER_DELAY,
-  ewma, isGold, isSolved, isStruggle, missionLength, outcomeOf, solvesToClear,
+  FLASHCARD_ALPHA, FLASHCARD_OBS, GOLD_STREAK_FOR_JUMP, JUMP, M0, OBS, STRUGGLES_FOR_CUSHION, TRANSFER_DELAY,
+  ewma, fastMs, isGold, isSolved, isStruggle, missionLength, outcomeOf, solvesToClear,
   type FactStat, type Outcome,
 } from "@/rig/adaptive";
 import { classifyError } from "@/rig/errors";
@@ -142,7 +142,11 @@ export function fold(events: LoggedEvent[]): PlayerState {
       }
       case "planet_cleared": {
         const t = tierOfPlanet(e.payload.planetId);
-        if (t === s.tier) { s.cleared.push(t); move(t + 1); }
+        if (t !== s.tier) break;
+        if (!s.cleared.includes(t)) s.cleared.push(t);
+        // Deep Space has no next planet: a cleared mission opens the next, bigger sector instead.
+        if (t < MAX_TIER) move(t + 1);
+        else s.mission = freshMission(s.mission.n + 1);
         break;
       }
       case "hyper_jump_taken": {
@@ -152,7 +156,15 @@ export function fold(events: LoggedEvent[]): PlayerState {
       }
       case "orb_earned": s.orbs += e.payload.amount; break;
       case "upgrade_purchased": s.orbs -= e.payload.cost; s.equipped[e.payload.slot] = e.payload.itemId; break;
-      default: break; // explanation_started, flashcard_answered: telemetry only
+      case "flashcard_answered": {
+        // A gentle mastery nudge only: never a mission wave, a planet clear or a Hyper-Jump streak.
+        const p = e.payload;
+        if (p.guess !== p.a * p.b || p.latencyMs > fastMs(tierOf(p.a, p.b) ?? s.tier)) break;
+        const key = factKey(p.a, p.b), f = s.facts[key] ?? { m: M0, seen: 0, fastWins: 0 };
+        s.facts[key] = { m: Math.max(f.m, ewma(f.m, FLASHCARD_OBS, FLASHCARD_ALPHA)), seen: f.seen + 1, fastWins: f.fastWins + 1 };
+        break;
+      }
+      default: break; // explanation_started: telemetry only
     }
   }
 

@@ -9,7 +9,15 @@ export const fastMs = (tier: number) => FAST_MS[Math.min(Math.max(tier, 0), FAST
 
 export const M0 = 0.25;
 export const ALPHA = 0.35;
-export const ewma = (m: number, obs: number) => m + ALPHA * (obs - m);
+export const ewma = (m: number, obs: number, alpha = ALPHA) => m + alpha * (obs - m);
+
+/**
+ * Resting Bay flashcards: a fast, correct card is a gentle nudge (a smaller step toward a lower
+ * observation than a battle Gold) and counts as a fast win, so a Mint fact can polish to Gold.
+ * A correct card never lowers mastery. Slow or wrong cards change nothing.
+ */
+export const FLASHCARD_ALPHA = 0.18;
+export const FLASHCARD_OBS = 0.78;
 
 /** How a wave was finally solved, from best to most helped. */
 export type Outcome = "fast" | "thoughtful" | "powerup" | "self_corrected" | "radar" | "show_me_how";

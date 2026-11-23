@@ -57,11 +57,11 @@ export function selectTrick(a: number, b: number): TrickId {
     return "big-small-split";
   }
   if (hi <= 4 && a * b <= 12) return "fast-adding";
-  if ([2, 4, 8].some((k) => has(k) && ![5, 9, 10].includes(k === a ? b : a))) return "double-it";
+  if ([2, 4].some((k) => has(k) && ![5, 9, 10].includes(k === a ? b : a))) return "double-it";
   if (has(5) || has(10)) return "easy-5-10";
   if (has(9)) return "borrow-take-back";
-  if (Math.abs(a - b) === 1 || has(3) || has(6)) return "jump-one-more";
-  return "split-and-add";
+  if (has(6) || Math.abs(a - b) === 1 || (lo === 3 && hi <= 7)) return "jump-one-more";
+  return "split-and-add"; // 3 × 8, 7 × 7, 8 × 8
 }
 
 /** Flip It! is offered when the fleet has more squads than ships per squad (8 × 3 → 3 × 8). */
@@ -74,10 +74,10 @@ export function powerUpFits(t: TrickId, a: number, b: number): boolean {
     case "empty-mirror": return lo <= 1;
     case "fast-adding": return lo >= 2 && hi <= 10;
     case "flip-it": return a !== b && lo >= 2;
-    case "double-it": return [2, 4, 8].some(has);
+    case "double-it": return [2, 4].some(has);
     case "easy-5-10": return has(5) || has(10);
     case "borrow-take-back": return NINES.some(has);
-    case "jump-one-more": return hi <= 10 && (has(3) || has(6) || Math.abs(a - b) === 1);
+    case "jump-one-more": return hi <= 10 && lo >= 2 && (has(6) || Math.abs(a - b) === 1 || (lo === 3 && hi <= 7));
     case "split-and-add": return hi <= 10 && lo >= 2 && hi >= 6;
     case "big-small-split": return hi >= 11;
     case "half-double": return (a % 2 === 0 && b % 10 === 5) || (b % 2 === 0 && a % 10 === 5);
@@ -108,10 +108,11 @@ function fastAdding(a: number, b: number): Built {
 }
 
 function doubleIt(a: number, b: number): Built {
-  const k = [2, 4, 8].find((x) => (a === x || b === x) && ![5, 9, 10].includes(x === a ? b : a)) ?? (a <= b ? a : b);
+  // ×2 doubles once, ×4 doubles twice. (×8 is taught by Split & Add or Jump One More instead.)
+  const k = [2, 4].find((x) => (a === x || b === x) && ![5, 9, 10].includes(x === a ? b : a)) ?? (a === 2 || b === 2 ? 2 : 4);
   const n = k === a ? b : a;
   if (k === 2) return { trick: "double-it", full: [say("Multiplying by 2? Just Double It!", { kind: "halves", tone: "cyan", value: n })], repeat: say(`Double It! Just add ${n} to itself.`, { kind: "halves", tone: "cyan", value: n }), parts: [n, n], prompt: `Double ${n}! What is ${n} plus ${n}?` };
-  if (k === 4) return {
+  return {
     trick: "double-it",
     full: [
       say("Multiplying by 4? Just Double It — twice!", { kind: "fleet" }),
@@ -120,16 +121,6 @@ function doubleIt(a: number, b: number): Built {
     ],
     repeat: say(`Double It! Double ${n} to get ${2 * n}, then double again!`, { kind: "halves", tone: "cyan", value: 2 * n }),
     parts: [2 * n, 2 * n], prompt: `Double ${2 * n} to clear them all! What is ${2 * n} plus ${2 * n}?`,
-  };
-  return {
-    trick: "double-it",
-    full: [
-      say("Multiplying by 8? Double It three times!", { kind: "fleet" }),
-      say(`First double ${n}: ${n} plus ${n} makes ${2 * n}.`, { kind: "halves", tone: "cyan", value: 2 * n }),
-      say(`Double again: ${2 * n} plus ${2 * n} makes ${4 * n}.`, { kind: "halves", tone: "amber", value: 4 * n }),
-    ],
-    repeat: say(`Double It! Double ${n} three times: ${2 * n}, ${4 * n}…`, { kind: "halves", tone: "amber", value: 4 * n }),
-    parts: [4 * n, 4 * n], prompt: `Double ${4 * n} one last time! What is ${4 * n} plus ${4 * n}?`,
   };
 }
 

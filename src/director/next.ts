@@ -47,7 +47,7 @@ export function anchorOf(a: number, b: number): Fact | null {
   switch (selectTrick(a, b)) {
     case "borrow-take-back": { const x = [9, 19, 29, 99, 199].find(has)!; return { a: other(x), b: x + 1 }; }
     case "easy-5-10": return has(5) ? { a: other(5), b: 10 } : { a: other(10), b: 1 };
-    case "double-it": { const k = [2, 4, 8].find((x) => has(x) && ![5, 9, 10].includes(other(x)))!; return { a: k / 2, b: other(k) }; }
+    case "double-it": { const k = [2, 4].find((x) => has(x) && ![5, 9, 10].includes(other(x)))!; return { a: k / 2, b: other(k) }; }
     case "jump-one-more": return Math.abs(a - b) === 1 && lo >= 6 ? { a: lo, b: lo } : has(3) ? { a: 2, b: other(3) } : { a: 5, b: other(6) };
     case "split-and-add": return { a: lo === hi ? lo : Math.min(a, b), b: 5 };
     case "fast-adding": return { a: Math.max(1, a - 1), b };
@@ -58,12 +58,12 @@ export function anchorOf(a: number, b: number): Fact | null {
 }
 
 /** Another problem from the same tier that the same trick solves (Wave 3, transfer checks). */
-function sister(trick: TrickId, tier: number, exclude: string, rng: Rng): Fact | null {
+function sister(trick: TrickId, tier: number, exclude: string, rng: Rng, ramp = 0): Fact | null {
   if (ENUMERABLE_TIERS.includes(tier)) {
     const list = factsOf(tier).filter((f) => selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude);
     return list.length ? orient(list[Math.floor(rng() * list.length)], rng, tier) : null;
   }
-  for (let i = 0; i < 300; i++) { const f = drawFrom(tier, rng); if (selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude) return f; }
+  for (let i = 0; i < 300; i++) { const f = drawFrom(tier, rng, ramp); if (selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude) return f; }
   return null;
 }
 
@@ -103,7 +103,7 @@ export function nextWave(s: PlayerState, seed: number): Wave {
 
   const due = s.transferQueue.find((q) => q.due <= s.waves);
   if (due) {
-    const f = sister(due.trick, tier, due.key, rng) ?? sister(due.trick, due.tier, due.key, rng);
+    const f = sister(due.trick, tier, due.key, rng, s.mission.n) ?? sister(due.trick, due.tier, due.key, rng);
     if (f) return make(f, "transfer", true);
   }
 
@@ -123,7 +123,7 @@ export function nextWave(s: PlayerState, seed: number): Wave {
       return make(easy ? anchor : { a: 1, b: goal.b }, "anchor");
     }
     case 1: return make(goal, "discovery");
-    case 2: return make(sister(selectTrick(goal.a, goal.b), tier, factKey(goal.a, goal.b), rng) ?? target(s, tier, seed + 7), "application");
+    case 2: return make(sister(selectTrick(goal.a, goal.b), tier, factKey(goal.a, goal.b), rng, s.mission.n) ?? target(s, tier, seed + 7), "application");
     case 3: {
       const seen = new Set(s.history.slice(-3).map((w) => w.key));
       return make(ENUMERABLE_TIERS.includes(tier) ? orient(weakest(s, tier, mix(seed, s.waves), seen), rng, tier) : drawFrom(tier, rng, s.mission.n), "adaptive");
