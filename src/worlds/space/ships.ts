@@ -32,10 +32,11 @@ export function makeRocket(M: Materials) {
     group: rocket,
     /** Where shots leave from, in world space. */
     muzzle: () => rocket.localToWorld(new THREE.Vector3(0, 1.6, 0)),
-    flicker(T: number) {
-      const f = 1 + Math.sin(T * 40) * 0.08 + Math.sin(T * 23) * 0.06;
-      flameOut.scale.set(1, f, 1);
+    flicker(T: number, power = 1) {
+      const f = (1 + Math.sin(T * 40) * 0.08 + Math.sin(T * 23) * 0.06) * power;
+      flameOut.scale.set(Math.min(1.6, 0.6 + power * 0.4), f, Math.min(1.6, 0.6 + power * 0.4));
       flameIn.scale.set(1, f * 1.05, 1);
+      flameOut.visible = flameIn.visible = power > 0.02;
     },
   };
 }

@@ -26,10 +26,13 @@ export interface Stage {
   mats: Materials;
   bloom: UnrealBloomPass;
   grade: { sat: { value: number }; tint: { value: THREE.Vector3 }; vig: { value: number } };
-  onUpdate(fn: Update): void;
+  /** Run `fn` every frame; returns a function that stops it. */
+  onUpdate(fn: Update): () => void;
   /** Advance time by hand (tests, debugging, or a hidden tab) and render once. */
   step(seconds: number): void;
   readonly time: number;
+  /** Freeze the clock (frames still render): for inspecting a shot with `step`. */
+  paused: boolean;
   dispose(): void;
 }
 
@@ -67,13 +70,13 @@ export function createStage(container: HTMLElement, { aspect = 0.58 } = {}): Sta
   size();
 
   const updates: Update[] = [];
-  let time = 0, last = performance.now(), raf = 0;
+  let time = 0, last = performance.now(), raf = 0, paused = false;
   const advance = (dt: number) => {
     time += dt;
     for (const fn of updates) fn(dt, time);
   };
   const tick = (now: number) => {
-    advance(Math.min((now - last) / 1000, 0.05));
+    if (!paused) advance(Math.min((now - last) / 1000, 0.05));
     last = now;
     composer.render();
     raf = requestAnimationFrame(tick);
@@ -84,12 +87,17 @@ export function createStage(container: HTMLElement, { aspect = 0.58 } = {}): Sta
   return {
     container, renderer, scene, camera, mats, bloom,
     grade: gradePass.uniforms as unknown as Stage["grade"],
-    onUpdate: (fn) => void updates.push(fn),
+    onUpdate(fn) {
+      updates.push(fn);
+      return () => { const i = updates.indexOf(fn); if (i >= 0) updates.splice(i, 1); };
+    },
     step(seconds) {
       for (let i = 0; i < seconds * 60; i++) advance(1 / 60);
       composer.render();
     },
     get time() { return time; },
+    get paused() { return paused; },
+    set paused(v) { paused = v; },
     dispose() {
       cancelAnimationFrame(raf);
       ro.disconnect();

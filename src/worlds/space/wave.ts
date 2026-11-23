@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { add, PALETTE } from "@/engine/materials";
-import { sfx, unlockAudio } from "@/engine/sound";
+import { audio } from "@/engine/audio";
 import type { Stage } from "@/engine/stage";
 import { seeded } from "@/engine/util";
 import { makeInvader, makeRocket } from "./ships";
@@ -97,7 +97,10 @@ export function mountWave(stage: Stage, { rows = 3, perRow = 4 } = {}) {
   const camBase = new THREE.Vector3(0, 3.9, 12.5), look = new THREE.Vector3(0, 3.4, -3);
   const hud: { onAmmo: (left: number) => void } = { onAmmo: () => {} };
 
+  let cleared = false;
   const wave = () => {
+    cleared = false;
+    void audio.say("nova_incoming");
     invaders.forEach((v, i) => { v.alive = true; v.dying = 0; v.g.visible = true; v.g.scale.setScalar(1.3); v.delay = i * 0.07; });
     phase = "enter"; pt = 0; shot = 0; next = 0;
     hud.onAmmo(rows * perRow);
@@ -114,7 +117,7 @@ export function mountWave(stage: Stage, { rows = 3, perRow = 4 } = {}) {
     flash.position.copy(p);
     scene.add(flash);
     bursts.push({ parts, flash, mat, t0: T });
-    sfx.pop();
+    audio.sfx("burst");
   };
 
   stage.onUpdate((dt, T) => {
@@ -128,12 +131,13 @@ export function mountWave(stage: Stage, { rows = 3, perRow = 4 } = {}) {
         scene.add(m);
         balls.push({ m, from, i: shot, t0: T });
         shake = 0.07; recoil = 0.14;
-        sfx.thump();
+        audio.sfx("shot");
         shot++;
         next = pt + 0.17;
         hud.onAmmo(invaders.length - shot);
       }
-      if (shot >= invaders.length && !balls.length && pt > invaders.length * 0.17 + 1.8) wave();
+      if (shot >= invaders.length && !balls.length && !cleared) { cleared = true; void audio.say("nova_wave_clear"); }
+      if (shot >= invaders.length && !balls.length && pt > invaders.length * 0.17 + 2.6) wave();
     }
     for (const v of invaders) {
       let p = v.home;
@@ -178,7 +182,7 @@ export function mountWave(stage: Stage, { rows = 3, perRow = 4 } = {}) {
   wave();
   return {
     hud,
-    enableSound: unlockAudio,
+    enableSound: () => { audio.unlock(); audio.mood("battle"); void audio.say("nova_incoming"); },
     total: rows * perRow,
   };
 }

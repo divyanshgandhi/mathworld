@@ -53,6 +53,20 @@ export class Materials {
     return this.cache.get(k) as THREE.MeshStandardMaterial;
   }
 
+  /** Skin: soft clay with a warm sheen at grazing angles, so faces read as skin, not plastic. */
+  skin(color: number): THREE.MeshPhysicalMaterial {
+    const k = this.key("skin", color, {});
+    if (!this.cache.has(k)) this.cache.set(k, new THREE.MeshPhysicalMaterial({ color, roughness: 0.52, metalness: 0, sheen: 0.35, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffd6c4) }));
+    return this.cache.get(k) as THREE.MeshPhysicalMaterial;
+  }
+
+  /** Fabric: matte with a soft fuzz sheen (shirts, trousers, capes). */
+  fabric(color: number, o: THREE.MeshPhysicalMaterialParameters = {}): THREE.MeshPhysicalMaterial {
+    const k = this.key("fabric", color, o);
+    if (!this.cache.has(k)) this.cache.set(k, new THREE.MeshPhysicalMaterial({ color, roughness: 0.82, metalness: 0, sheen: 0.6, sheenRoughness: 0.8, sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.35), ...o }));
+    return this.cache.get(k) as THREE.MeshPhysicalMaterial;
+  }
+
   /** Neon glow: emissive above 1 so the bloom pass picks it up. */
   glow(color: number, intensity = 2.2, o: ClayOpts = {}): THREE.MeshStandardMaterial {
     return this.clay(color, { emissive: color, emissiveIntensity: intensity, ...o });
@@ -109,6 +123,15 @@ export function canvasTexture(w: number, h: number) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   return { texture, ctx: c.getContext("2d") as CanvasRenderingContext2D };
+}
+
+/** Draws text centred in a box, shrinking the font until it fits with a margin. Signs never clip. */
+export function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, maxW: number, maxPx: number, weight = "bold", family = "Georgia, 'Times New Roman', serif") {
+  let px = maxPx;
+  do { ctx.font = `${weight} ${px}px ${family}`; px -= 2; } while (ctx.measureText(text).width > maxW && px > 8);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, cx, cy);
 }
 
 /** A triangular prism (roofs, gables), centred on its depth. */

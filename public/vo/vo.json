@@ -1,0 +1,233 @@
+{
+  "teacher_intro": {
+    "voice": "Hadley",
+    "text": "Okay class, you have mastered addition and subtraction. As we all know, four plus four is... who is going to tell me?",
+    "duration": 8.4,
+    "src": "/vo/teacher_intro.mp3",
+    "end": 7.802
+  },
+  "kid_eight": {
+    "voice": "Fennick the Young Elf",
+    "text": "Ooh! Eight! It is eight!",
+    "duration": 3.36,
+    "src": "/vo/kid_eight.mp3",
+    "end": 2.764
+  },
+  "teacher_eight_ok": {
+    "voice": "Hadley",
+    "text": "Eight! Spot on, lovely work.",
+    "duration": 3.2,
+    "src": "/vo/teacher_eight_ok.mp3",
+    "end": 2.586
+  },
+  "teacher_eight_close": {
+    "voice": "Hadley",
+    "text": "Ooh, super close! Four plus four is eight.",
+    "duration": 3.92,
+    "src": "/vo/teacher_eight_close.mp3",
+    "end": 3.315
+  },
+  "teacher_q2": {
+    "voice": "Hadley",
+    "text": "And what is five minus three?",
+    "duration": 2.4,
+    "src": "/vo/teacher_q2.mp3",
+    "end": 1.73
+  },
+  "kid_two": {
+    "voice": "Fennick the Young Elf",
+    "text": "Two! That one is two!",
+    "duration": 2.56,
+    "src": "/vo/kid_two.mp3",
+    "end": 1.971
+  },
+  "teacher_two_ok": {
+    "voice": "Hadley",
+    "text": "Two! Brilliant.",
+    "duration": 2.24,
+    "src": "/vo/teacher_two_ok.mp3",
+    "end": 1.446
+  },
+  "teacher_two_close": {
+    "voice": "Hadley",
+    "text": "Nice try! Five minus three is two.",
+    "duration": 3.68,
+    "src": "/vo/teacher_two_close.mp3",
+    "end": 3.065
+  },
+  "teacher_mult": {
+    "voice": "Hadley",
+    "text": "Wonderful. Today, we begin... multiplication.",
+    "duration": 4.08,
+    "src": "/vo/teacher_mult.mp3",
+    "end": 3.509
+  },
+  "principal_sorry": {
+    "voice": "Preston",
+    "text": "Pardon the interruption, everyone.",
+    "duration": 2.72,
+    "src": "/vo/principal_sorry.mp3",
+    "end": 1.893
+  },
+  "captain_danger": {
+    "voice": "Miles",
+    "text": "There is grave danger in deep space. Earth needs its sharpest young minds. We are enrolling five cadets today.",
+    "duration": 6.96,
+    "src": "/vo/captain_danger.mp3",
+    "end": 6.261
+  },
+  "teacher_names": {
+    "voice": "Hadley",
+    "text": "Please stand when I call your name. Maya... Leo... Aarav... Zoe...",
+    "duration": 5.36,
+    "src": "/vo/teacher_names.mp3",
+    "end": 4.776
+  },
+  "teacher_pick_generic": {
+    "voice": "Hadley",
+    "text": "And our fifth cadet is... you!",
+    "duration": 2.96,
+    "src": "/vo/teacher_pick_generic.mp3",
+    "end": 2.329
+  },
+  "captain_brief1": {
+    "voice": "Miles",
+    "text": "Welcome, cadets. You are going to be the protectors of Earth against enemies in space.",
+    "duration": 5.04,
+    "src": "/vo/captain_brief1.mp3",
+    "end": 4.493
+  },
+  "captain_brief2": {
+    "voice": "Miles",
+    "text": "You have a spaceship, your co-pilot, and plasma balls to clear every squadron. Remember, plasma cells are precious. Too few and invaders slip past. Too many and we burn extra fuel.",
+    "duration": 11.92,
+    "src": "/vo/captain_brief2.mp3",
+    "end": 11.226
+  },
+  "nova_hi": {
+    "voice": "Zoey",
+    "text": "Hey! I am Nova, your co-pilot! Together we will calibrate every shot dead on. Ready for launch?",
+    "duration": 7.04,
+    "src": "/vo/nova_hi.mp3",
+    "end": 6.487
+  },
+  "nova_l0_intro": {
+    "voice": "Zoey",
+    "text": "Welcome to Cadet Bay! Drones fly in squadrons. Count every drone, load that many plasma balls, and fire!",
+    "duration": 7.28,
+    "src": "/vo/nova_l0_intro.mp3",
+    "end": 6.665
+  },
+  "nova_zero": {
+    "voice": "Zoey",
+    "text": "Zero squads means empty space. Not a single invader!",
+    "duration": 4.08,
+    "src": "/vo/nova_zero.mp3",
+    "end": 3.477
+  },
+  "nova_zero_ask": {
+    "voice": "Zoey",
+    "text": "How many plasma balls do we need for empty space?",
+    "duration": 3.2,
+    "src": "/vo/nova_zero_ask.mp3",
+    "end": 2.644
+  },
+  "nova_mirror": {
+    "voice": "Zoey",
+    "text": "One squad is just a mirror. It keeps the exact same number.",
+    "duration": 4.08,
+    "src": "/vo/nova_mirror.mp3",
+    "end": 3.472
+  },
+  "nova_mirror_repeat": {
+    "voice": "Zoey",
+    "text": "Remember Empty and Mirror: times zero is zero, times one stays the same!",
+    "duration": 4.96,
+    "src": "/vo/nova_mirror_repeat.mp3",
+    "end": 4.36
+  },
+  "nova_exact": {
+    "voice": "Zoey",
+    "text": "Dead on! Perfect calibration, cadet!",
+    "duration": 3.44,
+    "src": "/vo/nova_exact.mp3",
+    "end": 2.712
+  },
+  "nova_over": {
+    "voice": "Zoey",
+    "text": "Too many! The extra plasma balls flew past into space.",
+    "duration": 4.48,
+    "src": "/vo/nova_over.mp3",
+    "end": 3.869
+  },
+  "nova_under": {
+    "voice": "Zoey",
+    "text": "Some drones slipped past! We need more plasma balls.",
+    "duration": 4.0,
+    "src": "/vo/nova_under.mp3",
+    "end": 3.443
+  },
+  "nova_retry": {
+    "voice": "Zoey",
+    "text": "Shields are back up. Try that shot again!",
+    "duration": 3.04,
+    "src": "/vo/nova_retry.mp3",
+    "end": 2.467
+  },
+  "nova_l0_clear": {
+    "voice": "Zoey",
+    "text": "Cadet Bay is clear! The Moon is open. Let's fly!",
+    "duration": 4.24,
+    "src": "/vo/nova_l0_clear.mp3",
+    "end": 3.607
+  },
+  "nova_incoming": {
+    "voice": "Zoey",
+    "text": "Squadrons incoming! One plasma ball for every drone.",
+    "duration": 4.16,
+    "src": "/vo/nova_incoming.mp3",
+    "end": 3.531
+  },
+  "nova_wave_clear": {
+    "voice": "Zoey",
+    "text": "Wave cleared! Nice shooting, cadet.",
+    "duration": 3.28,
+    "src": "/vo/nova_wave_clear.mp3",
+    "end": 2.585
+  },
+  "teacher_yes": {
+    "voice": "Hadley",
+    "text": "Yes? Go ahead!",
+    "duration": 2.4,
+    "src": "/vo/teacher_yes.mp3",
+    "end": 1.64
+  },
+  "principal_intro": {
+    "voice": "Preston",
+    "text": "Class, this is the Captain of the Star Fleet.",
+    "duration": 3.2,
+    "src": "/vo/principal_intro.mp3",
+    "end": 2.437
+  },
+  "teacher_proud": {
+    "voice": "Hadley",
+    "text": "Five cadets... from my class? Captain, I know exactly who you need.",
+    "duration": 5.12,
+    "src": "/vo/teacher_proud.mp3",
+    "end": 4.49
+  },
+  "captain_names": {
+    "voice": "Miles",
+    "text": "Then call their names.",
+    "duration": 1.92,
+    "src": "/vo/captain_names.mp3",
+    "end": 1.211
+  },
+  "captain_nova": {
+    "voice": "Miles",
+    "text": "And every pilot needs a co-pilot. Meet yours.",
+    "duration": 3.6,
+    "src": "/vo/captain_nova.mp3",
+    "end": 3.025
+  }
+}

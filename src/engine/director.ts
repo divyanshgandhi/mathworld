@@ -5,7 +5,8 @@
  */
 export interface Step {
   name?: string;
-  d?: number;
+  /** Seconds, or a function of the moment (e.g. a voice clip's length). */
+  d?: number | (() => number);
   enter?(): void;
   update?(t: number, dt: number): void;
   done?(t: number): boolean;
@@ -47,6 +48,7 @@ export class Director<S extends Step> {
     if (!s) return;
     this.t += dt;
     s.update?.(this.t, dt);
-    if ((s.d !== undefined && this.t >= s.d) || s.done?.(this.t)) this.go(this.index + 1);
+    const d = typeof s.d === "function" ? s.d() : s.d;
+    if ((d !== undefined && this.t >= d) || s.done?.(this.t)) this.go(this.index + 1);
   }
 }

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { add, canvasTexture, PALETTE, type Materials } from "@/engine/materials";
+import { add, canvasTexture, fitText, PALETTE, type Materials } from "@/engine/materials";
 import type { Rng } from "@/engine/util";
 
 /** Desk positions: 3 rows of 3, the board at z = -5. The player sits in the middle (index 4). */
@@ -112,13 +112,32 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng) {
   add(room, new THREE.PlaneGeometry(1.1, 1.1), M.clay(0xffffff, { map: ops.texture }), 4.4, 2.3, -4.95, noCast);
 
   // clock, lights, teacher's desk
+  // the wall clock: 8:42, the same morning as the clock tower outside
   const clock = new THREE.Group();
   clock.position.set(0, 3.55, -4.97);
   room.add(clock);
-  add(clock, new THREE.CylinderGeometry(0.24, 0.24, 0.05, 32), M.clay(0xffffff), 0, 0, 0.02).rotation.x = Math.PI / 2;
-  add(clock, new THREE.TorusGeometry(0.24, 0.025, 8, 32), metal, 0, 0, 0.04);
-  const hourHand = add(clock, new THREE.BoxGeometry(0.025, 0.12, 0.01), M.clay(PALETTE.dark), 0, 0.05, 0.06);
-  const minuteHand = add(clock, new THREE.BoxGeometry(0.018, 0.18, 0.01), M.clay(PALETTE.dark), 0, 0.08, 0.065);
+  const dial = canvasTexture(256, 256);
+  {
+    const x = dial.ctx;
+    x.fillStyle = "#ffffff"; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill();
+    x.fillStyle = "#2b2d42";
+    for (let i = 1; i <= 12; i++) { const a = (i / 12) * Math.PI * 2; fitText(x, String(i), 128 + Math.sin(a) * 98, 128 - Math.cos(a) * 98, 40, 28, "600", "system-ui, sans-serif"); }
+    for (let i = 0; i < 60; i++) { const a = (i / 60) * Math.PI * 2, r0 = i % 5 ? 116 : 110; x.fillRect(128 + Math.sin(a) * r0 - 1, 128 - Math.cos(a) * r0 - 1, 2, 2); }
+    dial.texture.needsUpdate = true;
+  }
+  add(clock, new THREE.CylinderGeometry(0.24, 0.24, 0.05, 48), M.clay(0xffffff), 0, 0, 0.02).rotation.x = Math.PI / 2;
+  add(clock, new THREE.CircleGeometry(0.225, 48), M.clay(0xffffff, { map: dial.texture }), 0, 0, 0.046, { cast: false });
+  add(clock, new THREE.TorusGeometry(0.24, 0.025, 10, 48), metal, 0, 0, 0.04);
+  const handOn = (len: number, w: number, angle: number, z: number) => {
+    const pivot = new THREE.Group();
+    pivot.position.z = z;
+    pivot.rotation.z = -angle;
+    clock.add(pivot);
+    add(pivot, new THREE.BoxGeometry(w, len, 0.008), M.clay(PALETTE.dark), 0, len / 2 - 0.015, 0, { cast: false });
+    return pivot;
+  };
+  const hourHand = handOn(0.12, 0.022, ((8 + 42 / 60) / 12) * Math.PI * 2, 0.056);
+  const minuteHand = handOn(0.18, 0.014, (42 / 60) * Math.PI * 2, 0.062);
   const tubeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff3dc, emissiveIntensity: 2.2 });
   for (const z of [-1.2, 2.2]) {
     add(room, new THREE.BoxGeometry(2.4, 0.07, 0.16), tubeMat, 0, 3.86, z, noCast);
@@ -135,12 +154,37 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng) {
 
   // desks and chairs
   const deskTop = M.clay(0xc9a77c, { roughness: 0.7 }), chair = M.clay(0x6f9bb8, { roughness: 0.6 });
-  for (const [x, z] of SEATS) {
+  const paper = M.clay(0xfbf7ee, { roughness: 0.9 }), pencil = M.clay(0xf2c14e, { roughness: 0.5 }), packs = [0xff8f70, 0x3fa7d6, 0xf2c14e, 0xb79cff, 0x6cc3a0, 0xef6f8a, 0x8fd3ff, 0xffb36b, 0x7ddc3e];
+  for (const [i, [x, z]] of SEATS.entries()) {
     add(room, new THREE.BoxGeometry(1.15, 0.06, 0.62), deskTop, x, 0.72, z);
+    const nb = add(room, new THREE.BoxGeometry(0.42, 0.012, 0.3), paper, x - 0.12, 0.757, z + 0.04, { cast: false });
+    nb.rotation.y = 0.12 - (i % 3) * 0.1;
+    add(room, new THREE.BoxGeometry(0.006, 0.014, 0.28), M.clay(0x9fb3c8), x - 0.12, 0.765, z + 0.04, { cast: false }).rotation.y = nb.rotation.y;
+    const pc = add(room, new THREE.CylinderGeometry(0.008, 0.008, 0.2, 8), pencil, x + 0.22, 0.762, z + 0.08, { cast: false });
+    pc.rotation.set(Math.PI / 2, 0, 0.6 + i * 0.3);
+    const pack = add(room, new THREE.BoxGeometry(0.3, 0.36, 0.16), M.fabric(packs[i]), x + (i % 2 ? 0.48 : -0.48), 0.18, z + 0.62);
+    pack.rotation.y = 0.3 * (i % 2 ? 1 : -1);
     for (const a of [-1, 1]) for (const b of [-1, 1]) add(room, new THREE.BoxGeometry(0.05, 0.7, 0.05), metal, x + a * 0.52, 0.35, z + b * 0.26);
     add(room, new THREE.BoxGeometry(0.5, 0.05, 0.44), chair, x, 0.45, z + 0.55);
     add(room, new THREE.BoxGeometry(0.5, 0.42, 0.05), chair, x, 0.72, z + 0.8);
     for (const a of [-1, 1]) for (const b of [-1, 1]) add(room, new THREE.BoxGeometry(0.04, 0.45, 0.04), metal, x + a * 0.22, 0.22, z + 0.55 + b * 0.2);
+  }
+
+  // sunbeams: soft feathered shafts from each window, warm and faint (additive, no hard edges)
+  const beam = canvasTexture(64, 256);
+  {
+    const x = beam.ctx, g = x.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, "rgba(255,240,210,0.9)"); g.addColorStop(1, "rgba(255,240,210,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 64, 256);
+    const side = x.createLinearGradient(0, 0, 64, 0);
+    side.addColorStop(0, "rgba(0,0,0,1)"); side.addColorStop(0.3, "rgba(0,0,0,0)"); side.addColorStop(0.7, "rgba(0,0,0,0)"); side.addColorStop(1, "rgba(0,0,0,1)");
+    x.globalCompositeOperation = "destination-out"; x.fillStyle = side; x.fillRect(0, 0, 64, 256);
+    beam.texture.needsUpdate = true;
+  }
+  const beamMat = new THREE.MeshBasicMaterial({ map: beam.texture, transparent: true, opacity: 0.065, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  for (const z of [-2.4, 0.2, 2.8]) for (const r of [0, 1.1]) {
+    const b = add(room, new THREE.PlaneGeometry(1.5, 5.2), beamMat, -3.75, 1.15, z, { cast: false, recv: false });
+    b.rotation.set(0, r, -1.02);
   }
 
   // dust in the air
@@ -192,8 +236,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng) {
         tubeMat.emissiveIntensity = 2.2;
         tube.intensity = mood.on ? 22 : 0;
       }
-      minuteHand.rotation.z = -T * 0.2;
-      hourHand.rotation.z = -T * 0.017;
+      void minuteHand; void hourHand; // 8:42, frozen: time stands still on an ordinary Tuesday
       dust.position.y = Math.sin(T * 0.25) * 0.12;
       dust.rotation.y = T * 0.012;
     },
