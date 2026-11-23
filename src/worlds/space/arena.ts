@@ -12,7 +12,7 @@ import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WA
 import { classifyError, radarChoices } from "@/rig/errors";
 import { fleetOf, unitLabel, volley, type Fleet, type Ship } from "@/rig/fleet";
 import { factKey, PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/pools";
-import { FLIP_SEC, planShowMeHow, safetyNetApplies, WHY, type Plan, type Step } from "@/rig/showme";
+import { FLIP_SEC, planShowMeHow, safetyNetApplies, SHOT, WHY, type Plan, type Step } from "@/rig/showme";
 import { CARD, powerUpFits, selectTrick, type TrickId } from "@/rig/tricks";
 import { makeNova } from "./cast";
 import { BATTLE_LINES, ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, POWERUP_LINE, unlockLine } from "./lines";
@@ -831,13 +831,13 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (misses === 1) prefetchLesson(true);
     // stuck after a trick on an early level: the safety net drops to Fast Adding (once a wave)
     if (lessonsThisWave > 0 && !fallbackUsed && safetyNetApplies(tier, w.a, w.b)) {
-      await after(0.7);
+      await after(SHOT.pause);
       restore();
       return void showMeHow({ auto: true, fallback: true });
     }
     if (sc.showMeHow && lessonsThisWave === 0) {
       // third miss: no reaction line (Nova's lesson is the reaction), shields up, straight into Show Me How
-      await after(0.7);
+      await after(SHOT.pause);
       restore();
       return void showMeHow({ auto: true });
     }
@@ -932,12 +932,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const firstFlip = p.tricks.includes("flip-it") && !(s.seenTricks["flip-it"] ?? 0);
     const banner = (card: string, why: string | null) => setUi({ lesson: { card, why, mode: p.mode, fallback, prompt: null, equation: null } });
     setUi({ radar: null, invite: false, sectors: null, lockTotal: null, outcome: null });
-    banner(p.silentFlip !== flipped && p.tricks.includes("flip-it") ? CARD["flip-it"] : p.banner.card, p.silentFlip !== flipped && p.tricks.includes("flip-it") ? (firstFlip ? WHY["flip-it"] : null) : p.banner.why);
+    // a turn of its own shows the Flip It! card first; a turn under the first line goes straight to the trick
+    const flipCard = p.silentFlip !== flipped && p.tricks.includes("flip-it") && !p.turnUnderLine;
+    banner(flipCard ? CARD["flip-it"] : p.banner.card, flipCard ? (firstFlip ? WHY["flip-it"] : null) : p.banner.why);
     setUi({ belt: beltFor(s, w) });
     if (!fallback && safetyNetApplies(tier, w.a, w.b)) try { player.prefetch(planShowMeHow(w.a, w.b, s.seenTricks, { fallback: true }).steps.map((x) => x.speech)); } catch { /* none */ }
     lessonT0 = performance.now();
     ready(); // the keypad is live from here on: the cadet may fire the moment they see it
-    if (p.silentFlip !== flipped) {
+    if (p.silentFlip !== flipped && p.turnUnderLine) applyPowerUp("flip-it"); // the fleet turns while Nova speaks
+    else if (p.silentFlip !== flipped) {
       applyPowerUp("flip-it");
       await after(FLIP_SEC);
       if (id !== lessonId) return;

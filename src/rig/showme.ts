@@ -34,6 +34,8 @@ export interface Plan {
   fallback: boolean;
   /** Turn the fleet first, with no line of its own (a repeat Flip It!, or 10 × b whose pods say it). */
   silentFlip: boolean;
+  /** The turn plays under the first line instead of before it (10 × b: the pods turn while Nova names them). */
+  turnUnderLine: boolean;
   steps: Step[];
   banner: { card: string; why: string | null };
   /** The We-Do combine, as the HUD shows it: "15 + 9 = ?". */
@@ -129,11 +131,21 @@ const step = (caption: string, show: Show, card: string, o: { why?: boolean; swe
   caption: o.silent ? "" : caption, speech: o.silent ? "" : spokenForm(caption), show, why: !!o.why, card, hold: o.hold ?? 0, ...(o.sweep ? { sweep: true } : {}),
 });
 
-/** Early levels (single-digit facts, Earth to the Asteroid Belt): where the Fast Adding safety net applies. */
-export const safetyNetApplies = (tier: number, a: number, b: number) => tier <= 3 && Math.max(a, b) <= 10 && Math.min(a, b) >= 2;
+/**
+ * Early levels (single-digit facts, Earth to the Asteroid Belt): where the Fast Adding safety net applies.
+ * Not ×10: its Pods already are the fast adding (count the Pods), so a second lesson there only adds time.
+ */
+export const safetyNetApplies = (tier: number, a: number, b: number) => tier <= 3 && Math.max(a, b) < 10 && Math.min(a, b) >= 2;
 
-/** The shot budget (SPEC §4.1): a lesson in battle ends within this many seconds; a Fast Replay within 8. */
-export const BUDGET = { full: 10, fast: 8 } as const;
+/**
+ * The shot budget (SPEC §4.1): fire → outcome → Nova → ready again stays within 10 s. A third miss
+ * spends up to `volley` s on the volley (1.15 s of shots, 0.42 s of flight, a beat; see fire() in arena.ts) and `pause` s on the outcome before Show Me How starts, so a
+ * first lesson gets the rest; a Fast Replay is shorter still.
+ */
+export const SHOT = { volley: 1.8, pause: 0.3, max: 10 } as const;
+export const BUDGET = { full: SHOT.max - SHOT.volley - SHOT.pause, fast: 8 } as const;
+/** End to end, from the missed shot to the end of the We-Do question (the estimate the tests hold to `SHOT.max`). */
+export const shotSeconds = (p: Plan) => SHOT.volley + SHOT.pause + p.seconds;
 export const SILENT_HOLD = 0.8, SILENT_MIN = 0.45;
 /** The Flip It! quarter-turn (the stage plays it in 0.8 s before the first beat). */
 export const FLIP_SEC = 0.8;
@@ -164,7 +176,7 @@ export function planShowMeHow(a: number, b: number, seen: Partial<Record<TrickId
     const sweep: Show = { kind: "rows", upTo: ra - 1, total: (ra - 1) * rb };
     const steps = [step(again ? l.brief : l.beats[0].say, sweep, card, { why: !again, sweep: true }), step(l.ask, { kind: "wedo", answer: a * b }, card)];
     return {
-      lesson: { ...l, a, b }, trick: "fast-adding", tricks: ["fast-adding"], mode: again ? "fast" : "full", fallback: true, silentFlip: flip,
+      lesson: { ...l, a, b }, trick: "fast-adding", tricks: ["fast-adding"], mode: again ? "fast" : "full", fallback: true, silentFlip: flip, turnUnderLine: false,
       steps, banner: { card, why: again ? null : WHY["fast-adding"] }, equation: equation(l), answer: a * b, seconds: estimate(steps) + (flip ? FLIP_SEC : 0),
     };
   }
@@ -173,7 +185,7 @@ export function planShowMeHow(a: number, b: number, seen: Partial<Record<TrickId
   const base = { lesson: l, trick: l.trick, tricks: l.tricks, mode: l.mode, fallback: false, banner, equation: equation(l), answer: a * b };
   if (film) {
     const steps = l.beats.map((x, i) => step(x.say, x.show, i < l.flipBeats ? CARD["flip-it"] : l.card, { why: !!x.why }));
-    return { ...base, silentFlip: false, steps, seconds: estimate(steps) };
+    return { ...base, silentFlip: false, turnUnderLine: false, steps, seconds: estimate(steps) };
   }
   // battle: the turn is silent; the main trick's beats follow. A Fast Replay still plays the whole
   // visual sequence (the split, then each part with its number), with its one reminder line.
@@ -181,20 +193,27 @@ export function planShowMeHow(a: number, b: number, seen: Partial<Record<TrickId
   const own = whole.beats.slice(whole.flipBeats, -1);
   const visual = own.filter((x) => x.show.kind !== "fleet" || (x.why && !fast));
   const spokenAt = fast ? Math.max(0, visual.findIndex((x) => x.show.kind !== "fleet")) : Math.max(0, visual.findIndex((x) => x.why));
+  // 10 × b: the fleet is already b Pods, so it turns while Nova names them, and her WHY is the short
+  // line ("Each squad of 10 is one Pod!", as the banner says). A ×10 miss is ready again in ~6 s.
+  const pods = l.trick === "easy-5-10" && (a === 10 || b === 10);
   const plan = (hold: number, short: 0 | 1 | 2, brief = fast): Step[] => [
     ...visual.map((x, i) => i === spokenAt
-      ? step(brief ? l.brief : dropCardName(x.say), x.show, l.card, { why: !brief && !!x.why })
+      ? step(brief ? l.brief : dropCardName(x.say), x.show, l.card, { why: (!brief || (pods && !fast)) && !!x.why })
       : step(x.say, x.show, l.card, { silent: true, hold })),
     // the HUD shows the equation, so a long question can shrink to its last words
     step(short === 2 || (short === 1 && l.parts.length > 2) ? (l.parts.some((x) => x < 0) ? "What's left?" : "What's the total?") : l.ask, wedo, l.card),
   ];
-  const turn = l.flipBeats > 0 ? FLIP_SEC : 0, budget = BUDGET[l.mode] - turn;
-  let steps = plan(SILENT_HOLD, 0);
+  // the turn plays under the first line when that line opens the lesson over the whole fleet (or its Pods)
+  const turnUnderLine = l.flipBeats > 0 && spokenAt === 0 && (pods || ["fleet", "slice"].includes(visual[0]?.show.kind ?? ""));
+  const turn = l.flipBeats > 0 && !turnUnderLine ? FLIP_SEC : 0, budget = BUDGET[l.mode] - turn;
+  let steps = plan(SILENT_HOLD, 0, fast || pods);
   if (estimate(steps) > budget) steps = plan(SILENT_MIN, 0);
   const quick = Math.min(SILENT_MIN, 3.5 / Math.max(1, visual.length - 1));
   if (estimate(steps) > budget) steps = plan(quick, 1);
+  // the HUD shows the equation, so the question shrinks before the WHY does
+  if (estimate(steps) > budget) steps = plan(quick, 2);
   // a very big armada: the WHY stays on the banner and Nova says the one-line version
   if (estimate(steps) > budget) steps = plan(quick, 1, true);
   if (estimate(steps) > budget) steps = plan(quick, 2, true);
-  return { ...base, silentFlip: l.flipBeats > 0, steps, seconds: estimate(steps) + turn };
+  return { ...base, silentFlip: l.flipBeats > 0, turnUnderLine, steps, seconds: estimate(steps) + turn };
 }
