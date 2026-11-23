@@ -66,7 +66,7 @@ interface ShipView {
   ship: Ship; kind: Kind; g: THREE.Group; home: THREE.Vector3; offset: THREE.Vector3; pos: THREE.Vector3;
   gRow: number; gCol: number; size: THREE.Vector2;
   alive: boolean; pop: number; enter: number; wink: number; ph: number;
-  micro?: THREE.Group[]; carrier?: ReturnType<typeof makeCarrier>; dread?: ReturnType<typeof makeDreadnought>; base: number;
+  micro?: THREE.Group[]; podTag?: THREE.Object3D; carrier?: ReturnType<typeof makeCarrier>; dread?: ReturnType<typeof makeDreadnought>; base: number;
 }
 type Ball = { m: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; t0: number; dur: number; land?: () => void };
 
@@ -229,7 +229,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         alive: true, pop: 0, enter: -ship.id * stagger, wink: 0, ph: rnd() * 6, base: 1,
       };
       if (kind === "fighter") { v.g.add(lite(f) ? makeFighterLite(M) : makeInvader(M)); v.base = 0.78; }
-      else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient); v.g.add(p.group); v.micro = p.micro; }
+      else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient); v.g.add(p.group); v.micro = p.micro; v.podTag = p.tag; }
       else if (kind === "carrier") { v.carrier = makeCarrier(M, sec.orient); v.g.add(v.carrier.group); }
       else { v.dread = makeDreadnought(M, unitLabel(ship.k), sec.orient); v.g.add(v.dread.group); }
       v.g.scale.setScalar(v.base);
@@ -709,11 +709,12 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     setUi({ canFire: false, radar: null, invite: false, lesson: { card: l.card, prompt: null } });
     if (sectorMode) { sectorMode = false; setUi({ sectors: null, lockTotal: null }); }
     emit({ type: "explanation_started", payload: { trickId: l.trick, a: w.a, b: w.b, mode: l.mode } });
-    // Fast Replay (SPEC §4.4: ≤ 8 s): the visual split + ONE reminder line + the We-Do. On a flipped
-    // fact the fleet turns while Nova gives the trick's reminder, instead of a second spoken line.
-    // (Only when Flip It is itself a repeat: a first Flip It keeps its own three beats.)
-    const silentFlip = l.mode === "fast" && l.beats[0]?.show.kind === "rotate" && l.beats.length > 2;
-    const beats = silentFlip ? l.beats.slice(1) : l.beats;
+    // The fleet turns without its own spoken beats (so the lesson keeps to the shot budget) when:
+    // - Fast Replay (SPEC §4.4: ≤ 8 s, ONE reminder line + the We-Do) and Flip It is a repeat too;
+    // - 10 × b: the Base-10 fleet is already b pods, so the turn is a quarter-turn of pods that the
+    //   pod line explains ("every squad of 10 is one pod"); a first Flip It elsewhere keeps its beats.
+    const silentFlip = l.flipBeats > 0 && ((l.mode === "fast" && l.flipBeats === 1) || (w.a === 10 && l.trick === "easy-5-10"));
+    const beats = silentFlip ? l.beats.slice(l.flipBeats) : l.beats;
     if (silentFlip && !flipped) applyPowerUp("flip-it");
     beats.forEach((b) => void live(b.say)); // prepare every beat while the first one plays
     let shown = false;
@@ -754,6 +755,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       v.g.position.copy(v.pos).setY(v.pos.y + Math.sin(T * 2 + v.ph) * (v.kind === "fighter" ? 0.05 : 0.015));
       // fighters, carriers and dreadnoughts stay upright when the fleet turns; a pod turns with it (its 10 now runs the other way)
       v.g.rotation.z = v.kind === "pod" ? 0 : -formation.rotation.z + (v.kind === "fighter" ? Math.sin(T * 1.7 + v.ph) * 0.06 : 0);
+      if (v.podTag) v.podTag.rotation.z = -formation.rotation.z; // its "10" badge still reads upright
       if (v.kind === "fighter") v.g.rotation.y = Math.sin(T * 1.3 + v.ph) * 0.35;
       let sc = v.base;
       if (!v.alive) { const p = Math.max(0, 1 - (stage.time - v.pop) * 6); sc *= p; v.g.visible = p > 0; }

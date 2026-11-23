@@ -38,6 +38,8 @@ export interface Lesson {
   card: string;
   mode: "full" | "fast";
   beats: Beat[];
+  /** How many leading beats are the Flip It! turn (0 when the fleet is not turned). */
+  flipBeats: number;
   /** Signed addends that make a × b (e.g. 4 × 9 → [40, -4]). */
   parts: number[];
   wedo: { prompt: string; answer: number };
@@ -276,10 +278,11 @@ export function lesson(a: number, b: number, seen: Partial<Record<TrickId, numbe
         say(`Now it's just ${b} squads of ${a}!`, { kind: "fleet" }),
       ]));
   }
+  const flipBeats = beats.length;
   beats.push(...(fast ? [built.repeat] : built.full), say(built.prompt, { kind: "wedo", answer: a * b }));
   const out: Lesson = {
     a, b, tricks: flip ? ["flip-it", built.trick] : [built.trick], trick: built.trick, card: CARD[built.trick],
-    mode: fast ? "fast" : "full", beats, parts: built.parts, wedo: { prompt: built.prompt, answer: a * b },
+    mode: fast ? "fast" : "full", beats, flipBeats, parts: built.parts, wedo: { prompt: built.prompt, answer: a * b },
   };
   const sum = out.parts.reduce((s, p) => s + p, 0);
   if (sum !== a * b) throw new Error(`${built.trick}: parts of ${a} × ${b} add to ${sum}`);
