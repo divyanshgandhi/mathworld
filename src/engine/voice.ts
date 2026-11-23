@@ -22,8 +22,16 @@ interface Tts {
 let tts: Promise<Tts | null> | null = null;
 const added = new Map<string, Promise<void>>();
 
-/** Start downloading the model in the background (cached by the browser after the first visit). */
-export function warmVoice(): Promise<Tts | null> {
+/**
+ * Start downloading the model in the background (cached by the browser after the first visit), and
+ * the voices that will speak live soon (Nova's for Show Me How), so the first live line is quick.
+ */
+export function warmVoice(voices: VoiceName[] = []): Promise<Tts | null> {
+  const ready = load();
+  for (const v of voices) void ready.then((t) => t && ensure(t, v).catch(() => {}));
+  return ready;
+}
+function load(): Promise<Tts | null> {
   return (tts ??= (async () => {
     try {
       const url = "/vendor/phonon-tts/index.js";

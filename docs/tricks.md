@@ -9,6 +9,16 @@ These scripts are the single source of truth for **Nova's in-world `Show Me How`
 - **First encounter (`seenCount === 0`):** Full paced beats + interactive **We-Do** final tap → unlocks the Trick Card on the Resting Bay desk and mounts the Power-Up on the rocket's Tactical Belt.
 - **Repeat encounters (`seenCount >= 1`):** Fast ≤ 8-second replay using the **Repeat line** + immediate visual move + **We-Do** final tap.
 
+
+### In battle: the shot budget (`src/rig/showme.ts`)
+No single shot may take more than 5–10 s, so in battle each script is compiled into a short lesson; the **Academy films** (`film: true`) still speak every line below.
+- **First sight:** the Card Name banner shows the name and a short WHY. Nova says **one** line, the script's WHY beat (without a trailing "Let's use …", which the banner already says). The script's other beats play as **silent visual moves** that label their numbers on the fleet (`15`, `9`, `+ 8`, `− 4`…). The lesson ends on the **We-Do question** alone ("What is 15 plus 9?"), and the HUD shows the equation (`15 + 9 = ?`). Planned to fit in **≤ 10 s**.
+- **Repeat:** the same visual moves with a one-line reminder (`brief` in `src/rig/tricks.ts`, the Repeat line without the card name), then the question. Planned to fit in **≤ 8 s**.
+- **Flip It!** turns the fleet silently first; the banner names it.
+- **The keypad stays live** for the whole lesson: firing at any moment ends it cleanly, and that shot is the We-Do.
+- **Safety net (Earth to the Asteroid Belt, single-digit facts):** a miss after a lesson drops to Fast Adding. The fewer squads are swept one at a time with running totals, then "What is 16 plus 8?".
+- Very big armadas shrink further if needed: shorter holds, then "What's the total?", then the one-line reminder in place of the WHY.
+
 ---
 
 ## Deterministic Trick-Router Priority (`selectTrick(a, b)`)

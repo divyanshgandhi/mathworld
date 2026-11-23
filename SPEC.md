@@ -161,6 +161,7 @@ All trick scripts live as declarative data in **`docs/tricks.md`** and are compi
   - **First time seeing a trick (`seenCount === 0`):** Plays the full paced walkthrough (Card Name banner → explicit **WHY** → one visual change per spoken beat → **We-Do** interactive final combine tap → unlocks Trick Card onto Resting Bay desk!).
   - **Repeat visits (`seenCount ≥ 1`):** Plays the **≤ 8-second Fast Replay** (skips the intro, jumps straight to the visual split + 1-line reminder + **We-Do** final tap).
   - **Foundation Fallback:** If a cadet misses an early small fact even after a trick, drop cleanly to **Fast Adding** (`4 + 4 + 4`).
+  - **In battle (shot budget, §4.1):** Nova speaks one line per lesson (the WHY on first sight, a one-line reminder on repeat), the other beats are silent visual moves with their numbers labelled on the fleet, and it ends on the We-Do question. First sight fits in ≤ 10 s, a Fast Replay in ≤ 8 s, and the keypad stays live throughout. Academy films speak the full script. See `docs/tricks.md`.
 
 ---
 

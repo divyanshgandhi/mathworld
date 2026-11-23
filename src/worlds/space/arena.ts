@@ -1088,7 +1088,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       if (started) return;
       started = true;
       audio.unlock();
-      void warmVoice(); // live speech for Show Me How warms in the background
+      void warmVoice(["Zoey"]); // Nova's live Show Me How lines warm in the background
       audio.mood("battle");
       setUi({ started: true });
       void startWave();

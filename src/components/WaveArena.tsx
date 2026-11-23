@@ -39,10 +39,10 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       if (gone || !box.current) return;
       const stage = createStage(box.current, { fill: true });
       const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
-      window.__mw = { stage, arena: a };
+      const { audio } = await import("@/engine/audio");
+      window.__mw = { stage, arena: a, audio };
       setArena(a);
       // flown in from another battle: sound is already unlocked, so launch straight away
-      const { audio } = await import("@/engine/audio");
       if (audio.context?.state === "running") a.start();
       cleanup = () => { a.dispose(); stage.dispose(); };
     })();

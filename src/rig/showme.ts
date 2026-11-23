@@ -59,6 +59,7 @@ export const WHY: Record<TrickId, string> = {
 
 /** The banner's WHY for this fleet (Easy 5s & 10s says the half that applies). */
 export function whyFor(t: TrickId, a: number, b: number) {
+  if (t === "empty-mirror") return a === 0 || b === 0 ? "×0 is empty space" : "×1 is a mirror";
   if (t === "easy-5-10") return a === 10 || b === 10 ? "a squad of 10 is one Pod" : "5 is half of 10";
   if (t === "double-it") return [2, 4].find((k) => (a === k || b === k) && ![5, 9, 10].includes(k === a ? b : a)) === 2 ? "×2 is a double" : "×4 is double, then double again";
   if (t === "borrow-take-back") { const x = [199, 99, 29, 19, 9].find((n) => a === n || b === n) ?? 9; return `${x} is just 1 shy of ${x + 1}`; }

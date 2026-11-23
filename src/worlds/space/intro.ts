@@ -417,7 +417,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
     const i = Math.max(0, director.find(first));
     if (i >= director.find("knock")) { setEnv("class"); room.write("× MULTIPLICATION"); glide([-1.4, 2.25, 4.0], [-0.3, 1.4, -3.6], 0); lookAt(headPosition(teacher), CLASS_CENTRE); }
     audio.unlock();
-    void warmVoice();
+    void warmVoice(["Hadley", "Zoey"]); // the cadet's name, then Nova's live lesson lines
     setUi({ started: true });
     director.go(i);
   }
