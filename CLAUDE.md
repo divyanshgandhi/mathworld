@@ -1,0 +1,24 @@
+@AGENTS.md
+
+# Math World
+
+A space multiplication game for kids (Grade 3+) and adults: answer to fire plasma cannonballs, learn visually from every miss, unlock tricks as live tactical power-ups (`We Do`), and climb the Solar System from `0 × 0` up to unbounded multi-digit armadas.
+
+Read in this exact order before making changes:
+1. `STATE.md` — current status and next active phase
+2. `SPEC.md` — locked end-to-end product, pedagogy, visual unit, audio, and DB specification
+3. `ROADMAP.md` — phased execution plan and acceptance criteria
+4. `docs/tricks.md` — the exact kid-named trick scripts
+
+## Engineering & Execution Rules
+
+- **Execute Phases 0 → 6 strictly in order.** Do NOT spend time polishing `/intro` visuals or adding extra art until Phase 0 (DB + Vercel), Phase 1 (`src/rig/` + 5-bot simulation), Phase 2 (playable single + multi-digit wave + live Power-Ups), and Phase 3 (`Show Me How` + Phonon voice) are complete and verified.
+- **Small vertical slices + clean commits.** Commit after each working phase or sub-slice with a crisp commit message. Run `bun run check` (`next typegen`, `tsc`, `eslint`, `vitest`) after every step and confirm it is green.
+- **Code owns the math and structure; AI writes words only.** All pools, mastery math, error classification, and trick beat breakdowns live in pure TypeScript under `src/rig/` with Vitest assertions proving partial products equal `a × b`.
+- **Event-sourced persistence.** Every player action appends to `events` (`src/db/schema.ts`); `PlayerState` is folded purely by `src/director/fold.ts`. Never store loose mutable mastery columns that drift from the event log.
+- **Trick scripts come from `docs/tricks.md`.** Turn those exact scripts and kid-friendly names into deterministic beats; never invent generic textbook explanations.
+- **Client-only Gradium Phonon (`phonon-tts`).** Never import `phonon-tts` in Server Components, SSR, or Vercel API routes. Pre-bake static intro/briefing audio into `public/vo/` and run `phonon-tts` exclusively inside a browser Web Worker.
+- **Zero private leaks.** This repository is public and shareable. Keep secrets, API keys, personal notes, and paths outside `mathworld/` completely out of files, comments, and commits.
+- **Do not import from `design/lookbook/`.** Lookbook HTML files are static visual reference only.
+- **Verify by playing it.** Open the live routes in a browser, test desktop keyboard AND mobile touch (`inputMode="none"`), test `0` as a valid answer, test undershoot/overshoot, test `Show Me How` repeat shortening, and check console errors.
+- Before ending any session, update `STATE.md`.

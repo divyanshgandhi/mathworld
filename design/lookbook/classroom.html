@@ -1,0 +1,242 @@
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Classroom intro for Math World in three character styles: a sleepy Tuesday lesson with a raise-hand prompt, the knock where the principal and captain arrive, and a cast lineup including Nova.</h2>
+<style>
+.sb{font-size:13px;padding:6px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:transparent;color:var(--text-primary);cursor:pointer;text-align:left}
+.sb.on{background:var(--bg-accent);color:var(--text-accent);border-color:var(--border-accent)}
+.sb small{display:block;font-size:11px;color:var(--text-secondary)}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.lab{font-size:12px;color:var(--text-muted);width:62px}
+.cap{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:78%;background:rgba(13,14,26,.74);color:#f3f1ea;font:15px/1.45 var(--font-sans),sans-serif;padding:8px 14px;border-radius:10px;text-align:center;pointer-events:none}
+.cap b{color:#b6f23a;font-weight:500;margin-right:4px}
+.nm{position:absolute;transform:translate(-50%,-100%);font:500 12px/1.2 var(--font-sans),sans-serif;color:#2b2540;background:rgba(255,255,255,.82);padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none}
+</style>
+<div style="padding:.5rem 0">
+<div class="row"><span class="lab">Characters</span><span id="styles" style="display:contents"></span></div>
+<div class="row"><span class="lab">Moment</span><span id="moments" style="display:contents"></span></div>
+<div class="row"><span class="lab">Camera</span><span id="views" style="display:contents"></span></div>
+<div id="stage" style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#1b1a24;min-height:240px">
+<div id="labels" style="position:absolute;inset:0;pointer-events:none"></div>
+<div id="cap" class="cap">Loading three.js…</div>
+<div style="position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:180px;height:3px;border-radius:2px;background:rgba(255,255,255,.15)"><div id="bar" style="height:100%;width:0;background:#b6f23a;border-radius:2px"></div></div>
+<button id="hand" disabled style="position:absolute;right:12px;bottom:12px;font-size:13px;padding:8px 14px;border-radius:999px;border:0;background:#b6f23a;color:#0d0e1a;font-weight:500;cursor:pointer">✋ Raise hand</button>
+</div>
+</div>
+<script type="module">
+import * as THREE from 'https://esm.sh/three@0.170.0';
+import {EffectComposer} from 'https://esm.sh/three@0.170.0/examples/jsm/postprocessing/EffectComposer.js';
+import {RenderPass} from 'https://esm.sh/three@0.170.0/examples/jsm/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'https://esm.sh/three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'https://esm.sh/three@0.170.0/examples/jsm/postprocessing/OutputPass.js';
+import {ShaderPass} from 'https://esm.sh/three@0.170.0/examples/jsm/postprocessing/ShaderPass.js';
+const $=id=>document.getElementById(id),wrap=$('stage'),capEl=$('cap'),barEl=$('bar'),handBtn=$('hand'),labelsEl=$('labels');
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.domElement.style.display='block';wrap.prepend(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x2a2440);
+const camera=new THREE.PerspectiveCamera(48,1.7,0.05,200);
+let seed=11;const rnd=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+const MC=new Map();
+function mat(c,o={}){const k=c+JSON.stringify(o,(key,v)=>v&&v.isTexture?v.uuid:v);if(!MC.has(k))MC.set(k,new THREE.MeshStandardMaterial({color:c,roughness:0.62,metalness:0,...o}));return MC.get(k)}
+function add(p,geo,m,x,y,z,o={}){const ms=new THREE.Mesh(geo,m);ms.position.set(x,y,z);ms.castShadow=o.cast!==false;ms.receiveShadow=o.recv!==false;p.add(ms);return ms}
+function ctex(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return{t,x:c.getContext('2d')}}
+// lights
+const hemi=new THREE.HemisphereLight(0xdfe6f0,0x6b5a4a,0.8);scene.add(hemi);
+const key=new THREE.DirectionalLight(0xd6e4ff,1.8);key.position.set(-9,7,1.5);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
+Object.assign(key.shadow.camera,{left:-8,right:8,top:8,bottom:-8,near:1,far:30});key.shadow.bias=-0.0004;key.shadow.normalBias=0.02;scene.add(key);
+const tube=new THREE.PointLight(0xfff1d6,22,16,2);tube.position.set(0,3.5,0.5);scene.add(tube);
+const spot=new THREE.SpotLight(0xffc27a,0,22,0.42,0.6,1.2);spot.position.set(8.6,2.1,-3.5);spot.target.position.set(1,0,-1.2);spot.castShadow=true;spot.shadow.mapSize.set(1024,1024);scene.add(spot,spot.target);const fill=new THREE.PointLight(0xffe2b8,0,9,2);fill.position.set(2.6,2.2,-1.6);scene.add(fill);
+const studioKey=new THREE.DirectionalLight(0xfff1e0,0);studioKey.position.set(36,7,8);studioKey.target.position.set(40,0,0);studioKey.castShadow=true;studioKey.shadow.mapSize.set(1024,1024);
+Object.assign(studioKey.shadow.camera,{left:-6,right:6,top:6,bottom:-6,near:1,far:30});scene.add(studioKey,studioKey.target);
+// room
+const room=new THREE.Group();scene.add(room);
+const plank=ctex(256,256);for(let i=0;i<8;i++){const v=150+((i*37)%5)*9;plank.x.fillStyle=`rgb(${v+34},${v+4},${v-36})`;plank.x.fillRect(0,i*32,256,32);plank.x.fillStyle='rgba(60,40,20,.35)';plank.x.fillRect(0,i*32,256,2);plank.x.fillRect(((i*97)%200)+20,i*32,2,32)}
+plank.t.wrapS=plank.t.wrapT=THREE.RepeatWrapping;plank.t.repeat.set(3,3);
+add(room,new THREE.PlaneGeometry(12,10),mat(0xffffff,{map:plank.t,roughness:0.8}),0,0,0,{cast:false}).rotation.x=-Math.PI/2;
+const wallM=mat(0xdcd3c2,{roughness:0.9}),sideM=mat(0xd2cbbd,{roughness:0.9}),trimM=mat(0xf2efe8),woodM=mat(0x9a7350,{roughness:0.7}),metalM=mat(0x5a5f6e,{roughness:0.5,metalness:0.3});
+add(room,new THREE.BoxGeometry(12,4,0.2),wallM,0,2,-5.1);add(room,new THREE.BoxGeometry(12,4,0.2),wallM,0,2,5.1);
+add(room,new THREE.BoxGeometry(0.2,4,10.4),sideM,-6.1,2,0);
+add(room,new THREE.BoxGeometry(0.2,4,0.9),sideM,6.1,2,-4.65);add(room,new THREE.BoxGeometry(0.2,4,7.9),sideM,6.1,2,1.05);add(room,new THREE.BoxGeometry(0.2,1.6,1.2),sideM,6.1,3.2,-3.5);
+add(room,new THREE.PlaneGeometry(12,10),mat(0xe8e4dc,{roughness:0.95}),0,4,0,{cast:false}).rotation.x=Math.PI/2;
+add(room,new THREE.BoxGeometry(12,0.18,0.06),woodM,0,0.09,-4.97);
+const paneM=new THREE.MeshStandardMaterial({color:0x223344,emissive:0xdbe9ff,emissiveIntensity:1.2});
+for(const z of[-2.4,0.2,2.8]){add(room,new THREE.BoxGeometry(0.08,1.8,1.8),trimM,-5.99,2.2,z);const p=add(room,new THREE.PlaneGeometry(1.6,1.6),paneM,-5.94,2.2,z,{cast:false});p.rotation.y=Math.PI/2;
+add(room,new THREE.BoxGeometry(0.04,1.6,0.05),trimM,-5.92,2.2,z);add(room,new THREE.BoxGeometry(0.04,0.05,1.6),trimM,-5.92,2.2,z)}
+const hallM=new THREE.MeshStandardMaterial({color:0x111111,emissive:0xffc27a,emissiveIntensity:0.25});add(room,new THREE.PlaneGeometry(3,3),hallM,7.3,1.5,-3.5,{cast:false}).rotation.y=-Math.PI/2;
+add(room,new THREE.BoxGeometry(2.4,0.2,3),mat(0x8a8170),7.2,0,-3.5);
+const door=new THREE.Group();door.position.set(6.02,0,-4.1);room.add(door);add(door,new THREE.BoxGeometry(0.07,2.35,1.18),mat(0x5b7f95,{roughness:0.55}),0,1.175,0.59);
+add(door,new THREE.SphereGeometry(0.05,12,8),mat(0xffc94d,{metalness:0.7,roughness:0.3}),-0.07,1.1,1.05);
+add(door,new THREE.BoxGeometry(0.02,0.5,0.5),mat(0xcfe4ff,{emissive:0xcfe4ff,emissiveIntensity:0.3}),-0.04,1.75,0.59);
+const board=ctex(1024,340);
+function boardText(s){const x=board.x;x.fillStyle='#2f4a3c';x.fillRect(0,0,1024,340);for(let i=0;i<40;i++){x.fillStyle=`rgba(255,255,255,${0.02+rnd()*0.04})`;x.beginPath();x.ellipse(rnd()*1024,rnd()*340,40+rnd()*120,10+rnd()*30,rnd()*3,0,7);x.fill()}
+x.fillStyle='rgba(240,238,228,.92)';x.font='bold 112px "Chalkboard SE","Comic Sans MS","Marker Felt",cursive';x.textAlign='center';x.textBaseline='middle';x.fillText(s,512,180);
+x.font='34px "Chalkboard SE","Comic Sans MS",cursive';x.textAlign='left';x.fillStyle='rgba(240,238,228,.6)';x.fillText('Tuesday',40,48);board.t.needsUpdate=true}
+add(room,new THREE.BoxGeometry(6.3,2.3,0.1),woodM,0,2.05,-4.98);add(room,new THREE.PlaneGeometry(6,2),mat(0xffffff,{map:board.t,roughness:0.95}),0,2.05,-4.92,{cast:false});
+add(room,new THREE.BoxGeometry(5.6,0.06,0.14),woodM,0,0.92,-4.86);
+const poster=ctex(256,320);{const x=poster.x;x.fillStyle='#1d2350';x.fillRect(0,0,256,320);x.fillStyle='#ffd76b';x.beginPath();x.arc(30,160,70,0,7);x.fill();
+[['#c9b8a6',100,6],['#e8b36b',125,9],['#5aa7e8',152,10],['#e0704f',178,8],['#e8c39a',210,18],['#f0d9a8',245,15]].forEach(([c,px,r])=>{x.fillStyle=c;x.beginPath();x.arc(px,160,r,0,7);x.fill()});
+x.fillStyle='#f3f1ea';x.font='bold 24px sans-serif';x.textAlign='center';x.fillText('OUR SOLAR',128,48);x.fillText('SYSTEM',128,78);poster.t.needsUpdate=true}
+add(room,new THREE.PlaneGeometry(1,1.25),mat(0xffffff,{map:poster.t}),-5.95,2.3,-4.25,{cast:false}).rotation.y=Math.PI/2;
+const ops=ctex(256,256);{const x=ops.x;x.fillStyle='#fff4e0';x.fillRect(0,0,256,256);[['+','#ff8f70',64,70],['−','#3fa7d6',192,70],['×','#7ddc3e',64,190],['÷','#b79cff',192,190]].forEach(([s,c,px,py])=>{x.fillStyle=c;x.font='bold 110px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(s,px,py)});ops.t.needsUpdate=true}
+add(room,new THREE.PlaneGeometry(1.1,1.1),mat(0xffffff,{map:ops.t}),4.4,2.3,-4.95,{cast:false});
+const clock=new THREE.Group();clock.position.set(0,3.55,-4.97);room.add(clock);add(clock,new THREE.CylinderGeometry(0.24,0.24,0.05,32),mat(0xffffff),0,0,0.02).rotation.x=Math.PI/2;
+add(clock,new THREE.TorusGeometry(0.24,0.025,8,32),metalM,0,0,0.04);const hourH=add(clock,new THREE.BoxGeometry(0.025,0.12,0.01),mat(0x2b2d42),0,0.05,0.06);const minH=add(clock,new THREE.BoxGeometry(0.018,0.18,0.01),mat(0x2b2d42),0,0.08,0.065);
+const tubeM=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xfff3dc,emissiveIntensity:2.2});for(const z of[-1.2,2.2]){add(room,new THREE.BoxGeometry(2.4,0.07,0.16),tubeM,0,3.86,z,{cast:false});add(room,new THREE.BoxGeometry(2.6,0.05,0.3),metalM,0,3.92,z,{cast:false})}
+const tdesk=new THREE.Group();tdesk.position.set(2.5,0,-3.7);room.add(tdesk);add(tdesk,new THREE.BoxGeometry(1.7,0.08,0.85),woodM,0,0.76,0);add(tdesk,new THREE.BoxGeometry(1.6,0.7,0.06),woodM,0,0.38,-0.35);
+for(const s of[-1,1])add(tdesk,new THREE.BoxGeometry(0.06,0.72,0.8),woodM,s*0.8,0.36,0);
+add(tdesk,new THREE.SphereGeometry(0.09,16,12),mat(0xd94a4a,{roughness:0.4}),0.5,0.88,0.1);[[0x3fa7d6,0.06],[0xff8f70,0.11],[0x7ddc3e,0.16]].forEach(([c,y])=>add(tdesk,new THREE.BoxGeometry(0.4,0.05,0.3),mat(c),-0.45,0.78+y,-0.05));
+const seats=[];[-1.6,0.6,2.8].forEach(z=>[-2.6,0,2.6].forEach(x=>seats.push([x,z])));
+const deskM=mat(0xc9a77c,{roughness:0.7}),chairM=mat(0x6f9bb8,{roughness:0.6});
+for(const[x,z]of seats){add(room,new THREE.BoxGeometry(1.15,0.06,0.62),deskM,x,0.72,z);for(const a of[-1,1])for(const b of[-1,1])add(room,new THREE.BoxGeometry(0.05,0.7,0.05),metalM,x+a*0.52,0.35,z+b*0.26);
+add(room,new THREE.BoxGeometry(0.5,0.05,0.44),chairM,x,0.45,z+0.55);add(room,new THREE.BoxGeometry(0.5,0.42,0.05),chairM,x,0.72,z+0.8);for(const a of[-1,1])for(const b of[-1,1])add(room,new THREE.BoxGeometry(0.04,0.45,0.04),metalM,x+a*0.22,0.22,z+0.55+b*0.2)}
+const dg=new THREE.BufferGeometry(),dp=[];for(let i=0;i<260;i++)dp.push(-5.5+rnd()*11,0.3+rnd()*3.3,-4.5+rnd()*9);dg.setAttribute('position',new THREE.Float32BufferAttribute(dp,3));
+const dust=new THREE.Points(dg,new THREE.PointsMaterial({color:0xfff2d0,size:0.025,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(dust);
+// studio for the cast lineup
+add(scene,new THREE.CylinderGeometry(7,7,0.1,64),mat(0xe9e3f3,{roughness:0.85}),40,-0.05,0,{cast:false});
+add(scene,new THREE.CylinderGeometry(8,8,7,64,1,true,Math.PI/2,Math.PI),mat(0xd9d0ea,{roughness:0.95,side:THREE.DoubleSide}),40,3.4,0,{cast:false});
+// characters
+const SKIN=[0xf1c7a5,0xd9a27e,0xa86b4a,0x7a4a32,0xf5d6c0,0xc68f6a];
+const KIDS=[{skin:0,hair:0x2b1b12,hs:'pigtails',top:0xff8f70,bot:0x4a5a8a},{skin:2,hair:0x1a1212,hs:'curly',top:0x6cc3a0,bot:0x3d405b},{skin:4,hair:0xc98a3c,hs:'short',top:0x7fa7ff,bot:0x55597a},
+{skin:3,hair:0x120c0a,hs:'bun',top:0xf2c14e,bot:0x3d405b},{skin:1,hair:0x3a2416,hs:'long',top:0xb79cff,bot:0x4a5a8a},{skin:5,hair:0x6b3a1f,hs:'short',top:0xef6f8a,bot:0x55597a},
+{skin:0,hair:0xe2c27a,hs:'long',top:0x8fd3ff,bot:0x3d405b},{skin:2,hair:0x1a1212,hs:'short',top:0xffb36b,bot:0x4a5a8a}];
+const PLAYER={skin:1,hair:0x2b1b12,hs:'short',top:0x7ddc3e,bot:0x3d405b};
+const TEACHER={adult:1,skin:4,hair:0x8a7a6a,hs:'bun',top:0xd9a441,bot:0x6b4f7a,ex:['glasses']};
+const PRINCIPAL={adult:1,skin:2,hair:0x3a3a3a,hs:'bald',top:0x2f3e63,bot:0x2f3e63,ex:['tie','mustache']};
+const CAPTAIN={adult:1,skin:0,hair:0x2b1b12,hs:'short',top:0xf3eee6,bot:0x23305a,ex:['cap','epaulettes','badge']};
+const CS={bean:{label:'Clay bean',sub:'chibi, bean eyes',eye:'bean',torso:'capsule',kid:{L:0.2,Ht:0.34,R:0.2,H:0.3,A:0.24},adult:{L:0.42,Ht:0.58,R:0.24,H:0.27,A:0.4}},
+story:{label:'Storybook',sub:'taller, brows, nose',eye:'dot',torso:'taper',kid:{L:0.36,Ht:0.42,R:0.16,H:0.21,A:0.38},adult:{L:0.72,Ht:0.72,R:0.2,H:0.19,A:0.62}},
+toy:{label:'Big-eye toy',sub:'googly eyes, peg body',eye:'big',torso:'capsule',kid:{L:0.16,Ht:0.42,R:0.22,H:0.25,A:0.26},adult:{L:0.36,Ht:0.78,R:0.25,H:0.23,A:0.46}}};
+const dark=mat(0x2b2d42,{roughness:0.35}),glint=mat(0xffffff,{emissive:0xffffff,emissiveIntensity:0.6}),shoeM=mat(0x3a3340),white=mat(0xffffff,{roughness:0.3}),cheekM=mat(0xff9aa2,{roughness:0.8}),mouthM=mat(0x6a2a2a);
+const gold=mat(0xffc94d,{metalness:0.6,roughness:0.3,emissive:0xffb020,emissiveIntensity:0.25});
+function makeChar(sp,st){const g=new THREE.Group(),P=st[sp.adult?'adult':'kid'],{L,Ht,R,H,A}=P,taper=st.torso==='taper';
+const skin=mat(SKIN[sp.skin],{roughness:0.55}),top=mat(sp.top),bot=mat(sp.bot),hair=mat(sp.hair,{roughness:0.75});
+const legs=[];for(const s of[-1,1]){const lp=new THREE.Group();lp.position.set(s*R*0.45,L,0);g.add(lp);
+if(taper)add(lp,new THREE.CylinderGeometry(R*0.32,R*0.28,L,12),bot,0,-L/2,0);else add(lp,new THREE.CapsuleGeometry(R*0.36,Math.max(0.01,L-R*0.5),6,12),bot,0,-L/2,0);
+const sh=add(lp,new THREE.SphereGeometry(R*0.4,16,10),shoeM,0,-L+R*0.1,R*0.15);sh.scale.set(1,0.6,1.4);legs.push(lp)}
+const torso=taper?add(g,new THREE.CylinderGeometry(R*0.85,R*1.1,Ht,24),top,0,L+Ht/2,0):add(g,new THREE.CapsuleGeometry(R,Math.max(0.02,Ht-R*1.2),8,20),top,0,L+Ht/2,0);
+const arms=[];for(const s of[-1,1]){const ap=new THREE.Group();ap.position.set(s*(R*(taper?0.92:1.0)+R*0.22),L+Ht-R*0.35,0);g.add(ap);
+add(ap,new THREE.CapsuleGeometry(R*0.27,Math.max(0.01,A-R*0.5),6,12),top,0,-A/2,0);add(ap,new THREE.SphereGeometry(R*0.3,14,10),skin,0,-A+R*0.05,0);ap.rotation.z=s*0.12;arms.push(ap)}
+if(taper)add(g,new THREE.CylinderGeometry(H*0.32,H*0.36,H*0.4,12),skin,0,L+Ht+H*0.1,0);
+const head=new THREE.Group();head.position.set(0,L+Ht+(taper?H*0.25:-R*0.15),0);g.add(head);const hy=H*0.95;
+add(head,new THREE.SphereGeometry(H,32,20),skin,0,hy,0);
+const surf=(x,y)=>Math.sqrt(Math.max(0,H*H-x*x-y*y)),ex=H*0.36,ey=H*0.08,eyes=[];
+for(const s of[-1,1]){const x=s*ex,eg=new THREE.Group();eg.position.set(x,hy+ey,surf(x,ey));head.add(eg);eyes.push(eg);
+if(st.eye==='bean'){const e=add(eg,new THREE.SphereGeometry(H*0.1,14,10),dark,0,0,-H*0.03,{cast:false});e.scale.set(0.8,1.25,0.6);add(eg,new THREE.SphereGeometry(H*0.028,8,6),glint,H*0.03,H*0.05,H*0.03,{cast:false})}
+else if(st.eye==='dot'){add(eg,new THREE.SphereGeometry(H*0.08,12,8),dark,0,0,-H*0.02,{cast:false});const b=add(head,new THREE.BoxGeometry(H*0.24,H*0.05,H*0.06),hair,x,hy+ey+H*0.24,surf(x,ey+H*0.24)*0.96,{cast:false});b.rotation.z=-s*0.15}
+else{const w=add(eg,new THREE.SphereGeometry(H*0.24,18,12),white,0,0,-H*0.08,{cast:false});w.scale.z=0.6;add(eg,new THREE.SphereGeometry(H*0.12,12,10),dark,0,-H*0.02,H*0.06,{cast:false});add(eg,new THREE.SphereGeometry(H*0.035,8,6),glint,H*0.04,H*0.03,H*0.13,{cast:false})}}
+if(st.eye!=='dot')for(const s of[-1,1]){const c=add(head,new THREE.SphereGeometry(H*0.13,12,8),cheekM,s*H*0.56,hy-H*0.2,surf(H*0.56,-H*0.2)*0.9,{cast:false});c.scale.z=0.4}
+else add(head,new THREE.SphereGeometry(H*0.12,12,8),skin,0,hy-H*0.08,H*0.98,{cast:false});
+const mouth=add(head,new THREE.TorusGeometry(H*0.17,H*0.035,6,16,Math.PI),mouthM,0,hy-H*0.34,surf(0,-H*0.34)*0.97,{cast:false});mouth.rotation.z=Math.PI;
+const hs=sp.hs;
+if(hs!=='bald'){const cap=add(head,new THREE.SphereGeometry(H*1.06,28,14,0,Math.PI*2,0,Math.PI*0.45),hair,0,hy,0);cap.rotation.x=-0.35}
+if(hs==='bun')add(head,new THREE.SphereGeometry(H*0.38,16,12),hair,0,hy+H*0.7,-H*0.6);
+if(hs==='pigtails')for(const s of[-1,1])add(head,new THREE.SphereGeometry(H*0.32,16,12),hair,s*H*1.0,hy+H*0.05,-H*0.25);
+if(hs==='curly')for(let k=0;k<12;k++){const th=(k%6)/6*Math.PI*2+(k<6?0:0.5),ph=k<6?0.55:1.05,x=Math.sin(ph)*Math.cos(th),z=Math.sin(ph)*Math.sin(th);if(k>=6&&z>0.5)continue;add(head,new THREE.SphereGeometry(H*0.36,12,10),hair,x*H,hy+Math.cos(ph)*H,z*H)}
+if(hs==='long')add(head,new THREE.CapsuleGeometry(H*0.78,H*0.9,8,16),hair,0,hy-H*0.45,-H*0.32);
+if(hs==='bald')for(const s of[-1,1])add(head,new THREE.SphereGeometry(H*0.3,12,10),hair,s*H*0.88,hy-H*0.05,-H*0.25);
+const ex_=sp.ex||[];
+if(ex_.includes('glasses')){for(const s of[-1,1])add(head,new THREE.TorusGeometry(H*0.2,H*0.03,8,20),dark,s*ex,hy+ey,surf(ex,ey)+H*(st.eye==='big'?0.12:0.03),{cast:false});add(head,new THREE.BoxGeometry(H*0.32,H*0.04,H*0.04),dark,0,hy+ey,surf(0,ey)+H*0.04,{cast:false})}
+if(ex_.includes('mustache'))add(head,new THREE.TorusGeometry(H*0.16,H*0.06,8,16,Math.PI),hair,0,hy-H*0.2,surf(0,-H*0.2)*1.0,{cast:false});
+if(ex_.includes('tie'))add(g,new THREE.BoxGeometry(R*0.25,Ht*0.55,0.03),mat(0xd94a4a),0,L+Ht*0.55,R*(taper?1.0:1.02));
+if(ex_.includes('cap')){const cm=mat(0x23305a);add(head,new THREE.CylinderGeometry(H*1.0,H*1.05,H*0.42,24),cm,0,hy+H*0.78,-H*0.02);add(head,new THREE.CylinderGeometry(H*0.75,H*0.75,H*0.05,24,1,false,-Math.PI/2,Math.PI),dark,0,hy+H*0.58,H*0.35);add(head,new THREE.SphereGeometry(H*0.12,12,8),gold,0,hy+H*0.82,H*1.03)}
+if(ex_.includes('epaulettes'))for(const s of[-1,1])add(g,new THREE.BoxGeometry(R*0.6,0.04,R*0.6),gold,s*R*0.95,L+Ht-R*0.05,0);
+if(ex_.includes('badge'))add(g,new THREE.BoxGeometry(R*0.3,R*0.3,0.03),gold,-R*0.45,L+Ht*0.7,R*0.97);
+g.userData={arms,legs,head,mouth,eyes,torso,blink:rnd()*3,ph:rnd()*6,r:0,raise:false,talking:false,look:null,baseArmX:0};return g}
+function makeNova(){const g=new THREE.Group();add(g,new THREE.SphereGeometry(0.32,32,20),mat(0xf3eee6,{roughness:0.45}),0,0,0);
+const f=add(g,new THREE.SphereGeometry(0.24,24,16),mat(0x10153a,{roughness:0.25}),0,0.02,0.16,{cast:false});f.scale.set(1,0.75,0.55);
+const em=c=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:3});
+for(const s of[-1,1])add(g,new THREE.CapsuleGeometry(0.028,0.04,4,8),em(0x3dfcff),s*0.08,0.06,0.29,{cast:false});
+const sm=add(g,new THREE.TorusGeometry(0.06,0.014,6,16,Math.PI),em(0x3dfcff),0,-0.04,0.29,{cast:false});sm.rotation.z=Math.PI;
+const ring=add(g,new THREE.TorusGeometry(0.46,0.018,8,64),em(0x7ddc3e),0,0,0,{cast:false});ring.rotation.x=Math.PI/2.3;
+add(g,new THREE.CylinderGeometry(0.012,0.012,0.2,6),dark,0,0.38,0);add(g,new THREE.SphereGeometry(0.04,10,8),em(0x7ddc3e),0,0.5,0,{cast:false});
+for(const s of[-1,1])add(g,new THREE.SphereGeometry(0.07,12,8),mat(0x7ddc3e),s*0.31,0.02,0);
+g.userData={nova:true,ring};return g}
+let C={kids:[],cast:[]},styleKey='bean';
+const DOOR=new THREE.Vector3(6,1.3,-3.5),CLASS=new THREE.Vector3(0,1,1.2);
+function face(g,t){g.rotation.y=Math.atan2(t.x-g.position.x,t.z-g.position.z)}
+function build(k){styleKey=k;[...C.kids,...C.cast,C.player,C.teacher,C.principal,C.captain].forEach(g=>g&&scene.remove(g));const st=CS[k];C={kids:[],cast:[]};let j=0;
+seats.forEach(([x,z],i)=>{const g=makeChar(i===4?PLAYER:KIDS[j++],st);g.position.set(x,0.47-st.kid.L,z+0.5);g.rotation.y=Math.PI;const u=g.userData;u.legs.forEach(l=>l.rotation.x=-Math.PI/2);u.baseArmX=-0.8;scene.add(g);if(i===4)C.player=g;else C.kids.push(g)});
+C.teacher=makeChar(TEACHER,st);C.teacher.position.set(-1.7,0,-4.0);scene.add(C.teacher);
+C.principal=makeChar(PRINCIPAL,st);C.principal.position.set(4.7,0,-3.0);face(C.principal,CLASS);scene.add(C.principal);
+C.captain=makeChar(CAPTAIN,st);C.captain.position.set(4.95,0,-4.0);face(C.captain,CLASS);scene.add(C.captain);
+[TEACHER,PRINCIPAL,CAPTAIN,KIDS[0],KIDS[1],PLAYER].forEach((sp,i)=>{const g=makeChar(sp,st);g.position.set(40+(i-3)*1.2,0,0);scene.add(g);C.cast.push(g)});
+const n=makeNova();n.position.set(40+3*1.2,1.3,0);scene.add(n);C.cast.push(n);
+C.cast.forEach(g=>{g.userData.top=new THREE.Box3().setFromObject(g).max.y});
+document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s===k));setMoment(moment)}
+// post
+const Grade={uniforms:{tDiffuse:{value:null},sat:{value:0.6},tint:{value:new THREE.Vector3(1,1,1)},vig:{value:0.3}},
+vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+fragmentShader:'uniform sampler2D tDiffuse;uniform float sat;uniform vec3 tint;uniform float vig;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);float l=dot(c.rgb,vec3(0.2126,0.7152,0.0722));vec3 col=mix(vec3(l),c.rgb,sat)*tint;float d=distance(vUv,vec2(0.5));col*=1.0-vig*smoothstep(0.35,0.85,d);gl_FragColor=vec4(col,c.a);}'};
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(512,512),0.55,0.5,1.0);composer.addPass(bloom);composer.addPass(new OutputPass());const grade=new ShaderPass(Grade);composer.addPass(grade);
+function size(){const w=wrap.clientWidth||680,h=Math.round(w*0.58);renderer.setSize(w,h);composer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}
+new ResizeObserver(size).observe(wrap);size();
+// moments, script, views
+const MOM={tuesday:{sat:0.58,tint:[1.03,1.0,0.95],hall:0.25,spot:0,win:1.1,exp:0.95},knock:{sat:1.08,tint:[1.05,1.0,0.93],hall:3.4,spot:90,win:1.3,exp:1.05}};
+const SCRIPT={tuesday:[
+{who:'teacher',n:'Teacher',t:3.6,say:'Class, you have learned addition and subtraction. As we all know, 4 + 4 is…',board:'4 + 4 = ?',look:'teacher',door:0},
+{who:'teacher',n:'Teacher',t:2.0,say:"Who's going to tell me?"},
+{wait:5,ans:'Eight!',kid:1},
+{who:'teacher',n:'Teacher',t:2.2,say:'Eight. Lovely.',board:'4 + 4 = 8'},
+{who:'teacher',n:'Teacher',t:2.4,say:"And what's 5 − 3?",board:'5 − 3 = ?'},
+{wait:5,ans:'Two!',kid:3},
+{who:'teacher',n:'Teacher',t:3.2,say:"Two. Okay class, today we're starting multiplication…",board:'5 − 3 = 2'}],
+knock:[
+{t:1.8,say:'<i>knock knock</i>',door:-1.35,look:'door',board:'×'},
+{who:'principal',n:'Principal',t:2.2,say:'Sorry to interrupt.'},
+{who:'captain',n:'Captain',t:3.8,say:'There is grave danger in space. We are enrolling five of your brightest students as cadets.'},
+{who:'teacher',n:'Teacher',t:3.2,say:'Maya… Leo… Aarav… Zoe…',look:'teacher'},
+{who:'teacher',n:'Teacher',t:2.6,say:'…and you!',look:'player'},
+{t:2.2,say:'',door:0}]};
+const VIEWS={back:{p:[-1.5,2.3,3.9],l:[0.8,1.1,-4]},teacher:{p:[-0.5,1.95,-4.35],l:[0.3,0.85,2.5]},door:{p:[1.5,1.8,-2.1],l:[5.6,1.25,-3.6]},cast:{p:[40,1.3,5.8],l:[40,0.85,0]}};
+let moment='tuesday',view='back',si=0,stT=0,waitS=null,doorTarget=0,flick=0,T=0;
+const camPos=new THREE.Vector3(...VIEWS.back.p),camLook=new THREE.Vector3(...VIEWS.back.l);
+function allPeople(){return[...C.kids,C.player,C.teacher,C.principal,C.captain]}
+function headPos(g){return g.userData.head.getWorldPosition(new THREE.Vector3())}
+function lookAt(k){const tp=k==='door'?DOOR:k==='player'?headPos(C.player):headPos(C.teacher);[...C.kids,C.player].forEach(g=>g.userData.look=tp);
+C.player.userData.look=k==='player'?headPos(C.teacher):tp;C.teacher.userData.look=k==='teacher'?CLASS:tp;C.principal.userData.look=CLASS;C.captain.userData.look=CLASS}
+function startStep(){const s=SCRIPT[moment][si];stT=0;allPeople().forEach(g=>g.userData.talking=false);
+if(s.board)boardText(s.board);if(s.door!==undefined)doorTarget=s.door;if(s.look)lookAt(s.look);
+if(s.wait){waitS={t:s.wait,pressed:false,answered:false,ans:s.ans,kid:s.kid};capEl.innerHTML='<b>Raise your hand</b> Space or tap ✋';handBtn.disabled=false;handBtn.style.opacity=1}
+else{waitS=null;handBtn.disabled=true;handBtn.style.opacity=0.35;barEl.style.width='0';if(s.who)C[s.who].userData.talking=true;capEl.innerHTML=s.say?(s.n?`<b>${s.n}</b>`:'')+s.say:'';capEl.style.opacity=s.say?1:0}
+if(s.wait)capEl.style.opacity=1}
+function next(){si=(si+1)%SCRIPT[moment].length;startStep()}
+function stepScript(dt){const s=SCRIPT[moment][si];stT+=dt;
+if(waitS){const w=waitS;if(!w.answered){barEl.style.width=Math.max(0,1-stT/w.t)*100+'%';if(w.pressed||stT>=w.t){w.answered=true;w.at=stT;const who=w.pressed?C.player:C.kids[w.kid];who.userData.raise=true;who.userData.talking=true;
+capEl.innerHTML=`<b>${w.pressed?'You':'Classmate'}</b>${w.ans}`;barEl.style.width='0';handBtn.disabled=true;handBtn.style.opacity=0.35}}
+else if(stT-w.at>2.2){allPeople().forEach(g=>{g.userData.raise=false;g.userData.talking=false});next()}return}
+if(stT>=s.t)next()}
+function setMoment(m){moment=m;si=0;const k=m==='knock';C.principal.visible=C.captain.visible=k;door.rotation.y=k?0:door.rotation.y;
+document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));allPeople().forEach(g=>{g.userData.raise=false});startStep()}
+function setView(v){if(v==='cast'||view==='cast'){camPos.set(...VIEWS[v].p);camLook.set(...VIEWS[v].l)}view=v;document.querySelectorAll('[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));labelsEl.innerHTML='';
+if(v==='cast')['Teacher','Principal','Captain','Classmate','Classmate','You, the cadet','Nova, co-pilot'].forEach(t=>{const d=document.createElement('div');d.className='nm';d.textContent=t;labelsEl.appendChild(d)})}
+function press(){if(waitS&&!waitS.answered)waitS.pressed=true}
+handBtn.onclick=press;document.addEventListener('keydown',e=>{if(e.code==='Space'&&waitS&&!waitS.answered){e.preventDefault();press()}});
+function animChar(g,dt){const u=g.userData;if(u.nova){g.position.y=1.3+Math.sin(T*2)*0.08;u.ring.rotation.z+=dt*1.5;g.rotation.y=Math.sin(T*0.7)*0.4;return}
+u.torso.scale.y=1+Math.sin(T*2.2+u.ph)*0.015;u.blink-=dt;let ey=1;if(u.blink<0){ey=0.12;if(u.blink<-0.12)u.blink=2+rnd()*3}u.eyes.forEach(e=>e.scale.y=ey);
+u.mouth.scale.y=u.talking?0.5+Math.abs(Math.sin(T*13+u.ph))*1.6:1;
+let yaw=0;if(u.look){const w=headPos(g);const d=Math.atan2(u.look.x-w.x,u.look.z-w.z)-g.rotation.y;yaw=Math.max(-1.1,Math.min(1.1,Math.atan2(Math.sin(d),Math.cos(d))))}
+u.head.rotation.y+=(yaw-u.head.rotation.y)*Math.min(1,dt*5);u.head.rotation.z=Math.sin(T*1.3+u.ph)*0.04+(u.talking?Math.sin(T*6)*0.035:0);
+u.r+=((u.raise?1:0)-u.r)*Math.min(1,dt*8);const a=u.arms[1];a.rotation.z=0.12+(Math.PI*0.9-0.12)*u.r+(u.raise?Math.sin(T*9)*0.06:0);a.rotation.x=u.baseArmX*(1-u.r);u.arms[0].rotation.x=u.baseArmX}
+const tmpV=new THREE.Vector3(),clk=new THREE.Clock();
+function update(dt){T+=dt;stepScript(dt);const M=MOM[moment],cast=view==='cast';
+const lerp=(a,b,k)=>a+(b-a)*Math.min(1,dt*k);
+grade.uniforms.sat.value=lerp(grade.uniforms.sat.value,cast?1.0:M.sat,3);const tn=grade.uniforms.tint.value;tn.set(lerp(tn.x,cast?1:M.tint[0],3),lerp(tn.y,cast?1:M.tint[1],3),lerp(tn.z,cast?1:M.tint[2],3));
+renderer.toneMappingExposure=lerp(renderer.toneMappingExposure,cast?1.05:M.exp,3);
+hallM.emissiveIntensity=lerp(hallM.emissiveIntensity,M.hall,2.5);spot.intensity=lerp(spot.intensity,cast?0:M.spot*(door.rotation.y<-0.3?1:0.05),2.5);paneM.emissiveIntensity=M.win;fill.intensity=lerp(fill.intensity,!cast&&moment==='knock'?9:0,3);
+studioKey.intensity=lerp(studioKey.intensity,cast?2.6:0,4);key.intensity=lerp(key.intensity,cast?0.6:1.8,4);
+if(moment==='tuesday'&&!cast){if(flick<=0&&rnd()<0.006)flick=0.35;}if(flick>0){flick-=dt;const on=rnd()>0.5;tubeM.emissiveIntensity=on?2.2:0.3;tube.intensity=on?22:4}else{tubeM.emissiveIntensity=2.2;tube.intensity=22}
+door.rotation.y+=(doorTarget-door.rotation.y)*Math.min(1,dt*3);
+minH.rotation.z=-T*0.2;hourH.rotation.z=-T*0.017;
+dust.position.y=Math.sin(T*0.25)*0.12;dust.rotation.y=T*0.012;
+[...allPeople(),...C.cast].forEach(g=>animChar(g,dt));C.cast.forEach((g,i)=>{if(!g.userData.nova)g.rotation.y=Math.sin(T*0.5+i)*0.45});
+const V=VIEWS[view];camPos.lerp(tmpV.set(...V.p),Math.min(1,dt*2.5));camLook.lerp(tmpV.set(...V.l),Math.min(1,dt*2.5));
+camera.position.set(camPos.x+Math.sin(T*0.3)*0.05,camPos.y+Math.sin(T*0.45)*0.03,camPos.z);camera.lookAt(camLook);
+capEl.style.display=cast?'none':'';
+if(cast){const w=wrap.clientWidth,h=wrap.clientHeight;[...labelsEl.children].forEach((d,i)=>{const g=C.cast[i];tmpV.set(g.position.x,(g.userData.top||2)+0.12,g.position.z).project(camera);d.style.left=((tmpV.x+1)/2*w)+'px';d.style.top=((1-tmpV.y)/2*h)+'px'})}}
+function tick(){update(Math.min(clk.getDelta(),0.05));composer.render();requestAnimationFrame(tick)}
+const mk=(el,list,attr,fn)=>list.forEach(([k,n,d])=>{const b=document.createElement('button');b.className='sb';b.dataset[attr]=k;b.innerHTML=d?`${n}<small>${d}</small>`:n;b.onclick=()=>fn(k);$(el).appendChild(b)});
+mk('styles',Object.entries(CS).map(([k,v])=>[k,v.label,v.sub]),'s',build);
+mk('moments',[['tuesday','Sleepy Tuesday'],['knock','The knock']],'m',m=>{setMoment(m);setView(m==='knock'?'door':'back')});
+mk('views',[['back','Back of class'],['teacher',"Teacher's view"],['door','The door'],['cast','Cast lineup']],'v',setView);
+build('bean');setView('back');tick();
+window.__step=sec=>{for(let i=0;i<sec*60;i++)update(1/60);composer.render()};window.__api={build,setMoment,setView,press};
+</script>
