@@ -12,7 +12,7 @@ export function makeRocket(M: Materials) {
   outline(add(body, new THREE.LatheGeometry([V(0.47, 2.35), V(0.36, 2.65), V(0.2, 2.9), V(0.05, 3.02), V(0, 3.04)], 48), trim), M);
   const band = add(body, new THREE.TorusGeometry(0.6, 0.06, 12, 48), trim, 0, 1.15, 0);
   band.rotation.x = Math.PI / 2;
-  add(body, new THREE.SphereGeometry(0.2, 24, 16), M.glow(PALETTE.sky, 1.4), 0, 1.65, 0.52, { cast: false });
+  add(body, new THREE.SphereGeometry(0.2, 24, 16), M.glow(PALETTE.sky, 0.55), 0, 1.65, 0.52, { cast: false });
   add(body, new THREE.TorusGeometry(0.22, 0.045, 10, 32), dark, 0, 1.65, 0.53);
   outline(add(body, new THREE.CylinderGeometry(0.3, 0.42, 0.32, 32), dark, 0, -0.12, 0), M);
   const fin = new THREE.Shape();
@@ -47,8 +47,8 @@ export function makeInvader(M: Materials) {
   const body = new THREE.SphereGeometry(0.55, 32, 16);
   body.scale(1, 0.5, 1);
   outline(add(g, body, M.clay(PALETTE.invader, { roughness: 0.5 })), M);
-  add(g, new THREE.SphereGeometry(0.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.clay(0xb8f5ff, { transparent: true, opacity: 0.65, roughness: 0.2, emissive: PALETTE.cyan, emissiveIntensity: 0.15 }), 0, 0.12, 0);
-  const eye = M.glow(PALETTE.cyan, 2.2), running = M.glow(PALETTE.cyan, 0.9); // running lights stay under the bloom threshold
+  add(g, new THREE.SphereGeometry(0.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.clay(0xb8f5ff, { transparent: true, opacity: 0.7, roughness: 0.2 }), 0, 0.12, 0);
+  const eye = M.glow(PALETTE.cyan, 0.6), running = M.glow(PALETTE.cyan, 0.35); // all under the bloom threshold: no halo in battle
   for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(0.075, 12, 8), eye, s * 0.12, 0.26, 0.2, noCast);
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2;

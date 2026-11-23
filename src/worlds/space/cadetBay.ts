@@ -119,14 +119,16 @@ export function mountCadetBay(stage: Stage, opts: { onUi?: (ui: BayUi) => void; 
     attempts++;
     emit({ type: "attempt_submitted", payload: { a: w.a, b: w.b, planetId: w.planetId, guess: n, latencyMs: latency, errorType: classifyError(w.a, w.b, n), attemptIndex: attempts, usedRadar: false, powerUpUsed: null, isTransferCheck: w.isTransferCheck, waveRole: w.role } });
     const alive = drones.filter((d) => d.alive);
-    for (let i = 0; i < Math.min(n, alive.length + 6); i++) {
-      audio.sfx("shot");
+    // the whole volley takes at most ~1.5 s however big the number, so a shot never drags
+    const shots = Math.min(n, alive.length + 6), gap = Math.max(12, Math.min(150, 1500 / Math.max(1, shots)));
+    for (let i = 0; i < shots; i++) {
+      if (i % Math.max(1, Math.round(60 / gap)) === 0) audio.sfx("shot");
       const target = alive[i];
       launch(target ? target.g.position.clone().add(group.position) : null, target);
-      await wait(150);
+      await wait(gap);
     }
     if (n > alive.length) audio.sfx("flyby");
-    await wait(650);
+    await wait(500);
     if (n === p) {
       audio.sfx("clear");
       overlay.card("", "");
@@ -174,7 +176,6 @@ export function mountCadetBay(stage: Stage, opts: { onUi?: (ui: BayUi) => void; 
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const stop = stage.onUpdate((dt, T) => {
-    overlay.eq(audio.level());
     for (const d of drones) {
       d.g.position.lerp(d.home, Math.min(1, dt * 2.2));
       d.g.position.y += Math.sin(T * 2 + d.ph) * 0.002;
@@ -199,7 +200,7 @@ export function mountCadetBay(stage: Stage, opts: { onUi?: (ui: BayUi) => void; 
   camera.updateProjectionMatrix();
   scene.background = new THREE.Color(0x030612);
   scene.fog = null;
-  Object.assign(stage.bloom, { strength: 0.6, radius: 0.3, threshold: 1.0 });
+  Object.assign(stage.bloom, { strength: 0.12, radius: 0.2, threshold: 1.4 }); // battle reads clean: no halos on ships or drones
   stage.renderer.toneMappingExposure = 1.0;
   stage.grade.sat.value = 1;
   stage.grade.tint.value.set(1, 1, 1);
@@ -213,6 +214,8 @@ export function mountCadetBay(stage: Stage, opts: { onUi?: (ui: BayUi) => void; 
     fire,
     get ui() { return ui; },
     log: () => log,
+    /** Lift Nova's captions clear of a keypad docked at the bottom (mobile). */
+    captionAt: (px: number) => overlay.captionAt(px),
     dispose() { stop(); overlay.dispose(); scene.remove(group); },
   };
 }

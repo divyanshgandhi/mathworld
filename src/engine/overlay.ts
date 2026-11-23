@@ -1,6 +1,6 @@
 /**
- * The 2D layer over the canvas, display only: speaker-coloured captions with a live voice
- * equaliser, title cards, fades, eyelids, blur and a timer bar. Interactive controls (choices,
+ * The 2D layer over the canvas, display only: speaker-coloured captions (text only: the voice is
+ * heard, not drawn), title cards, fades, eyelids, blur and a timer bar. Interactive controls (choices,
  * buttons, the keypad) are React components on @ui-sdk/react, layered above this.
  */
 const css = (el: HTMLElement, s: Partial<CSSStyleDeclaration>) => Object.assign(el.style, s);
@@ -23,8 +23,8 @@ const SPEAKERS: Record<string, [string, string]> = {
 
 export interface Overlay {
   caption(speaker: string, text: string): void;
-  /** Voice level 0..1 for the caption's equaliser. */
-  eq(level: number): void;
+  /** Lift captions clear of a panel docked at the bottom of the frame (px from the bottom). */
+  captionAt(bottomPx: number): void;
   /** A title card; `at: "top"` keeps the middle of the frame clear for what the shot is showing. */
   card(kicker: string, main: string, sub?: string, at?: "centre" | "top"): void;
   fade(opacity: number, color?: string): void;
@@ -48,31 +48,23 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
   card.append(kicker, main, sub);
 
   const cap = div(root, { left: "50%", bottom: "18px", transform: "translateX(-50%)", maxWidth: "84%", display: "flex", alignItems: "center", gap: "10px", background: "rgba(13,14,26,.78)", color: "#f3f1ea", fontSize: "15px", lineHeight: "1.45", padding: "9px 14px", borderRadius: "12px", opacity: "0", transition: "opacity .25s", backdropFilter: "blur(6px)" });
-  const chip = document.createElement("span"), bars = document.createElement("span"), text = document.createElement("span");
+  const chip = document.createElement("span"), text = document.createElement("span");
   css(chip, { flex: "none", fontSize: "11px", fontWeight: "600", letterSpacing: ".08em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "999px" });
-  css(bars, { flex: "none", display: "inline-flex", alignItems: "flex-end", gap: "2px", height: "15px" });
-  const eqBars = Array.from({ length: 4 }, () => { const b = document.createElement("span"); css(b, { width: "3px", height: "3px", borderRadius: "2px", background: "currentColor" }); bars.appendChild(b); return b; });
-  cap.append(chip, bars, text);
+  cap.append(chip, text);
 
   const barW = div(root, { left: "50%", bottom: "8px", transform: "translateX(-50%)", width: "200px", height: "4px", borderRadius: "2px", background: "rgba(255,255,255,.15)", opacity: "0" });
   const bar = div(barW, { position: "relative", height: "100%", width: "0", background: "#b6f23a", borderRadius: "2px" });
-  let t = 0;
 
   return {
     caption(speaker, txt) {
       const [bg, fg] = SPEAKERS[speaker] ?? ["rgba(255,255,255,0.14)", "#f8fafc"];
       chip.textContent = speaker;
       chip.style.display = speaker ? "" : "none";
-      bars.style.display = speaker ? "inline-flex" : "none";
       css(chip, { background: bg, color: fg });
-      bars.style.color = fg;
       text.textContent = txt;
       cap.style.opacity = txt ? "1" : "0";
     },
-    eq(level) {
-      t += 0.016;
-      eqBars.forEach((b, i) => (b.style.height = `${Math.min(15, 3 + level * (8 + (i % 2) * 5) * (0.7 + 0.3 * Math.sin(t * 20 + i)))}px`));
-    },
+    captionAt(px) { cap.style.bottom = `${px}px`; barW.style.bottom = `${Math.max(8, px - 10)}px`; },
     card(k, m, s = "", at = "centre") {
       kicker.textContent = k;
       kicker.style.display = k ? "" : "none";

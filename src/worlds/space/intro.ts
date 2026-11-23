@@ -425,7 +425,6 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   const stop = stage.onUpdate((dt, time) => {
     director.update(dt);
     const voice = audio.level();
-    overlay.eq(voice);
     if (env === "space") earth.update(dt);
     if (env === "town") town.update(time);
     if (env === "class") {

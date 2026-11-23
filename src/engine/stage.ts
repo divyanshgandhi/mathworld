@@ -36,8 +36,11 @@ export interface Stage {
   dispose(): void;
 }
 
-/** One canvas, one scene, one camera, clay-friendly lighting defaults and the bloom + grade post chain. */
-export function createStage(container: HTMLElement, { aspect = 0.58 } = {}): Stage {
+/**
+ * One canvas, one scene, one camera, clay-friendly lighting defaults and the bloom + grade post chain.
+ * `fill` sizes the canvas to the container's box (a full-screen game); otherwise height = width × aspect.
+ */
+export function createStage(container: HTMLElement, { aspect = 0.58, fill = false } = {}): Stage {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -59,7 +62,7 @@ export function createStage(container: HTMLElement, { aspect = 0.58 } = {}): Sta
   composer.addPass(gradePass);
 
   const size = () => {
-    const w = container.clientWidth || 680, h = Math.round(w * aspect);
+    const w = container.clientWidth || 680, h = fill ? container.clientHeight || Math.round(w * aspect) : Math.round(w * aspect);
     renderer.setSize(w, h);
     composer.setSize(w, h);
     camera.aspect = w / h;
