@@ -97,7 +97,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
     <div className="fixed inset-0 select-none overflow-hidden bg-[#030612] text-white">
       <div ref={box} className="absolute inset-0" />
       <div className="absolute left-3 top-3 z-20"><PauseMenu label="Warm-up paused" /></div>
-      <div className="pointer-events-none absolute right-3 top-3 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {state.orbs} orbs</div>
+      <div className="pointer-events-none absolute right-16 top-3.5 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {state.orbs} orbs</div>
 
       {started && p && !done && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">

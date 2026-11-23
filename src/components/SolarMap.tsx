@@ -76,7 +76,7 @@ export function SolarMap() {
             <Button aria-label="Resting Bay" onClick={() => router.push("/bay")} className={`${ghost} grid size-10 place-items-center bg-black/45 p-0 text-lg`}>⌂</Button>
             <span className={`${glass} pointer-events-none px-4 py-2 font-mono text-xs tracking-[0.25em] text-lime-200`}>SOLAR SYSTEM</span>
           </div>
-          <div className="pointer-events-none absolute right-3 top-3 z-10 flex flex-col items-end gap-1.5">
+          <div className="pointer-events-none absolute right-16 top-3.5 z-10 flex flex-col items-end gap-1.5">
             <span className="rounded-full bg-black/45 px-3 py-1.5 font-mono text-sm text-amber-200">✦ {state.orbs} orbs</span>
             {jump && <span className={`rounded-full border px-3 py-1 font-mono text-[11px] ${jump.available ? "border-amber-300 bg-amber-300/20 text-amber-100" : "border-white/15 bg-black/45 text-white/70"}`}>⚡ {jump.label}</span>}
           </div>

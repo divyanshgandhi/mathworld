@@ -12,7 +12,7 @@ bun run build    # production build
 bun run proof    # regenerate docs/levelling-proof.md from the bot harness
 ```
 
-Locally the database is PGlite in `.data/pg`, created and migrated on first use (delete the folder to start fresh). Set `DATABASE_URL` to use Postgres instead. `NEXT_PUBLIC_MW_MUTE=1`, `?mute` or `localStorage["mw:mute"] = "1"` silences all audio while everything still paces on the baked clip lengths.
+Locally the database is PGlite in `.data/pg`, created and migrated on first use (delete the folder to start fresh). Set `DATABASE_URL` to use Postgres instead. The speaker button in the top-right corner of every screen mutes and unmutes (remembered in `localStorage["mw:mute"]`; `?mute` starts muted). Muted audio still plays at zero volume, so pacing never changes.
 
 ### What a new cadet plays
 

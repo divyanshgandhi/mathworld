@@ -11,10 +11,20 @@ export type Sfx = "dive" | "chime" | "knock" | "door" | "blip_ok" | "blip_close"
 class SoundEngine {
   manifest: Record<string, Clip> = {};
   /**
-   * Silent when NEXT_PUBLIC_MW_MUTE=1 (a dev-only env flag, e.g. in .env.development.local),
-   * when the URL has ?mute, or when localStorage "mw:mute" is "1". Everything still runs; nothing is heard.
+   * Muting only turns the master volume to 0: every line, bed and effect still plays, so pacing and
+   * lip-sync are identical and sound can come back mid-line. Remembered in localStorage "mw:mute";
+   * `?mute` in the URL starts muted.
    */
-  muted = typeof window !== "undefined" && (process.env.NEXT_PUBLIC_MW_MUTE === "1" || /[?&]mute\b/.test(location.search) || localStorage.getItem("mw:mute") === "1");
+  muted = typeof window !== "undefined" && (/[?&]mute\b/.test(location.search) || localStorage.getItem("mw:mute") === "1");
+  private subs = new Set<() => void>();
+  setMuted(m: boolean) {
+    this.muted = m;
+    try { localStorage.setItem("mw:mute", m ? "1" : "0"); } catch { /* private mode */ }
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.04);
+    this.subs.forEach((f) => f());
+  }
+  /** For React (useSyncExternalStore): called whenever `muted` changes. */
+  subscribe = (f: () => void) => { this.subs.add(f); return () => void this.subs.delete(f); };
   speaking = false;
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -80,12 +90,12 @@ class SoundEngine {
   }
 
   /**
-   * Play a baked line. Resolves when it ends (or at once if muted or missing). `still`: checked once
+   * Play a baked line. Resolves when it ends (or at once if missing). `still`: checked once
    * the clip has loaded, so a line cancelled while it was loading never starts late over the next one.
    */
   async say(id: string, still?: () => boolean) {
     await this.preload();
-    const buf = this.ctx && !this.muted ? await this.load(id) : undefined;
+    const buf = this.ctx ? await this.load(id) : undefined;
     if (still && !still()) return undefined;
     return buf ? this.play(buf) : undefined;
   }
@@ -99,7 +109,7 @@ class SoundEngine {
   /** Play live speech (an AudioBuffer from voice.ts) through the same lip-sync path. */
   play(buf: AudioBuffer) {
     this.stopVoice();
-    if (!this.ctx || this.muted) return Promise.resolve();
+    if (!this.ctx) return Promise.resolve();
     const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
     src.buffer = buf;
     g.gain.value = 1.15;
@@ -125,7 +135,7 @@ class SoundEngine {
   /** Cross-fade the music bed. */
   mood(m: Mood) {
     const a = this.ctx;
-    if (!a || this.muted) return;
+    if (!a) return;
     const t = a.currentTime;
     if (this.bed) {
       const old = this.bed;
@@ -169,7 +179,7 @@ class SoundEngine {
 
   sfx(name: Sfx) {
     const a = this.ctx;
-    if (!a || this.muted) return;
+    if (!a) return;
     const t = a.currentTime;
     const env = (peak: number, atk: number, rel: number, dl = 0) => {
       const g = a.createGain();

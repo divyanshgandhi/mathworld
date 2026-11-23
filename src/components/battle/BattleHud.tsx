@@ -129,7 +129,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
         </div>
       )}
 
-      <div className="pointer-events-none absolute right-3 top-3 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {ui.orbs} orbs</div>
+      <div className="pointer-events-none absolute right-16 top-3.5 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {ui.orbs} orbs</div>
       {menu && <div className="absolute left-3 top-3 z-20">{menu}</div>}
       {dev && (
         <div className="pointer-events-none absolute left-3 top-16 z-10 font-mono text-[11px] text-white/60">
