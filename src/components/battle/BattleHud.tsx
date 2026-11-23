@@ -26,27 +26,35 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   /** The pause menu button (top-left). */
   menu?: ReactNode;
 }) {
-  const [entry, setEntry] = useState("");
+  const [entry, setEntryState] = useState("");
+  // the latest entry, so a digit and Enter in the same frame (fast fingers, scripts) are never lost
+  const live = useRef("");
+  const setEntry = useCallback((v: string | ((prev: string) => string)) => {
+    live.current = typeof v === "function" ? v(live.current) : v;
+    setEntryState(live.current);
+  }, []);
   const plateRef = useRef<HTMLDivElement>(null), dockRef = useRef<HTMLDivElement>(null);
   const w = ui?.wave, sectorActive = ui?.sectors?.find((s) => s.active) ?? null;
 
   // when every sector is locked, the plasma lock (their sum) loads into the readout
   const [prevTotal, setPrevTotal] = useState<number | null>(null);
-  if ((ui?.lockTotal ?? null) !== prevTotal) { setPrevTotal(ui?.lockTotal ?? null); if (ui?.lockTotal != null) setEntry(String(ui.lockTotal)); }
+  if ((ui?.lockTotal ?? null) !== prevTotal) { setPrevTotal(ui?.lockTotal ?? null); if (ui?.lockTotal != null) setEntryState(String(ui.lockTotal)); }
+  useEffect(() => { live.current = entry; }, [entry]);
 
   const fire = useCallback(() => {
-    if (!arena || !ui || entry === "") return;
-    if (sectorActive) { arena.lockSector(Number(entry)); setEntry(""); return; }
+    const v = live.current;
+    if (!arena || !ui || v === "") return;
+    if (sectorActive) { arena.lockSector(Number(v)); setEntry(""); return; }
     if (!ui.canFire) return;
-    void arena.fire(Number(entry));
+    void arena.fire(Number(v));
     setEntry("");
-  }, [arena, ui, entry, sectorActive]);
+  }, [arena, ui, sectorActive, setEntry]);
   const press = useCallback((k: string) => {
     arena?.poke();
     if (k === "Fire") return fire();
     if (k === "⌫") return setEntry((v) => v.slice(0, -1));
     setEntry((v) => (v === "0" ? k : (v + k).slice(0, 9)));
-  }, [fire, arena]);
+  }, [fire, arena, setEntry]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -114,8 +122,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
             </div>
           )}
           {o && (
-            <div role="status" className={`rounded-full px-5 py-1 font-mono text-lg font-semibold tabular-nums shadow-lg ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
-              {o.kind === "exact" ? `✓ Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
+            <div role="status" className={`rounded-full px-5 py-1 font-mono font-semibold tabular-nums shadow-lg transition ${o.last ? "text-sm opacity-75" : "text-lg"} ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
+              {o.last ? "Last shot: " : ""}{o.kind === "exact" ? `✓ Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
             </div>
           )}
         </div>
@@ -192,7 +200,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
             className={`mt-1.5 w-full rounded-xl py-1.5 text-sm md:mt-2 md:py-2 font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40 ${ui.invite ? "bg-sky-300 text-[#06202b]" : "border border-sky-300/30 text-sky-100/85 hover:border-sky-300/70"}`}>
             Show Me How
           </Button>
-          {!ui.canFire && !ui.lesson && <p className="mt-1 hidden text-center text-xs text-white/45 md:block">Volley in flight…</p>}
+          {!ui.canFire && !ui.lesson && <p className="mt-1 hidden text-center text-xs text-white/45 md:block">Stand by…</p>}
         </div>
       )}
 

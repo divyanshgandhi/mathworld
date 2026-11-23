@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { WarmupDrill } from "@/components/WarmupDrill";
 import { WaveArena } from "@/components/WaveArena";
 import { PLANETS_BY_TIER, type PlanetId } from "@/rig/pools";
@@ -11,18 +10,19 @@ export function generateStaticParams() {
   return [...WARMUPS, ...PLANETS_BY_TIER].map((planet) => ({ planet }));
 }
 
-async function Battle({ params }: { params: PageProps<"/play/[planet]">["params"] }) {
+/**
+ * Every real planet is prerendered above, so awaiting `params` up front costs nothing for them; it is
+ * what lets an unknown planet answer with a real 404. Instant-navigation validation is off for that.
+ */
+export const instant = false;
+
+/**
+ * A planet battle, or a Mercury / Venus warm-up. The game owns the whole screen. `params` is awaited
+ * outside any Suspense boundary, so an unknown planet is a real 404 (not a 200 with a not-found body).
+ */
+export default async function PlayPage({ params }: PageProps<"/play/[planet]">) {
   const { planet } = await params;
   if (planet === "mercury" || planet === "venus") return <WarmupDrill planet={planet} />;
   if (!(PLANETS_BY_TIER as readonly string[]).includes(planet)) notFound();
   return <WaveArena planet={planet as PlanetId} />;
-}
-
-/** A planet battle, or a Mercury / Venus warm-up. The game owns the whole screen (a dark frame while it loads). */
-export default function PlayPage(props: PageProps<"/play/[planet]">) {
-  return (
-    <Suspense fallback={<div className="fixed inset-0 bg-[#030612]" />}>
-      <Battle params={props.params} />
-    </Suspense>
-  );
 }

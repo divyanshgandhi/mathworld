@@ -50,6 +50,8 @@ describe("error classifier and radar", () => {
     expect(classifyError(6, 24, 124)).toBe("place_value"); // forgot the carry
     expect(classifyError(6, 24, 1440)).toBe("place_value");
     expect(classifyError(7, 8, 55)).toBe("off_by_one_unit");
+    expect(classifyError(1, 4, 3)).toBe("off_by_one_unit"); // a squad of 1 is not "one squad off"
+    expect(classifyError(4, 1, 3)).toBe("off_by_one_unit");
     expect(classifyError(7, 8, 50)).toBe("undershoot_close");
     expect(classifyError(7, 8, 62)).toBe("overshoot_close");
     expect(classifyError(7, 8, 9)).toBe("wild_guess");

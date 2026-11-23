@@ -34,7 +34,8 @@ export interface ArenaUi {
   started: boolean;
   wave: { a: number; b: number; role: string; index: number; of: number; flipped: boolean; sectorLock: boolean } | null;
   canFire: boolean;
-  outcome: { kind: "exact" | "under" | "over"; value: number; orbs?: number } | null;
+  /** `last`: the shields are back up, so the chip now reports the previous shot, not the fleet on screen. */
+  outcome: { kind: "exact" | "under" | "over"; value: number; orbs?: number; last?: boolean } | null;
   radar: number[] | null;
   invite: boolean;
   belt: { id: TrickId; card: string; fits: boolean; active: boolean }[];
@@ -306,7 +307,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     return t;
   }
   function laser(x: number | null, y: number | null) {
-    const W = fw / scale + 1.4, H = fh / scale + 1.4;
+    // just past the fleet edge: long enough to read as a cut, short of the axis labels and the keypad
+    const W = fw / scale + 0.6, H = fh / scale + 0.6;
     const m = new THREE.Mesh(x !== null ? new THREE.BoxGeometry(0.07, H, 0.07) : new THREE.BoxGeometry(W, 0.07, 0.07), M.glow(0xffd36b, 1.1));
     m.position.set(x ?? 0, y ?? 0, 0.5);
     m.userData.grow = { t0: stage.time, axis: x !== null ? "y" : "x" };
@@ -847,6 +849,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     void say(mash ? "nova_hold_fire" : sc.invite ? "nova_invite" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: mash });
     await after(1.05);
     restore();
+    if (ui.outcome) setUi({ outcome: { ...ui.outcome, last: true } });
     await after(0.4);
     ready();
   }

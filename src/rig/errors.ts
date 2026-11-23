@@ -25,7 +25,8 @@ export function classifyError(a: number, b: number, guess: number): ErrorType | 
   if (guess === p) return null;
   if (guess === a + b) return "added_instead";
   const groups = [a * (b + 1), (a + 1) * b, ...(b > 0 ? [a * (b - 1)] : []), ...(a > 0 ? [(a - 1) * b] : [])];
-  if (groups.includes(guess)) return "off_by_one_group";
+  // a squad of one is just one drone: 3 on 1 × 4 is "a hair off", not "one squad off"
+  if (groups.includes(guess) && Math.abs(guess - p) > 1) return "off_by_one_group";
   if (p >= 10 && (guess === p * 10 || guess === Math.floor(p / 10) || guess === forgotCarry(a, b))) return "place_value";
   if (Math.abs(guess - p) <= 2) return "off_by_one_unit";
   if (missRatio(a, b, guess) > WAY_OFF) return "wild_guess";
