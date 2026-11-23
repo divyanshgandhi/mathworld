@@ -1,0 +1,115 @@
+import { describe, expect, it } from "vitest";
+import { fold, transferRate, type LoggedEvent, type WaveRole } from "@/director/fold";
+import { acceptHyperJump, housekeeping, nextWave, scaffold } from "@/director/next";
+import { tierOf } from "@/rig/pools";
+
+const planets = ["earth", "moon", "mars", "asteroid-belt", "jupiter", "saturn", "uranus", "deep-space"] as const;
+let clock = 0;
+const shot = (a: number, b: number, guess: number, o: { tier?: number; ms?: number; role?: WaveRole; radar?: boolean; transfer?: boolean; i?: number } = {}): LoggedEvent => ({
+  type: "attempt_submitted", at: (clock += o.ms ?? 1000),
+  payload: { a, b, planetId: planets[o.tier ?? tierOf(a, b) ?? 0], guess, latencyMs: o.ms ?? 1000, errorType: null, attemptIndex: o.i ?? 1, usedRadar: !!o.radar, powerUpUsed: null, isTransferCheck: !!o.transfer, waveRole: o.role ?? "discovery" },
+});
+const right = (a: number, b: number, o: Parameters<typeof shot>[3] = {}) => shot(a, b, a * b, o);
+
+describe("fold", () => {
+  it("is pure: the same log always gives the same state", () => {
+    const log = [right(3, 4, { tier: 2 }), shot(7, 8, 54), right(7, 8, { i: 2 })];
+    expect(fold(log)).toEqual(fold(log));
+  });
+
+  it("recomputes correctness and moves mastery by how the wave was solved", () => {
+    const s = fold([shot(3, 8, 23, { tier: 2 }), right(3, 8, { tier: 2, i: 2 }), right(5, 6, { ms: 1200 }), right(8, 7, { ms: 9000 })]);
+    expect(s.history.map((h) => h.outcome)).toEqual(["self_corrected", "fast", "thoughtful"]);
+    expect(s.facts["3x8"].m).toBeCloseTo(0.25 + 0.35 * (0.65 - 0.25));
+    expect(s.facts["8x7"]).toBeUndefined(); // 8 × 7 is filed under 7x8
+    expect(s.facts["7x8"].seen).toBe(1);
+  });
+
+  it("clears Earth's tutorial on 2 of 3 first-try solves, and moves on when the director says so", () => {
+    let log: LoggedEvent[] = [right(0, 5, { role: "tutorial", ms: 9000 }), shot(1, 7, 8, { role: "tutorial" }), right(1, 7, { role: "tutorial", i: 2 }), right(1, 3, { role: "tutorial", ms: 9000 })];
+    let s = fold(log);
+    expect(s.offers.clear).toBe(true);
+    log = [...log, ...housekeeping(s)];
+    s = fold(log);
+    expect(s.tier).toBe(1);
+    expect(s.cleared).toEqual([0]);
+  });
+
+  it("offers a Hyper-Jump only after two Golds and a Gold probe from the planet it skips", () => {
+    const golds = [right(0, 3, { role: "tutorial" }), right(1, 6, { role: "tutorial" })];
+    expect(fold(golds).offers.hyperJumpTo).toBeNull();
+    expect(nextWave(fold(golds), 1).role).toBe("probe");
+    expect(fold([...golds, right(2, 7, { tier: 0, role: "probe", ms: 9000 })]).offers.hyperJumpTo).toBeNull(); // slow probe
+    const s = fold([...golds, right(2, 7, { tier: 0, role: "probe" })]);
+    expect(s.offers.hyperJumpTo).toBe(2);
+    const after = fold([...golds, right(2, 7, { tier: 0, role: "probe" }), acceptHyperJump(s)!]);
+    expect(after.tier).toBe(2);
+    expect(after.aceCleared).toEqual([0, 1]);
+  });
+
+  it("brings a Shield Recharge after two struggles, then calms down", () => {
+    const log = [shot(3, 7, 10, { tier: 2 }), right(3, 7, { tier: 2, i: 2, radar: true }), shot(4, 6, 20, { tier: 2 }), right(4, 6, { tier: 2, i: 2 })];
+    const s = fold(log);
+    expect(s.offers.cushion).toBe(true);
+    const w = nextWave(s, 1);
+    expect(w.role).toBe("recharge");
+    expect(fold([...log, right(w.a, w.b, { role: "recharge" })]).offers.cushion).toBe(false);
+  });
+
+  it("queues a transfer check after Show Me How and scores it", () => {
+    const smh: LoggedEvent[] = [
+      shot(7, 9, 70, { tier: 3 }), shot(7, 9, 70, { tier: 3, i: 2 }), shot(7, 9, 70, { tier: 3, i: 3 }),
+      { type: "explanation_completed", payload: { trickId: "borrow-take-back", a: 7, b: 9, mode: "full", wedoCorrect: true } },
+      right(7, 9, { tier: 3, i: 4 }),
+    ];
+    let s = fold(smh);
+    expect(s.seenTricks["borrow-take-back"]).toBe(1);
+    expect(s.transferQueue).toEqual([{ trick: "borrow-take-back", key: "7x9", tier: 3, due: 3 }]);
+    s = fold([...smh, right(6, 6, { tier: 3 }), right(7, 7, { tier: 3 })]);
+    const w = nextWave(s, 1);
+    expect(w).toMatchObject({ role: "transfer", isTransferCheck: true, trick: "borrow-take-back" });
+    s = fold([...smh, right(6, 6, { tier: 3 }), right(7, 7, { tier: 3 }), right(w.a, w.b, { tier: 3, transfer: true, role: "transfer" })]);
+    expect(s.transfer).toEqual({ checks: 1, passes: 1 });
+    expect(transferRate(s)).toBe(1);
+    expect(s.transferQueue).toEqual([]);
+  });
+
+  it("nudges a masher who fires three wild shots inside four seconds", () => {
+    clock = 0;
+    const s = fold([shot(3, 4, 90, { ms: 400 }), shot(3, 4, 0, { ms: 400, i: 2 }), shot(3, 4, 70, { ms: 400, i: 3 })]);
+    expect(s.antiMashNudges).toBe(1);
+  });
+
+  it("counts orbs and equips upgrades", () => {
+    const s = fold([
+      { type: "orb_earned", payload: { amount: 30, reason: "wave" } },
+      { type: "upgrade_purchased", payload: { slot: "hull", itemId: "solar-gold", cost: 20 } },
+    ]);
+    expect(s.orbs).toBe(10);
+    expect(s.equipped.hull).toBe("solar-gold");
+  });
+});
+
+describe("scaffolding", () => {
+  it("escalates gently: nudge, Radar when way off, invite, then Show Me How", () => {
+    expect(scaffold(1, 7, 8, 54)).toMatchObject({ nudge: true, radar: false, showMeHow: false });
+    expect(scaffold(1, 7, 8, 9)).toMatchObject({ radar: true });
+    expect(scaffold(2, 7, 8, 54)).toMatchObject({ radar: true, invite: true });
+    expect(scaffold(3, 7, 8, 54)).toMatchObject({ showMeHow: true });
+    expect(scaffold(0, 7, 8, 0, 11_000).radar).toBe(true);
+  });
+});
+
+describe("problem strings", () => {
+  it("runs anchor → discovery → application → adaptive → boss on the Asteroid Belt", () => {
+    let log: LoggedEvent[] = [{ type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "asteroid-belt" } }];
+    const roles: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const w = nextWave(fold(log), 42);
+      roles.push(w.role);
+      if (w.role !== "anchor") expect(w.tier).toBe(3);
+      log = [...log, right(w.a, w.b, { tier: 3, role: w.role, ms: 6000 })];
+    }
+    expect(roles).toEqual(["anchor", "discovery", "application", "adaptive", "boss"]);
+  });
+});

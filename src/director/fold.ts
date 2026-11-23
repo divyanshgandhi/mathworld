@@ -1,0 +1,168 @@
+import type { EventInput, UPGRADE_SLOTS, WAVE_ROLES } from "@/db/events";
+import {
+  GOLD_STREAK_FOR_JUMP, JUMP, M0, OBS, STRUGGLES_FOR_CUSHION, TRANSFER_DELAY,
+  ewma, isGold, isSolved, isStruggle, missionLength, outcomeOf, solvesToClear,
+  type FactStat, type Outcome,
+} from "@/rig/adaptive";
+import { classifyError } from "@/rig/errors";
+import { factKey, MAX_TIER, tierOf, tierOfPlanet, type Fact } from "@/rig/pools";
+import { selectTrick, type TrickId } from "@/rig/tricks";
+
+/** An event as folded: the contract shape plus an optional timestamp (ms) for the anti-mash rule. */
+export type LoggedEvent = EventInput & { at?: number };
+export type WaveRole = (typeof WAVE_ROLES)[number];
+
+export interface WaveRecord { a: number; b: number; key: string; factTier: number; tier: number; role: WaveRole; outcome: Outcome; transfer: boolean }
+interface OpenWave { a: number; b: number; role: WaveRole; transfer: boolean; attempts: number; usedRadar: boolean; powerUp: boolean; explained: boolean; firstLatencyMs: number }
+
+export interface PlayerState {
+  introCompleted: boolean;
+  /** Current planet as a tier: 0 Earth … 7 Deep Space. */
+  tier: number;
+  unlocked: number;
+  cleared: number[];
+  aceCleared: number[];
+  facts: Record<string, FactStat>;
+  seenTricks: Partial<Record<TrickId, number>>;
+  orbs: number;
+  equipped: Partial<Record<(typeof UPGRADE_SLOTS)[number], string>>;
+  waves: number;
+  history: WaveRecord[];
+  mission: { n: number; waves: number; inTier: number; solved: number; passed: boolean };
+  goldStreak: number;
+  /** The last wave was a Gold probe from the next planet: the Hyper-Jump is earned. */
+  probePassed: boolean;
+  struggleStreak: number;
+  lastStruggle: Fact | null;
+  transferQueue: { trick: TrickId; key: string; tier: number; due: number }[];
+  transfer: { checks: number; passes: number };
+  antiMashNudges: number;
+  open: OpenWave | null;
+  offers: { hyperJumpTo: number | null; cushion: boolean; clear: boolean };
+}
+
+const freshMission = (n: number) => ({ n, waves: 0, inTier: 0, solved: 0, passed: false });
+
+export const initialState = (): PlayerState => ({
+  introCompleted: false, tier: 0, unlocked: 0, cleared: [], aceCleared: [], facts: {}, seenTricks: {}, orbs: 0, equipped: {},
+  waves: 0, history: [], mission: freshMission(0), goldStreak: 0, probePassed: false, struggleStreak: 0, lastStruggle: null,
+  transferQueue: [], transfer: { checks: 0, passes: 0 }, antiMashNudges: 0, open: null,
+  offers: { hyperJumpTo: null, cushion: false, clear: false },
+});
+
+/**
+ * Player state is a pure fold over the event log: the same events always give the same state,
+ * nothing is stored that could drift from the log. Correctness and error types are recomputed here.
+ */
+export function fold(events: LoggedEvent[]): PlayerState {
+  const s = initialState();
+  let wild: number[] = [];
+
+  const openFor = (a: number, b: number, role: WaveRole = "discovery", transfer = false) => {
+    if (s.open && (s.open.a !== a || s.open.b !== b)) s.open = null; // abandoned wave
+    s.open ??= { a, b, role, transfer, attempts: 0, usedRadar: false, powerUp: false, explained: false, firstLatencyMs: 0 };
+    return s.open;
+  };
+
+  const move = (to: number) => {
+    s.tier = Math.min(MAX_TIER, to);
+    s.unlocked = Math.max(s.unlocked, s.tier);
+    s.mission = freshMission(0);
+    s.goldStreak = 0;
+    s.probePassed = false;
+    s.struggleStreak = 0;
+  };
+
+  const complete = (w: OpenWave) => {
+    const factTier = tierOf(w.a, w.b) ?? s.tier;
+    const outcome = outcomeOf(w, factTier), key = factKey(w.a, w.b);
+    const f = s.facts[key] ?? { m: M0, seen: 0, fastWins: 0 };
+    s.facts[key] = { m: ewma(f.m, OBS[outcome]), seen: f.seen + 1, fastWins: f.fastWins + (outcome === "fast" ? 1 : 0) };
+    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer });
+    s.waves++;
+
+    const inTier = factTier === s.tier || w.role === "tutorial";
+    s.probePassed = false;
+    if (w.role === "probe") {
+      // A probe from the next planet: Gold completes the streak, anything else resets it. It never
+      // counts toward the mission and never counts as a struggle.
+      if (isGold(outcome)) { s.goldStreak++; s.probePassed = true; } else s.goldStreak = 0;
+      s.open = null;
+      return;
+    }
+    const countsForMission = w.role !== "recharge" && !(w.role === "transfer" && !inTier);
+    if (countsForMission) {
+      s.mission.waves++;
+      if (w.role !== "anchor") { s.mission.inTier++; if (isSolved(outcome)) s.mission.solved++; }
+    }
+    if (w.role !== "anchor" && w.role !== "recharge" && inTier) s.goldStreak = isGold(outcome) ? s.goldStreak + 1 : 0;
+    if (w.role === "recharge") s.struggleStreak = 0;
+    else if (isStruggle(outcome)) { s.struggleStreak++; s.lastStruggle = { a: w.a, b: w.b }; }
+    else s.struggleStreak = 0;
+
+    if (w.transfer) {
+      s.transfer.checks++;
+      if (isSolved(outcome)) s.transfer.passes++;
+      const i = s.transferQueue.findIndex((q) => q.trick === selectTrick(w.a, w.b));
+      s.transferQueue.splice(i >= 0 ? i : 0, s.transferQueue.length ? 1 : 0);
+    }
+    if (outcome === "show_me_how") {
+      const trick = selectTrick(w.a, w.b);
+      if (!s.transferQueue.some((q) => q.trick === trick)) s.transferQueue.push({ trick, key, tier: factTier, due: s.waves + TRANSFER_DELAY });
+    }
+
+    if (s.mission.waves >= missionLength(s.tier)) {
+      if (s.mission.solved >= solvesToClear(s.tier)) s.mission.passed = true;
+      else s.mission = freshMission(s.mission.n + 1);
+    }
+    s.open = null;
+  };
+
+  for (const e of events) {
+    switch (e.type) {
+      case "intro_completed": s.introCompleted = true; break;
+      case "attempt_submitted": {
+        const p = e.payload, w = openFor(p.a, p.b, p.waveRole, p.isTransferCheck);
+        w.attempts++;
+        if (w.attempts === 1) w.firstLatencyMs = p.latencyMs;
+        w.usedRadar ||= p.usedRadar;
+        w.powerUp ||= !!p.powerUpUsed;
+        if (p.guess === p.a * p.b) { complete(w); break; }
+        if (classifyError(p.a, p.b, p.guess) === "wild_guess" && e.at !== undefined) {
+          wild = [...wild.filter((t) => e.at! - t < 4000), e.at];
+          if (wild.length >= 3) { s.antiMashNudges++; wild = []; }
+        }
+        break;
+      }
+      case "powerup_used": if (e.payload.valid) openFor(e.payload.a, e.payload.b).powerUp = true; break;
+      case "explanation_completed": {
+        openFor(e.payload.a, e.payload.b).explained = true;
+        s.seenTricks[e.payload.trickId] = (s.seenTricks[e.payload.trickId] ?? 0) + 1;
+        break;
+      }
+      case "planet_cleared": {
+        const t = tierOfPlanet(e.payload.planetId);
+        if (t === s.tier) { s.cleared.push(t); move(t + 1); }
+        break;
+      }
+      case "hyper_jump_taken": {
+        const from = tierOfPlanet(e.payload.fromPlanet), to = tierOfPlanet(e.payload.toPlanet);
+        if (from === s.tier && to > from) { for (let t = from; t < to; t++) s.aceCleared.push(t); move(to); }
+        break;
+      }
+      case "orb_earned": s.orbs += e.payload.amount; break;
+      case "upgrade_purchased": s.orbs -= e.payload.cost; s.equipped[e.payload.slot] = e.payload.itemId; break;
+      default: break; // explanation_started, flashcard_answered: telemetry only
+    }
+  }
+
+  s.offers = {
+    hyperJumpTo: s.probePassed && s.goldStreak >= GOLD_STREAK_FOR_JUMP && s.tier < MAX_TIER ? Math.min(MAX_TIER, s.tier + JUMP) : null,
+    cushion: s.struggleStreak >= STRUGGLES_FOR_CUSHION,
+    clear: s.mission.passed,
+  };
+  return s;
+}
+
+/** North-star: accuracy on transfer checks (sister problems after Show Me How). */
+export const transferRate = (s: PlayerState) => (s.transfer.checks ? s.transfer.passes / s.transfer.checks : null);

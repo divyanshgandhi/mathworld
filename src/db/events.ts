@@ -8,6 +8,8 @@ export const PLANETS = ["mercury", "venus", "earth", "moon", "mars", "asteroid-b
 export const TRICKS = ["empty-mirror", "fast-adding", "flip-it", "double-it", "easy-5-10", "jump-one-more", "split-and-add", "borrow-take-back", "big-small-split", "half-double"] as const;
 export const ERROR_TYPES = ["added_instead", "off_by_one_group", "off_by_one_unit", "place_value", "undershoot_close", "overshoot_close", "wild_guess"] as const;
 export const UPGRADE_SLOTS = ["hull", "blaster", "thruster"] as const;
+/** Where a wave sits in its mission (see src/director/next.ts). */
+export const WAVE_ROLES = ["tutorial", "anchor", "discovery", "application", "adaptive", "transfer", "boss", "recharge", "probe"] as const;
 
 /** Factors go up to 5-digit × 3-digit; the product stays well inside safe integers. */
 const factor = z.number().int().min(0).max(99_999);
@@ -26,6 +28,7 @@ export const EventInput = z.discriminatedUnion("type", [
       correct: z.boolean().optional(),
       latencyMs: count, errorType: z.enum(ERROR_TYPES).nullable(), attemptIndex: z.number().int().min(1),
       usedRadar: z.boolean(), powerUpUsed: trick.nullable(), isTransferCheck: z.boolean(),
+      waveRole: z.enum(WAVE_ROLES).optional(),
     }),
   }),
   z.object({ type: z.literal("powerup_used"), payload: z.object({ trickId: trick, a: factor, b: factor, valid: z.boolean() }) }),
