@@ -157,3 +157,20 @@ export function scaffold(misses: number, a: number, b: number, lastGuess: number
     showMeHow: misses >= 3,
   };
 }
+
+/** Waves in a practice run (a replay of a cleared planet, or a dev drill). */
+export const PRACTICE_WAVES = 5;
+
+/**
+ * Wave `k` of a practice run on `tier`: the same problem string a mission there would serve
+ * (anchor → discovery → application → adaptive → boss), from the cadet's real mastery, but logged
+ * as role "practice" so the fold moves mastery and leaves the campaign alone.
+ */
+export function practiceWave(s: PlayerState, tier: number, k: number, seed: number): Wave {
+  const ps: PlayerState = {
+    ...s, tier, waves: s.waves + k, goldStreak: 0, struggleStreak: 0, transferQueue: [],
+    mission: { n: s.mission.n + tier, waves: k % PRACTICE_WAVES, inTier: 0, solved: 0, passed: false },
+    offers: { hyperJumpTo: null, cushion: false, clear: false },
+  };
+  return { ...nextWave(ps, mix(seed, 101, tier)), isTransferCheck: false };
+}

@@ -131,7 +131,8 @@ To scale cleanly from `3 × 4` up to `5-digit × 3-digit` without breaking the S
 - **Mobile / Tablet:** Set `inputMode="none"` on the display readout so the OS virtual keyboard never covers the 3D arena; render a chunky built-in cockpit number pad right below the canvas.
 - **Critical Edge Cases:**
   - **`0` MUST be a valid submittable answer** (for Level 0 `×0` problems — never reject `num <= 0`!).
-  - **Anti-Mash Guard:** Lock input for ~500ms while a volley is in flight. If 3 wild misses occur in `< 4s`, Nova smiles: *"Hold fire, cadet! Take a breath—try slicing this fleet with a Trick Power-Up."*
+  - **Anti-Mash Guard:** Lock input while a volley is in flight. If 3 wild misses occur in `< 4s`, Nova smiles: *"Hold fire, cadet! Take a breath—try slicing this fleet with a Trick Power-Up."* (In play a shot takes ~3–4 s end to end, so the client counts 3 wild misses within 12 s, each fired within 4 s of the fleet being ready.)
+  - **Shot budget:** no single shot takes more than 5–10 s from fire to ready again (volley capped at ~1.5 s, outcome ~1 s, one short Nova line, ~0.4 s shield regroup). Numbers of 10 and up are Base-10 ships, never dozens of single fighters.
 
 ### 4.2 Progressive Wrong-Answer Escalation (No Freezing, No Nagging)
 1. **Miss #1 (Close, `|guess − answer| / answer ≤ 0.25`):**
@@ -255,6 +256,8 @@ Hosted on **Supabase Postgres** (Vercel production) with **PGlite** locally and 
      - `planet_cleared` / `hyper_jump_taken` (`{ fromPlanet, toPlanet }`)
      - `orb_earned` / `upgrade_purchased` (`{ slot, itemId, cost }`)
      - `flashcard_answered` (`{ a, b, correct, latencyMs }`)
+
+Practice waves (replaying a cleared planet, or a dev drill) are logged with `waveRole: "practice"`: they move fact mastery but never the mission, streaks or planet clears.
 
 All player state (`introCompleted`, `currentPlanet`, `unlockedPlanets`, `factMastery`, `seenTricks`, `orbs`, `equippedUpgrades`, `transferQueue`) is **purely folded** from `events` by `src/director/fold.ts` (unit-tested and deterministic!).
 

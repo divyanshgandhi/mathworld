@@ -229,5 +229,278 @@
     "duration": 3.6,
     "src": "/vo/captain_nova.mp3",
     "end": 3.025
+  },
+  "nova_dead_on": {
+    "voice": "Zoey",
+    "text": "Dead on!",
+    "duration": 1.44,
+    "end": 0.679,
+    "src": "/vo/nova_dead_on.mp3"
+  },
+  "nova_bullseye": {
+    "voice": "Zoey",
+    "text": "Bullseye, cadet!",
+    "duration": 2.0,
+    "end": 1.136,
+    "src": "/vo/nova_bullseye.mp3"
+  },
+  "nova_perfect": {
+    "voice": "Zoey",
+    "text": "Perfect shot!",
+    "duration": 1.6,
+    "end": 0.757,
+    "src": "/vo/nova_perfect.mp3"
+  },
+  "nova_incoming_short": {
+    "voice": "Zoey",
+    "text": "Squadrons incoming!",
+    "duration": 2.08,
+    "end": 1.282,
+    "src": "/vo/nova_incoming_short.mp3"
+  },
+  "nova_err_added": {
+    "voice": "Zoey",
+    "text": "Careful! That added them. We need whole squads.",
+    "duration": 4.08,
+    "end": 3.464,
+    "src": "/vo/nova_err_added.mp3"
+  },
+  "nova_err_group": {
+    "voice": "Zoey",
+    "text": "So close! One squad off.",
+    "duration": 2.8,
+    "end": 2.055,
+    "src": "/vo/nova_err_group.mp3"
+  },
+  "nova_err_unit": {
+    "voice": "Zoey",
+    "text": "Just a hair off!",
+    "duration": 1.76,
+    "end": 0.896,
+    "src": "/vo/nova_err_unit.mp3"
+  },
+  "nova_err_place": {
+    "voice": "Zoey",
+    "text": "Check your place value, cadet!",
+    "duration": 2.32,
+    "end": 1.624,
+    "src": "/vo/nova_err_place.mp3"
+  },
+  "nova_err_under": {
+    "voice": "Zoey",
+    "text": "Too few! Load a few more.",
+    "duration": 2.72,
+    "end": 2.117,
+    "src": "/vo/nova_err_under.mp3"
+  },
+  "nova_err_over": {
+    "voice": "Zoey",
+    "text": "Too many! Load a few less.",
+    "duration": 2.72,
+    "end": 2.172,
+    "src": "/vo/nova_err_over.mp3"
+  },
+  "nova_err_wild": {
+    "voice": "Zoey",
+    "text": "Way off! Radar is up.",
+    "duration": 2.48,
+    "end": 1.862,
+    "src": "/vo/nova_err_wild.mp3"
+  },
+  "nova_radar": {
+    "voice": "Zoey",
+    "text": "Radar is up. Pick a target!",
+    "duration": 2.64,
+    "end": 1.995,
+    "src": "/vo/nova_radar.mp3"
+  },
+  "nova_invite": {
+    "voice": "Zoey",
+    "text": "Sneaky squad! Try a Power-Up, the Radar, or Show Me How.",
+    "duration": 4.72,
+    "end": 4.074,
+    "src": "/vo/nova_invite.mp3"
+  },
+  "nova_hold_fire": {
+    "voice": "Zoey",
+    "text": "Hold fire, cadet! Take a breath, and try a Trick Power-Up.",
+    "duration": 4.4,
+    "end": 3.754,
+    "src": "/vo/nova_hold_fire.mp3"
+  },
+  "nova_misfit": {
+    "voice": "Zoey",
+    "text": "That trick doesn't fit this fleet. Try another one!",
+    "duration": 3.36,
+    "end": 2.76,
+    "src": "/vo/nova_misfit.mp3"
+  },
+  "nova_sector_ok": {
+    "voice": "Zoey",
+    "text": "Sector locked!",
+    "duration": 1.68,
+    "end": 0.935,
+    "src": "/vo/nova_sector_ok.mp3"
+  },
+  "nova_sector_no": {
+    "voice": "Zoey",
+    "text": "Not quite. Count that sector again.",
+    "duration": 2.88,
+    "end": 2.279,
+    "src": "/vo/nova_sector_no.mp3"
+  },
+  "nova_all_locked": {
+    "voice": "Zoey",
+    "text": "All sectors locked. Fire!",
+    "duration": 2.56,
+    "end": 1.756,
+    "src": "/vo/nova_all_locked.mp3"
+  },
+  "nova_planet_clear": {
+    "voice": "Zoey",
+    "text": "Planet clear! The next world is open.",
+    "duration": 3.2,
+    "end": 2.596,
+    "src": "/vo/nova_planet_clear.mp3"
+  },
+  "nova_practice_done": {
+    "voice": "Zoey",
+    "text": "Practice run complete. Nice flying!",
+    "duration": 3.28,
+    "end": 2.646,
+    "src": "/vo/nova_practice_done.mp3"
+  },
+  "nova_show_me": {
+    "voice": "Zoey",
+    "text": "Watch this, cadet.",
+    "duration": 2.0,
+    "end": 1.122,
+    "src": "/vo/nova_show_me.mp3"
+  },
+  "pu_flip": {
+    "voice": "Zoey",
+    "text": "Flip It! Same ships, turned sideways.",
+    "duration": 3.44,
+    "end": 2.873,
+    "src": "/vo/pu_flip.mp3"
+  },
+  "pu_split": {
+    "voice": "Zoey",
+    "text": "Split and Add! Count each side, then add.",
+    "duration": 3.68,
+    "end": 3.042,
+    "src": "/vo/pu_split.mp3"
+  },
+  "pu_borrow": {
+    "voice": "Zoey",
+    "text": "Borrow and Take Back! Fill the rows, then zap the ghosts.",
+    "duration": 4.24,
+    "end": 3.69,
+    "src": "/vo/pu_borrow.mp3"
+  },
+  "pu_double": {
+    "voice": "Zoey",
+    "text": "Double It! Count one half, then double.",
+    "duration": 3.36,
+    "end": 2.774,
+    "src": "/vo/pu_double.mp3"
+  },
+  "pu_bigsmall": {
+    "voice": "Zoey",
+    "text": "Big and Small Split! Big ships first, then the small ones.",
+    "duration": 4.4,
+    "end": 3.816,
+    "src": "/vo/pu_bigsmall.mp3"
+  },
+  "pu_sector": {
+    "voice": "Zoey",
+    "text": "Sector Lock! Crack each sector, then add.",
+    "duration": 3.68,
+    "end": 3.033,
+    "src": "/vo/pu_sector.mp3"
+  },
+  "pu_easy": {
+    "voice": "Zoey",
+    "text": "Easy fives and tens! Count the pods.",
+    "duration": 3.2,
+    "end": 2.651,
+    "src": "/vo/pu_easy.mp3"
+  },
+  "pu_easy5": {
+    "voice": "Zoey",
+    "text": "Five is half of ten. Use the twin!",
+    "duration": 3.04,
+    "end": 2.436,
+    "src": "/vo/pu_easy5.mp3"
+  },
+  "pu_fast": {
+    "voice": "Zoey",
+    "text": "Fast Adding! One squad at a time.",
+    "duration": 3.12,
+    "end": 2.491,
+    "src": "/vo/pu_fast.mp3"
+  },
+  "pu_jump": {
+    "voice": "Zoey",
+    "text": "Jump One More! Start from what you know.",
+    "duration": 3.12,
+    "end": 2.509,
+    "src": "/vo/pu_jump.mp3"
+  },
+  "pu_mirror": {
+    "voice": "Zoey",
+    "text": "Empty and Mirror! Zero is empty, one is a mirror.",
+    "duration": 4.08,
+    "end": 3.437,
+    "src": "/vo/pu_mirror.mp3"
+  },
+  "pu_half": {
+    "voice": "Zoey",
+    "text": "Half and Double! Same ships, an easier shape.",
+    "duration": 3.92,
+    "end": 3.276,
+    "src": "/vo/pu_half.mp3"
+  },
+  "captain_jump_mars": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to Mars?",
+    "duration": 3.52,
+    "end": 2.985,
+    "src": "/vo/captain_jump_mars.mp3"
+  },
+  "captain_jump_asteroid-belt": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to the Asteroid Belt?",
+    "duration": 3.92,
+    "end": 3.225,
+    "src": "/vo/captain_jump_asteroid-belt.mp3"
+  },
+  "captain_jump_jupiter": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to Jupiter?",
+    "duration": 3.6,
+    "end": 2.936,
+    "src": "/vo/captain_jump_jupiter.mp3"
+  },
+  "captain_jump_saturn": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to Saturn?",
+    "duration": 3.44,
+    "end": 2.866,
+    "src": "/vo/captain_jump_saturn.mp3"
+  },
+  "captain_jump_uranus": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to Uranus?",
+    "duration": 3.76,
+    "end": 3.175,
+    "src": "/vo/captain_jump_uranus.mp3"
+  },
+  "captain_jump_deep-space": {
+    "voice": "Miles",
+    "text": "Ace telemetry! Hyper-Jump straight to Deep Space?",
+    "duration": 3.84,
+    "end": 3.251,
+    "src": "/vo/captain_jump_deep-space.mp3"
   }
 }

@@ -1,0 +1,66 @@
+import type { ErrorType } from "@/rig/errors";
+import type { PlanetId } from "@/rig/pools";
+import type { TrickId } from "@/rig/tricks";
+
+/**
+ * Nova's in-battle lines: short on purpose, so a shot (fire → outcome → line → ready) stays well under
+ * 10 seconds. Every line here is baked by scripts/bake-voices.py under the same id and text; until a
+ * clip exists the caption still shows and the pause is paced on reading time.
+ */
+export const BATTLE_LINES = {
+  nova_dead_on: "Dead on!",
+  nova_bullseye: "Bullseye, cadet!",
+  nova_perfect: "Perfect shot!",
+  nova_incoming_short: "Squadrons incoming!",
+  nova_err_added: "Careful! That added them. We need whole squads.",
+  nova_err_group: "So close! One squad off.",
+  nova_err_unit: "Just a hair off!",
+  nova_err_place: "Check your place value, cadet!",
+  nova_err_under: "Too few! Load a few more.",
+  nova_err_over: "Too many! Load a few less.",
+  nova_err_wild: "Way off! Radar is up.",
+  nova_radar: "Radar is up. Pick a target!",
+  nova_invite: "Sneaky squad! Try a Power-Up, the Radar, or Show Me How.",
+  nova_hold_fire: "Hold fire, cadet! Take a breath, and try a Trick Power-Up.",
+  nova_misfit: "That trick doesn't fit this fleet. Try another one!",
+  nova_sector_ok: "Sector locked!",
+  nova_sector_no: "Not quite. Count that sector again.",
+  nova_all_locked: "All sectors locked. Fire!",
+  nova_planet_clear: "Planet clear! The next world is open.",
+  nova_practice_done: "Practice run complete. Nice flying!",
+  nova_show_me: "Watch this, cadet.",
+  pu_flip: "Flip It! Same ships, turned sideways.",
+  pu_split: "Split and Add! Count each side, then add.",
+  pu_borrow: "Borrow and Take Back! Fill the rows, then zap the ghosts.",
+  pu_double: "Double It! Count one half, then double.",
+  pu_bigsmall: "Big and Small Split! Big ships first, then the small ones.",
+  pu_sector: "Sector Lock! Crack each sector, then add.",
+  pu_easy: "Easy fives and tens! Count the pods.",
+  pu_easy5: "Five is half of ten. Use the twin!",
+  pu_fast: "Fast Adding! One squad at a time.",
+  pu_jump: "Jump One More! Start from what you know.",
+  pu_mirror: "Empty and Mirror! Zero is empty, one is a mirror.",
+  pu_half: "Half and Double! Same ships, an easier shape.",
+  captain_jump_mars: "Ace telemetry! Hyper-Jump straight to Mars?",
+  "captain_jump_asteroid-belt": "Ace telemetry! Hyper-Jump straight to the Asteroid Belt?",
+  captain_jump_jupiter: "Ace telemetry! Hyper-Jump straight to Jupiter?",
+  captain_jump_saturn: "Ace telemetry! Hyper-Jump straight to Saturn?",
+  captain_jump_uranus: "Ace telemetry! Hyper-Jump straight to Uranus?",
+  "captain_jump_deep-space": "Ace telemetry! Hyper-Jump straight to Deep Space?",
+} as const;
+export type LineId = keyof typeof BATTLE_LINES;
+
+export const EXACT_LINES: LineId[] = ["nova_dead_on", "nova_bullseye", "nova_perfect"];
+export const ERROR_LINE: Record<ErrorType, LineId> = {
+  added_instead: "nova_err_added", off_by_one_group: "nova_err_group", off_by_one_unit: "nova_err_unit", place_value: "nova_err_place",
+  undershoot_close: "nova_err_under", overshoot_close: "nova_err_over", wild_guess: "nova_err_wild",
+};
+export const POWERUP_LINE: Record<TrickId, LineId> = {
+  "empty-mirror": "pu_mirror", "fast-adding": "pu_fast", "flip-it": "pu_flip", "double-it": "pu_double", "easy-5-10": "pu_easy",
+  "jump-one-more": "pu_jump", "split-and-add": "pu_split", "borrow-take-back": "pu_borrow", "big-small-split": "pu_bigsmall", "half-double": "pu_half",
+};
+export const jumpLine = (to: PlanetId) => `captain_jump_${to}` as LineId;
+
+export const PLANET_NAMES: Record<PlanetId, string> = {
+  earth: "Earth · Cadet Bay", moon: "The Moon", mars: "Mars", "asteroid-belt": "Asteroid Belt", jupiter: "Jupiter", saturn: "Saturn", uranus: "Uranus", "deep-space": "Deep Space",
+};

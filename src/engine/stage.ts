@@ -85,6 +85,14 @@ export function createStage(container: HTMLElement, { aspect = 0.58, fill = fals
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
+  // a hidden or starved tab gets few or no animation frames: keep the game clock (and its timers) moving anyway
+  const hiddenTick = window.setInterval(() => {
+    const now = performance.now();
+    if (!document.hidden && now - last < 150) return;
+    if (!paused) advance(Math.min((now - last) / 1000, 0.25));
+    last = now;
+    composer.render();
+  }, 50);
 
   const mats = new Materials();
   return {
@@ -103,6 +111,7 @@ export function createStage(container: HTMLElement, { aspect = 0.58, fill = fals
     set paused(v) { paused = v; },
     dispose() {
       cancelAnimationFrame(raf);
+      window.clearInterval(hiddenTick);
       ro.disconnect();
       composer.dispose();
       mats.dispose();

@@ -78,6 +78,11 @@ export function fold(events: LoggedEvent[]): PlayerState {
     const outcome = outcomeOf(w, factTier), key = factKey(w.a, w.b);
     const f = s.facts[key] ?? { m: M0, seen: 0, fastWins: 0 };
     s.facts[key] = { m: ewma(f.m, OBS[outcome]), seen: f.seen + 1, fastWins: f.fastWins + (outcome === "fast" ? 1 : 0) };
+    if (w.role === "practice") {
+      // Replaying another planet (or a dev drill): the fact's mastery moves, the mission does not.
+      s.open = null;
+      return;
+    }
     s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer });
     s.waves++;
 

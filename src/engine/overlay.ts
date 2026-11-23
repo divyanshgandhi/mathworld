@@ -47,7 +47,7 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
   css(sub, { fontSize: "15px", letterSpacing: ".08em", marginTop: "14px", opacity: ".85" });
   card.append(kicker, main, sub);
 
-  const cap = div(root, { left: "50%", bottom: "18px", transform: "translateX(-50%)", maxWidth: "84%", display: "flex", alignItems: "center", gap: "10px", background: "rgba(13,14,26,.78)", color: "#f3f1ea", fontSize: "15px", lineHeight: "1.45", padding: "9px 14px", borderRadius: "12px", opacity: "0", transition: "opacity .25s", backdropFilter: "blur(6px)" });
+  const cap = div(root, { left: "50%", bottom: "18px", transform: "translateX(-50%)", width: "max-content", maxWidth: "min(84%, 640px)", display: "flex", alignItems: "center", gap: "10px", background: "rgba(13,14,26,.78)", color: "#f3f1ea", fontSize: "15px", lineHeight: "1.45", padding: "9px 14px", borderRadius: "12px", opacity: "0", transition: "opacity .25s", backdropFilter: "blur(6px)" });
   const chip = document.createElement("span"), text = document.createElement("span");
   css(chip, { flex: "none", fontSize: "11px", fontWeight: "600", letterSpacing: ".08em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "999px" });
   cap.append(chip, text);
