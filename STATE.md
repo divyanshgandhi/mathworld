@@ -1,43 +1,53 @@
 # STATE: mathworld
 
-_Updated 24 Nov 2026, Phase 2_
+_Updated 24 Nov 2026, Phase 2 review_
 
 ## What changed
-- **Commits:** `5788d64` baseline · `e0920e2` Phase 0 · `d952818` ui-sdk · `6802a1c` Phase 1 rig · `2067f26` intro + Level 0 · `a57d1b3` game shell · `e6f119f` rig fixes · `611c0ca` Phase 2 battles · this commit (anti-mash queueing, lesson pacing, framing, STATE).
-- **Base-10 fleet** (`src/rig/fleet.ts`, pure, tested): rows and columns split by place value into Battle Sectors. Each sector uses the biggest ship that tiles it: Fighter 1, Squadron Pod 10, Carrier 100, Dreadnought 1K+ (badges show 1K, 10K, 1M and so on). `volley(fleet, n)` pops exactly n ships' worth, biggest ships first, and can stop inside a pod (6 × 24 hit with 105 leaves 5 micro-fighters and 1 pod). A ×10 fact is now a few pods, never dozens of fighters.
-- **Ships** (`ships.ts`): pod with 2 × 5 poppable micro-fighters and a "10" tag, carrier with 100 cells in 10 strips, dreadnought with a damage meter, dashed ghost fighter, lite fighter for armadas over 140 ships, Hangar style hooks (hull, thruster, blaster ids). No halos: ships stay under the bloom threshold, and plasma balls sit just over it.
-- **Battle engine** (`src/worlds/space/arena.ts`): one engine for every planet and for Cadet Bay. In campaign mode the wave comes from `fold` + `nextWave` + `housekeeping`. Replays and `?dev&a=&b=` drills use `practiceWave` and log `waveRole: "practice"`. The fold moves mastery for those waves only: no mission, streak or clear, and a test covers this. Outcomes play out in the world: survivors wink with a "N still flying" chip; overshoot shows orange balls flying past with "+N flew past"; exact gives a clean pop and orbs. Scaffolding: a close miss gets an error-classified line, way off or 10 s idle brings the Radar, miss 2 gets the invite, miss 3 or a tap starts Show Me How (Phase 2 form: `lesson()` beats over the live fleet). Then the We-Do shot, with `explanation_completed` logged before that attempt. Anti-mash: 3 wild misses within 12 s, each fired within 4 s, gets the hold-fire line. Hyper-Jump offer (accept or decline), planet clear, practice complete, and `intro_completed` from Earth.
-- **Power-Up belt** (unlocked = tricks seen; `?dev` unlocks all). Each acts on the live fleet without giving the answer:
-  - Flip It turns the fleet a quarter and swaps the axes.
-  - Split & Add adds a laser slice at 5.
-  - Double It shows halves.
-  - Jump One More marks the anchor block plus one squad.
-  - Borrow & Take Back adds a ghost per squad.
-  - Easy 5s & 10s pulses the pods, or adds twin ghosts for ×5.
-  - Fast Adding counts squads one by one with running totals; the last one shows "?".
-  - Big & Small Split separates the bands. On 2d × 2d and up it turns into Sector-Lock: tap a sector, type its sub-product, lock it; the sum loads into the readout and the cadet fires. A wrong sub-product gets a line and nothing is logged.
-  - A misfit gets the coaching line and `powerup_used valid:false`.
-- **HUD** (`src/components/battle/BattleHud.tsx`): the big `a × b` plate with both axes named. The keypad docks right on desktop and at the bottom on phones, with a scrolling belt, Radar and sector chips. The stage frames the fleet inside the HUD's free area (`setSafe` plus camera view offset). `/play/[planet]` (`WaveArena.tsx`) has sign-up if there is no cadet, a Launch gate, and auto-launch when flying in from another battle. The intro's Cadet Bay uses the same engine and HUD. `/` is now a dev launch list with drills; `/wave` redirects to `/play/moon`.
-- **Shot budget:** the volley takes at most ~1.2 s, the outcome ~1 s, Nova says one short line, and the shields regroup in 0.4 s. 39 new short lines were baked with Phonon (`lines.ts` ↔ `bake-voices.py`). Reactions never cut a line off; one that arrives mid-line is dropped, except the hold-fire line, which waits.
-- **Plumbing:** an ordered event outbox (`src/engine/outbox.ts`). The stage clock keeps ticking when frames are starved or the tab is hidden. The overlay caption sizes to its text.
+- **Commits:** `5788d64` baseline · `e0920e2` Phase 0 · `d952818` ui-sdk · `6802a1c` Phase 1 rig · `2067f26` intro + Level 0 · `a57d1b3` game shell · `e6f119f` rig fixes · `611c0ca` Phase 2 battles · `0d98ec8` battle polish · Phase 2 review: `79986d7`, `5accbc0`, `9b4aeb1`, `c69a023`, `409cd71`, `30031be`, and this commit (STATE).
+- **Phase 2 (built before the review):** the Base-10 fleet (`src/rig/fleet.ts`), the ship models (`ships.ts`), one battle engine (`arena.ts`), the HUD (`BattleHud.tsx`), the Power-Up belt, Sector-Lock, scaffolding, Hyper-Jump, practice runs and the event outbox. Details are in the commit messages for `611c0ca` and `0d98ec8`.
+- **Review fixes (shot budget, ×10 in Level 1):**
+  - On a third miss the game goes straight into Show Me How, with no reaction line first.
+  - A 10 × b lesson turns the pods with no spoken Flip It beats. A new cadet's 10 × 8 at the Moon took 16.7 s and now takes 6.4 s.
+  - A repeat Flip It turns the fleet without its line. Fast Replay is one reminder line plus the We-Do, and `lesson()` now returns `flipBeats`.
+  - The dev shot timer now includes the lesson a shot triggers.
+- **Review fixes (HUD and visuals):**
+  - The outcome chip has its own reserved row under the plate, so it no longer covers the fleet's "10 each" label. Show Me How's card name and We-Do question moved into the keypad dock, and the last lesson caption no longer stays on screen into the next wave.
+  - For 0 × 7 and 5 × 0, the axis labels now sit outside the zero ring.
+  - Pod "10" badges stay upright when the fleet is flipped.
+  - The rocket flame halo is gone in battle.
+- **Review fixes (logic):**
+  - Borrow & Take Back on 2-digit fleets (19 × 24) adds the ghost squad, built from ships of the same class.
+  - Labels to the right of the fleet no longer overlap it.
+  - On a ×0 fleet only Empty & Mirror fits.
+  - Tapping another Power-Up leaves Sector-Lock cleanly. Tapping Sector-Lock again keeps the locks already made.
+  - Practice runs and Earth's tutorial never serve the fleet just played again.
+  - In the outbox, one bad event no longer drops the rest of its batch.
 
-## What's verified (played in the Claude_Browser pane; Playwright still has no Chrome)
-- `bun run check` is green with 61 tests. New tests: fleet decomposition (6 × 24, 16 × 24, ×10), sector and ship sums over every tier, volley partial / extra / 0, and practice runs leaving the campaign alone.
-- **Shot timings (fire → ready again):** 2.1–4.2 s across Earth, Moon (7 × 10, 10 × 8, 2 × 10), Mars (3 × 8, 4 × 9, 7 × 3), Asteroid Belt, Jupiter (6 × 24, 2 × 89), Saturn (16 × 24, 24 × 16, campaign), Uranus (7 × 345) and Deep Space (343 × 4536). Timings over 10 s in the logs came only from my own `stage.paused` inspection.
-- **One fresh cadet, campaign:** Earth (0 accepted as an answer on 0 × 7 and 10 × 0, overshoot, Earth clear) → Moon (Gold probe → Hyper-Jump offer → accepted) → Asteroid Belt (Show Me How tapped on 7 × 7, Split & Add unlocked and fired from the belt, transfer check served, clear) → Jupiter (3 misses → auto Show Me How → Big & Small Split unlocked; misfit coaching) → Saturn on a phone viewport (Sector-Lock by tapping keypad buttons, Hyper-Jump offered and declined, clear). Events were checked in `/api/events` in order: attempts, `powerup_used` (valid and invalid), `explanation_started` and `explanation_completed`, `planet_cleared`, `hyper_jump_taken`, orbs, `intro_completed`.
-- Cadet Bay through `/intro?dev` → Cadet Bay with another fresh cadet: Nova's welcome, the mirror lesson on the third miss, clear, and `introCompleted: true`.
-- Anti-mash hold-fire line fires. Show Me How repeat runs in `fast` mode.
-- Desktop at 1280 × 760 and phone at 375 × 812 screenshots reviewed. No new console errors.
+## What's verified (Claude_Browser pane; Playwright has no Chrome)
+- `bun run check` green, 62 tests. New tests: the tutorial no-repeat rule, ×0 fits and `flipBeats`.
+- **Fire → ready timings measured:**
+  - Plain shots on ×10 facts take 2.1–3.8 s across a full Moon campaign run.
+  - Third miss into Show Me How: 7 × 10 Fast Replay 7.5 s; 10 × 8 first lesson 6.4 s (was 16.7 s); 10 × 8 Fast Replay 7.6 s (was 12.5 s); 7 × 2 Fast Replay on a flipped fact 5.8 s.
+  - Cadet Bay mirror lesson: 6.3 s.
+- **Played paths:**
+  - Fresh cadet: `/intro?dev` → Cadet Bay. Three misses, then the mirror lesson, then clear. `intro_completed` and `planet_cleared` were logged, and "Fly to The Moon" auto-launched the Moon.
+  - Keyboard: 0 is accepted, Backspace works, Enter twice fires only once, and Enter starts the battle.
+  - Saturn: Sector-Lock combined with other Power-Ups. Borrow ghosts on 19 × 24.
+  - Phone at 375 × 812: Jupiter and Saturn Sector-Lock.
+- The server event log matched the client log (76 of 76, same order). No new console errors; the `/play` "URL data" errors in the pane were old entries and did not come back on fresh loads or link navigations.
 
 ## Next
-- **Phase 3:** the full in-world Show Me How beat player (camera push-in, one visual per beat), plus Academy films.
-- **Fast replay length:** on a flipped fact, the repeat is two doc lines (Flip It + trick), about 10–11 s when only captions play. In this pane live Phonon speech never returned within 1.2 s, so I could not hear or time real voice. Phase 3 should bring the repeat to ≤ 8 s.
-- **Phase 4:** title screen, Resting Bay, map (it can link to `/play/[planet]`, which shows a practice run on any planet that is not the cadet's current one), Hangar (style hooks exist), and flashcards.
+- **Phase 3:** the in-world Show Me How beat player and Academy films, with live Phonon timing.
+- **Phase 4:** title screen, Resting Bay, map, Hangar, flashcards.
 
 ## Open risks
-- **Live voice unverified:** this session never heard Phonon speech. Lesson beats fell back to captions paced on reading time. Baked lines play (manifest-driven), but I did not listen to them.
-- **Performance:** Deep Space 343 × 4536 is about 5.7k meshes, about 11 ms per frame on this Mac. Phones will struggle at Uranus and Deep Space sizes. InstancedMesh batching is the fix (ROADMAP "after Wednesday").
-- **Practice access:** any planet can be opened in practice mode by URL; no lock screen yet (Phase 4 map). `/play/<unknown>` streams the not-found page with HTTP 200 (params are read inside Suspense for instant navigation).
-- **Director repeats:** the director can serve the same fact twice in a row (1 × 4 after Show Me How in Cadet Bay). This is existing `nextWave` behaviour, not changed here.
-- **Uncommitted change, not mine:** `src/engine/audio.ts` has an uncommitted change that is not mine (a mute flag via `NEXT_PUBLIC_MW_MUTE`, `?mute` or localStorage). I left it out of my commits.
-- **Carried over:** the Vercel and Supabase deploy (owner), the flashcard ceiling decision, the intro is left untrimmed by request, and the history rewrite for owner names before going public.
+- **First-time lessons can still go over 10 s:**
+  - A cadet's first Show Me How on a trick still runs the full `docs/tricks.md` walkthrough. With captions it takes 11–21 s, for example 5 × 7, 8 × 5 with a first Flip It, or 8 × 2 with a first Flip It plus Double It (15.7 s measured).
+  - SPEC 4.4 treats the first walkthrough as full-length on purpose. Owner decision: should the 5–10 s rule cover first lessons too? If yes, trim the scripts in `docs/tricks.md` or split a two-trick lesson.
+- **Live voice unverified:** Phonon never answered within 1.2 s in the pane, so lessons were paced on captions. Real voice timing is not measured.
+- **Performance:** Deep Space is about 5.7k meshes. Not tested on a real phone or in Safari.
+- `/play/<unknown>` returns the not-found page with status 200. This comes from streaming params inside Suspense under `partialPrefetching`.
+- Any planet can be opened by URL as a practice run (Phase 4 map).
+- The campaign director can still serve a struggled fact again two waves later. That repeat is deliberate. Only an immediate repeat is blocked, and only on Earth and in practice.
+- **Uncommitted, not ours:** the mute flag in `src/engine/audio.ts` is still left out of every commit.
+- **Carried over:** the deploy (owner), the flashcard ceiling decision, the untrimmed intro (by request), and the history rewrite for owner names before going public.
