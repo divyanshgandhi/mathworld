@@ -1,56 +1,49 @@
 # STATE: mathworld
 
-_Updated 24 Nov 2026, Phase 5 (software side)_
+_Updated 24 Nov 2026, final integration pass_
 
 ## What changed
-- **Commits:** … Phase 4 `3d919f7`, `618f27c`, `7370ca3` · **Phase 5:** `f6c28f3` (×10 shot length), `ee8f977` (X-Ray + `/admin`), and this commit (protocol, README, STATE).
-- **×10 on The Moon is shorter** (owner: no shot over 5–10 s; ×10 felt long):
-  - `rig/showme.ts` has a whole-shot budget: `SHOT` = volley cap 1.8 s + outcome pause 0.3 s (was 0.7) + lesson ≤ 10 s. `shotSeconds()` is tested for every fact up to 12 × 12 and the tier 4–7 draws.
-  - On 10 × b, the Pods turn while Nova says the short WHY ("Each squad of 10 is one Pod!", already baked). Before, there was a silent 1 s Flip It card first.
-  - Other flipped lessons also turn under their first line when that line opens over the whole fleet (8 × 3 keeps its spoken WHY).
-  - The question shrinks to "What's the total?" before a WHY is ever dropped (the HUD shows the equation). Only 2-digit × 2-digit Sector-Lock first lessons now say the one-line version in battle; their WHY stays on the banner.
-  - There is no Fast Adding safety net on ×10: the Pods already are the fast adding.
-- **Telemetry, pure and tested** (`director/telemetry.ts`, `tests/telemetry.test.ts`, 83 tests in all):
-  - Transfer report: first-try accuracy before vs after a fleet's trick was explained, plus strict transfer checks, broken down by trick. The fold's history now records each wave's `trick` and `afterLesson`.
-  - Also: the X-Ray read-out, the 0–10 mastery grid, per-planet progress, sessions (30 min gap), Day-2 return and the timeline lines.
-- **Shift+D X-Ray** (`components/battle/XRay.tsx`, in every battle via BattleHud):
-  - A non-modal ui-sdk Drawer on the left: tier and mission, Transfer Rate (this session and all time), before → after, the active error, the transfer queue, and the EWMA of recent facts.
-  - The cadet keeps typing while it is open, and the fleet re-frames to the right of it.
-- **`/admin`** (not linked):
-  - The players table shows transfer checks, before → after a lesson, and Day-2 status.
-  - Each cadet has three tabs: Fact mastery (heatmap plus planets), Transfer rate (by trick, plus sessions) and Event timeline (the last 300 events).
-  - Access is off unless `MW_ADMIN_KEY` (10+ characters) is set. The passphrase form (`POST /api/admin/session`) stores a sha256 of the key in an httpOnly cookie scoped to `/admin` for 12 h. `?key=` also works, and Lock clears the cookie.
-- **Docs:** `docs/test-protocol.md` (the silent test with 3–5 kids and 1 adult, what to watch and log, how to read `/admin`). The README has a Telemetry section and a Field notes placeholder, and `.env.example` has `MW_ADMIN_KEY`.
+- **Commits:** … Phase 5 `f6c28f3`, `ee8f977`, `2cd7877` · **Integration:** `e756237` (dev mute flag, the previously uncommitted `audio.ts` change), `3c8c014` (integration fixes), the phone polish commit, and this commit (README, regenerated levelling proof, STATE).
+- **Fixes from playing it end to end:**
+  - A miss chip turns into "Last shot: 15 still flying" once the shields restore the fleet. Before, "15 still flying" sat over all 20 ships.
+  - 3 on 1 × 4 is now "Just a hair off!", not "So close! One squad off." A squad of one is one drone (`rig/errors.ts`, tested).
+  - The keypad wait label says "Stand by…". It used to say "Volley in flight…" during Nova's intro line. Digit and Enter in the same frame are never lost now (a ref in BattleHud).
+  - Split lasers stop just past the fleet. They used to cross the axis labels and run under the keypad.
+  - `/play/<unknown>` is a real 404 with a game-styled not-found screen. `params` is awaited outside Suspense, and `instant = false` is set on that route (every real planet is prerendered).
+  - Phones: the `a × b` plate no longer sits under the menu button. Sign-up focuses the name field.
+- **README rewritten:** how to run, what a new cadet plays, architecture, pedagogy choices, the levelling proof summary, telemetry, deploy, what's next.
+- **`docs/levelling-proof.md` regenerated:** only the random-masher's numbers moved by a point or two. All claims still pass.
 
-## What's verified (Claude_Browser pane, :3200)
-- **×10 timing** (fresh cadet, 10 × 8, three misses then a wrong We-Do):
-  - Before: fire to the end of Nova's question was 8.9 s, then an 8.6 s Fast Adding lesson.
-  - After: **6.5 s**, then a normal ~3 s miss.
-  - Correct ×10 shots: 3.5–3.7 s (unchanged).
-  - Frames: the 10 × 6 Pods mid-turn and settled, and 8 × 3 Split & Add turning under its WHY with upright 15 / 9 badges.
-- **X-Ray, played with the keyboard:**
-  - Shift+D toggled it, and digits and Enter still fired while it was open.
-  - 10 × 8 misses showed `wild_guess` and `added_instead`. The lesson queued "Easy 5s & 10s from 8 × 10 · in 2 waves". The served 6 × 5 transfer check gave **100% (1/1)** this session and emptied the queue.
-- **`/admin`:**
-  - With no key it shows "off". A wrong passphrase shows the alert, and the right one opens the table (14 local cadets; one shows "returned · day 2" from yesterday's play).
-  - The heatmap, transfer and timeline tabs show my own play. `?key=` works and Lock re-locks.
-  - A fresh tab had no console errors.
-- `bun run check` is green.
+## What's verified (Claude_Browser pane, :3200, audio muted)
+- **New cadet, desktop (1024 × 768):**
+  - Title → Start → sign-up → the full intro film, played through (~119 s).
+  - Captions are text only and no line was cut off. The cadet's name is spoken live and captioned. A late Space press let the classmate answer, as designed.
+  - Ignite → Cadet Bay: undershoot 3, overshoot 6, Show Me How (Empty & Mirror), We-Do 4, **0 on 0 × 7**, the Power-Up on 4 × 1, the clear card.
+  - `/bay` → flashcard (49) → `/map` → Moon. 10 × 8 with three misses (18, 88, 70) auto-started the ×10 lesson. The Radar on a wild miss.
+  - The Hyper-Jump to the Asteroid Belt.
+  - Asteroid Belt: the Easy 5s & 10s Power-Up, Show Me How on 7 × 5 and 7 × 7 (Split & Add).
+  - Pause menu → bay → Hangar: bought Solar Gold, and the gold hull flies in the next battle.
+  - Academy: Double It! film and the NAILED IT card.
+  - The returning cadet: Start → `/bay`, and `/intro` → `/bay`.
+- **Shot times measured (`ui.shots`, fire → ready):** correct and miss shots 1.9–3.8 s. The third miss on 10 × 8 plus its lesson took 1.9 + 4.8 s. First-sight lessons took 4.8–6.6 s. Nothing came near 10 s.
+- **Phone (375 × 812):**
+  - Title, sign-up and the intro start. Raising your hand with Space then answering 9 got "Ooh, super close!".
+  - Cadet Bay via `?dev`, an Asteroid Belt battle by touch with the Radar, `/bay`, `/map`, `/hangar`, `/academy`.
+- **Checks:** `bun run check` is green (83 tests), and `bun run build` passes alongside the running dev server.
 
 ## Next
-- **The owner's part of Phase 5:** run `docs/test-protocol.md` with real kids, fix the top 3 friction points, fill in README → Field notes.
-- Then Phase 6 polish and the deploy.
+- **The owner's part:** run `docs/test-protocol.md` with real kids, fix the top 3 friction points, fill in README → Field notes.
+- Deploy (Vercel + Supabase, `MW_ADMIN_KEY`), then a smoke test on a real phone with sound.
 
 ## Open risks
-- **Not run:** `next build` (it would disturb the running dev server, which shares `.next`). `/admin` uses `connection()` plus Suspense under `cacheComponents`, and dev showed no prerender error after that fix, but run `bun run build` before deploying.
-- **Local admin key:** a generated `MW_ADMIN_KEY` was appended to the gitignored `.env.development.local`. Change it or remove it as you like; production needs its own key in Vercel.
-- **Session scope:** "this session" in the X-Ray means events since the battle page opened. Server history carries no `at` stamp in the client, by design.
-- **Admin scale:** it reads every event of every cadet on each load. That is fine for a handful of testers, not for many.
-- **×10 lesson line:** the first-sight ×10 lesson now speaks the short WHY ("Each squad of 10 is one Pod!"), not "Every squad of 10 packs into one glowing Squadron Pod!". The Academy film still speaks the long one.
-- **Still not heard by ear** (dev audio muted). Still not tested on a real phone, touch device or Safari.
-- **Unexplained console noise:** two `404` errors with no URL on game routes. They did not appear on a fresh `/admin` tab.
+- **Not heard by ear:** pacing was judged from clip lengths and captions.
+- **Not tried yet:** Safari, real touch, or a deployed URL.
+- **Resting Bay:** a small diorama with empty space above and below on 4:3 and phone screens. It works, but it reads small.
+- **Flipped ×10 lesson** (8 × 10 turned into a column of Pods): at 1024 × 768 the axis labels and Pod tags render small.
+- **Cushion:** asking for Show Me How without a miss counts as a struggle, so two such waves bring a Shield Recharge wave (by design in `fold.ts`; worth watching with kids).
 - **Carried over:**
-  - The uncommitted mute flag in `src/engine/audio.ts` (another agent's).
-  - `/play/<unknown>` returns status 200.
   - Orb farming via warm-ups and flashcards.
-  - The deploy, and the history rewrite for owner names.
+  - `/admin` reads every event on each load.
+  - The X-Ray's "this session" is since the page opened.
+  - The local `MW_ADMIN_KEY` in the gitignored `.env.development.local`.
+  - The history rewrite for owner names before going public.
