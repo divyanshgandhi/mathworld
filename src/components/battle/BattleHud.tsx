@@ -6,6 +6,7 @@ import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { PLANET_NAMES } from "@/worlds/space/lines";
 import { ghost, glass, lime } from "./ui";
+import { XRay } from "./XRay";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -49,7 +50,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest?.("input, textarea, dialog") || document.querySelector("dialog[open]")) return;
+      // the X-Ray is a non-modal side sheet: the cadet keeps typing while it is open
+      if ((e.target as HTMLElement)?.closest?.("input, textarea, dialog:not([data-xray])") || document.querySelector("dialog[open]:not([data-xray])")) return;
       if (ui && !ui.started && e.key === "Enter") { e.preventDefault(); arena?.start(); return; }
       if (!ui?.wave) return;
       if (/^\d$/.test(e.key)) press(e.key);
@@ -67,7 +69,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       const phone = window.innerWidth < 768, plate = plateRef.current?.getBoundingClientRect(), dock = dockRef.current?.getBoundingClientRect();
       // the top keeps the plate and its chip row (outcome, Show Me How) clear of the fleet;
       // phones: Nova's caption floats just above the keypad, over the rocket, never over the fleet
-      arena.setSafe({ top: (plate?.bottom ?? 130) + 50, right: !phone && dock ? window.innerWidth - dock.left + 8 : 0, bottom: phone && dock ? window.innerHeight - dock.top + 4 : 0, left: 0 });
+      arena.setSafe({ top: (plate?.bottom ?? 130) + 50, right: !phone && dock ? window.innerWidth - dock.left + 8 : 0, bottom: phone && dock ? window.innerHeight - dock.top + 4 : 0 }); // `left` belongs to the X-Ray
       arena.captionAt(phone && dock ? window.innerHeight - dock.top + 8 : 22);
     };
     measure();
@@ -85,6 +87,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
 
   return (
     <>
+      <XRay arena={arena} ui={ui} />
       {/* the multiplication: big, centred, both axes named */}
       {w && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">

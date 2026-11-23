@@ -13,8 +13,12 @@ import { priceFor } from "./hangar";
 export type LoggedEvent = EventInput & { at?: number };
 export type WaveRole = (typeof WAVE_ROLES)[number];
 
-export interface WaveRecord { a: number; b: number; key: string; factTier: number; tier: number; role: WaveRole; outcome: Outcome; transfer: boolean }
-interface OpenWave { a: number; b: number; role: WaveRole; transfer: boolean; attempts: number; usedRadar: boolean; powerUp: boolean; explained: boolean; firstLatencyMs: number }
+export interface WaveRecord {
+  a: number; b: number; key: string; factTier: number; tier: number; role: WaveRole; outcome: Outcome; transfer: boolean;
+  /** The trick this fleet calls for, and whether it had been explained before this wave (telemetry: transfer). */
+  trick: TrickId; afterLesson: boolean;
+}
+interface OpenWave { a: number; b: number; role: WaveRole; transfer: boolean; attempts: number; usedRadar: boolean; powerUp: boolean; explained: boolean; firstLatencyMs: number; lessons: TrickId[] }
 
 export interface PlayerState {
   introCompleted: boolean;
@@ -65,7 +69,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
 
   const openFor = (a: number, b: number, role: WaveRole = "discovery", transfer = false) => {
     if (s.open && (s.open.a !== a || s.open.b !== b)) s.open = null; // abandoned wave
-    s.open ??= { a, b, role, transfer, attempts: 0, usedRadar: false, powerUp: false, explained: false, firstLatencyMs: 0 };
+    s.open ??= { a, b, role, transfer, attempts: 0, usedRadar: false, powerUp: false, explained: false, firstLatencyMs: 0, lessons: [] };
     return s.open;
   };
 
@@ -88,7 +92,8 @@ export function fold(events: LoggedEvent[]): PlayerState {
       s.open = null;
       return;
     }
-    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer });
+    const trick = selectTrick(w.a, w.b), lessonsBefore = (s.seenTricks[trick] ?? 0) - w.lessons.filter((t) => t === trick).length;
+    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer, trick, afterLesson: lessonsBefore > 0 });
     s.waves++;
 
     const inTier = factTier === s.tier || w.role === "tutorial";
@@ -113,11 +118,10 @@ export function fold(events: LoggedEvent[]): PlayerState {
     if (w.transfer) {
       s.transfer.checks++;
       if (isSolved(outcome)) s.transfer.passes++;
-      const i = s.transferQueue.findIndex((q) => q.trick === selectTrick(w.a, w.b));
+      const i = s.transferQueue.findIndex((q) => q.trick === trick);
       s.transferQueue.splice(i >= 0 ? i : 0, s.transferQueue.length ? 1 : 0);
     }
     if (outcome === "show_me_how") {
-      const trick = selectTrick(w.a, w.b);
       if (!s.transferQueue.some((q) => q.trick === trick)) s.transferQueue.push({ trick, key, tier: factTier, due: s.waves + TRANSFER_DELAY });
     }
 
@@ -146,7 +150,9 @@ export function fold(events: LoggedEvent[]): PlayerState {
       }
       case "powerup_used": if (e.payload.valid) openFor(e.payload.a, e.payload.b).powerUp = true; break;
       case "explanation_completed": {
-        openFor(e.payload.a, e.payload.b).explained = true;
+        const w = openFor(e.payload.a, e.payload.b);
+        w.explained = true;
+        w.lessons.push(e.payload.trickId);
         s.seenTricks[e.payload.trickId] = (s.seenTricks[e.payload.trickId] ?? 0) + 1;
         break;
       }

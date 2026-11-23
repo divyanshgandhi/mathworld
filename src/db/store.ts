@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { DB } from "./index";
 import { normalize, type EventInput, type EventType } from "./events";
 import { events, players, type Player } from "./schema";
@@ -37,6 +37,19 @@ export async function listEvents(db: DB, playerId: string) {
 export async function hasEvent(db: DB, playerId: string, type: EventType) {
   const [row] = await db.select({ id: events.id }).from(events).where(and(eq(events.playerId, playerId), eq(events.type, type))).limit(1);
   return !!row;
+}
+
+/** Every cadet, newest first (the /admin dashboard). */
+export async function listPlayers(db: DB) {
+  return db.select().from(players).orderBy(desc(players.createdAt));
+}
+
+/** Every event, oldest first, grouped by player (the /admin dashboard: a handful of testers, read whole). */
+export async function eventsByPlayer(db: DB) {
+  const rows = await db.select().from(events).orderBy(asc(events.id));
+  const out = new Map<string, typeof rows>();
+  for (const r of rows) { const l = out.get(r.playerId); if (l) l.push(r); else out.set(r.playerId, [r]); }
+  return out;
 }
 
 /** What the client may see of a player. */
