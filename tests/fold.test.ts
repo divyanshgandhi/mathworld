@@ -26,6 +26,14 @@ describe("fold", () => {
     expect(s.facts["7x8"].seen).toBe(1);
   });
 
+  it("never serves the tutorial fleet just played again, even right after a Show Me How", () => {
+    const explained: LoggedEvent = { type: "explanation_completed", payload: { trickId: "empty-mirror", a: 1, b: 4, mode: "full", wedoCorrect: true } };
+    const log = [shot(1, 4, 5, { role: "tutorial" }), shot(1, 4, 3, { role: "tutorial", i: 2 }), shot(1, 4, 6, { role: "tutorial", i: 3 }), explained, right(1, 4, { role: "tutorial", i: 4 })];
+    const s = fold(log);
+    expect(s.tier).toBe(0);
+    for (let seed = 1; seed < 40; seed++) expect(factKey(nextWave(s, seed).a, nextWave(s, seed).b)).not.toBe("1x4");
+  });
+
   it("clears Earth's tutorial on 2 of 3 first-try solves, and moves on when the director says so", () => {
     let log: LoggedEvent[] = [right(0, 5, { role: "tutorial", ms: 9000 }), shot(1, 7, 8, { role: "tutorial" }), right(1, 7, { role: "tutorial", i: 2 }), right(1, 3, { role: "tutorial", ms: 9000 })];
     let s = fold(log);

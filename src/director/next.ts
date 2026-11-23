@@ -113,7 +113,8 @@ export function nextWave(s: PlayerState, seed: number): Wave {
     return make(ENUMERABLE_TIERS.includes(next) ? orient(weakest(s, next, mix(seed, s.waves, 3)), rng, next) : drawFrom(next, rng), "probe");
   }
 
-  if (tier === 0) return make(orient(weakest(s, 0, mix(seed, s.waves)), rng, 0), "tutorial");
+  // the tutorial never serves the fleet just played again (after a Show Me How it is the weakest)
+  if (tier === 0) return make(orient(weakest(s, 0, mix(seed, s.waves), new Set(s.history.slice(-1).map((w) => w.key))), rng, 0), "tutorial");
 
   const goal = target(s, tier, seed);
   switch (s.mission.waves) {

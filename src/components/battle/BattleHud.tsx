@@ -126,6 +126,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
               {ui.lockTotal !== null && <p className="mt-1.5 text-center font-mono text-xs text-amber-200">Plasma lock: {ui.sectors.map((s) => fmt(s.value ?? 0)).join(" + ")} = {fmt(ui.lockTotal)}</p>}
             </div>
           )}
+          {ui.lesson?.prompt && <p className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center text-sm text-sky-100 md:mb-2">{ui.lesson.prompt}</p>}
           <div className="mb-1.5 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1 md:mb-2 md:py-2">
             <span className="text-[11px] uppercase tracking-wider text-white/50">{sectorActive ? `Sector ${sectorActive.label}` : "Plasma balls"}</span>
             <output aria-live="polite" aria-label="Plasma balls loaded" className="font-mono text-3xl tabular-nums text-lime-200 md:text-4xl">{entry || "0"}</output>

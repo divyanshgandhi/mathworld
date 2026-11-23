@@ -10,7 +10,7 @@ import { fold, type LoggedEvent, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, scaffold, type Wave } from "@/director/next";
 import { classifyError, radarChoices } from "@/rig/errors";
 import { fleetOf, unitLabel, volley, type Fleet, type Ship } from "@/rig/fleet";
-import { PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/pools";
+import { factKey, PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/pools";
 import { CARD, lesson, powerUpFits, selectTrick, type Lesson, type TrickId } from "@/rig/tricks";
 import { BATTLE_LINES, ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, POWERUP_LINE } from "./lines";
 import { BLASTERS, makeCarrier, makeDreadnought, makeFighterLite, makeGhost, makeInvader, makeRocket, makeTenSquadPod } from "./ships";
@@ -188,6 +188,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const len = buf ? audio.spokenLength(buf) : readTime(text);
     if (buf) void audio.play(buf);
     voiceUntil = performance.now() + len * 1000 + 550;
+    window.clearTimeout(captionTimer);
+    captionTimer = window.setTimeout(() => overlay.caption("", ""), len * 1000 + 900); // never left hanging over the next wave
     await wait(len * 1000 + 550); // pace on the end of speech plus a breath, so a line never cuts itself off
   }
 
@@ -340,6 +342,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const { a, b } = wave, has = (n: number) => a === n || b === n;
     if (t === "flip-it") { flipped = !flipped; flipT = stage.time; axisLabels(); setUi({ wave: { ...ui.wave!, flipped } }); return; }
     clearVisuals();
+    // another trick replaces Sector-Lock: its plates are gone, so its chips go too
+    if (sectorMode) { sectorMode = false; locked = new Map(); activeSector = null; sectorPlate = null; setUi({ sectors: null, lockTotal: null }); }
     switch (t) {
       case "empty-mirror": {
         if (a === 0 || b === 0) { zeroRing.scale.setScalar(1.3); break; }
@@ -482,11 +486,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     return unlocked.map((id) => ({ id, card: id === "big-small-split" && w.sectorLock ? "Sector-Lock" : CARD[id], fits: visualFits(id, w.a, w.b), active: active === id || (id === "flip-it" && flipped) }));
   }
 
-  /** Practice waves never repeat the fleet just played (the fold leaves the mission alone, so the plan could). */
+  /**
+   * Practice waves never repeat the fleet just played. The plan picks the weakest fact, and a fleet
+   * just missed is exactly that, so for this pick it counts as mastered; other seeds break any tie left.
+   */
   let lastKey = "";
-  function practiceDraw(s: PlayerState) {
+  function practiceDraw(s0: PlayerState) {
+    const s: PlayerState = lastKey ? { ...s0, facts: { ...s0.facts, [lastKey]: { m: 1, seen: 1, fastWins: 1 } } } : s0;
     let w = practiceWave(s, tier, practiceK, mix(seed, practiceK, tier));
-    for (let i = 1; i < 6 && `${Math.min(w.a, w.b)}x${Math.max(w.a, w.b)}` === lastKey; i++) w = practiceWave(s, tier, practiceK, mix(seed, practiceK, tier, i));
+    for (let i = 1; i < 6 && factKey(w.a, w.b) === lastKey; i++) w = practiceWave(s, tier, practiceK, mix(seed, practiceK, tier, i));
     return w;
   }
 
@@ -515,7 +523,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       ? { ...forced, tier, planetId: planet, role: "practice", trick: selectTrick(forced.a, forced.b), isTransferCheck: false, sectorLock: Math.min(forced.a, forced.b) >= 10 }
       : practiceDraw(s);
     wave = w;
-    lastKey = `${Math.min(w.a, w.b)}x${Math.max(w.a, w.b)}`;
+    lastKey = factKey(w.a, w.b);
     attempts = 0; usedRadar = false; active = null; flipped = false; flipT = 0; pendingLesson = null; sectorMode = false; locked = new Map(); activeSector = null; wild = [];
     formation.rotation.z = 0;
     build(w.a, w.b);
@@ -615,6 +623,12 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (mash) wild = [];
     // predictive pre-fetch (SPEC §6): a miss makes Show Me How likely, so voice its beats now
     if (misses === 1) try { lesson(w.a, w.b, state().seenTricks).beats.forEach((b) => void live(b.say)); } catch { /* no lesson for this fleet */ }
+    if (sc.showMeHow && !pendingLesson) {
+      // third miss: no reaction line (Nova's lesson is the reaction), shields up, straight into Show Me How
+      await after(0.7);
+      restore();
+      return void showMeHow(true);
+    }
     const radar = sc.radar ? radarChoices(w.a, w.b, seeded(mix(seed, w.a, w.b, attempts))) : null;
     setUi({ radar: radar ?? ui.radar, invite: sc.invite });
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
@@ -622,7 +636,6 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     await after(1.05);
     restore();
     await after(0.4);
-    if (sc.showMeHow && !pendingLesson) { markShot(); return void showMeHow(true); }
     ready();
   }
 
@@ -692,9 +705,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     setUi({ canFire: false, radar: null, invite: false, lesson: { card: l.card, prompt: null } });
     if (sectorMode) { sectorMode = false; setUi({ sectors: null, lockTotal: null }); }
     emit({ type: "explanation_started", payload: { trickId: l.trick, a: w.a, b: w.b, mode: l.mode } });
-    l.beats.forEach((b) => void live(b.say)); // prepare every beat while the first one plays
+    // Fast Replay (SPEC §4.4: ≤ 8 s): the visual split + ONE reminder line + the We-Do. On a flipped
+    // fact the fleet turns while Nova gives the trick's reminder, instead of a second spoken line.
+    // (Only when Flip It is itself a repeat: a first Flip It keeps its own three beats.)
+    const silentFlip = l.mode === "fast" && l.beats[0]?.show.kind === "rotate" && l.beats.length > 2;
+    const beats = silentFlip ? l.beats.slice(1) : l.beats;
+    if (silentFlip && !flipped) applyPowerUp("flip-it");
+    beats.forEach((b) => void live(b.say)); // prepare every beat while the first one plays
     let shown = false;
-    for (const beat of l.beats) {
+    for (const beat of beats) {
       if (wave !== w) return;
       const k = beat.show.kind;
       if (k === "rotate" && !flipped) applyPowerUp("flip-it");

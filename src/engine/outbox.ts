@@ -8,13 +8,23 @@ import type { LoggedEvent } from "@/director/fold";
 const queue: EventInput[] = [];
 let sending: Promise<void> | null = null;
 
+/** "ok" stored, "bad" rejected by validation (retrying won't help), "retry" network or server trouble. */
+async function send(body: unknown): Promise<"ok" | "bad" | "retry"> {
+  const r = await fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+  return r?.ok ? "ok" : r?.status === 400 ? "bad" : "retry";
+}
+
 async function drain() {
   while (queue.length) {
     const batch = queue.splice(0, 50);
-    const body = batch.length === 1 ? batch[0] : { events: batch };
     for (let tries = 0; tries < 3; tries++) {
-      const ok = await fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.ok || r.status === 400).catch(() => false);
-      if (ok) break;
+      const res = await send(batch.length === 1 ? batch[0] : { events: batch });
+      if (res === "ok") break;
+      if (res === "bad") {
+        // one malformed event must not take the rest of the batch with it: send them one by one
+        if (batch.length > 1) for (const e of batch) await send(e);
+        break;
+      }
       await new Promise((r) => setTimeout(r, 400 * (tries + 1)));
     }
   }
