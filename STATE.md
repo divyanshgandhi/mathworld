@@ -14,6 +14,8 @@ _Updated 24 Nov 2026, final integration pass_
 - **README rewritten:** how to run, what a new cadet plays, architecture, pedagogy choices, the levelling proof summary, telemetry, deploy, what's next.
 - **`docs/levelling-proof.md` regenerated:** only the random-masher's numbers moved by a point or two. All claims still pass.
 
+- **Sound toggle (`4195783`):** a speaker button sits top-right on every screen, and M toggles it too. Muting sets the master volume to 0, so pacing is identical. The dev env mute flag is gone, and the game is unmuted.
+
 ## What's verified (Claude_Browser pane, :3200, audio muted)
 - **New cadet, desktop (1024 × 768):**
   - Title → Start → sign-up → the full intro film, played through (~119 s).
