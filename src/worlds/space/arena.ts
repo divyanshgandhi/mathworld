@@ -713,10 +713,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (sectorMode) { sectorMode = false; setUi({ sectors: null, lockTotal: null }); }
     emit({ type: "explanation_started", payload: { trickId: l.trick, a: w.a, b: w.b, mode: l.mode } });
     // The fleet turns without its own spoken beats (so the lesson keeps to the shot budget) when:
-    // - Fast Replay (SPEC §4.4: ≤ 8 s, ONE reminder line + the We-Do) and Flip It is a repeat too;
+    // - Flip It is a repeat (its single reminder line): the turn itself is the reminder, and a Fast
+    //   Replay stays at ONE line + the We-Do (SPEC §4.4: ≤ 8 s);
     // - 10 × b: the Base-10 fleet is already b pods, so the turn is a quarter-turn of pods that the
-    //   pod line explains ("every squad of 10 is one pod"); a first Flip It elsewhere keeps its beats.
-    const silentFlip = l.flipBeats > 0 && ((l.mode === "fast" && l.flipBeats === 1) || (w.a === 10 && l.trick === "easy-5-10"));
+    //   pod line explains ("every squad of 10 is one pod"). A first Flip It elsewhere keeps its beats.
+    const silentFlip = l.flipBeats === 1 || (l.flipBeats > 0 && w.a === 10 && l.trick === "easy-5-10");
     const beats = silentFlip ? l.beats.slice(l.flipBeats) : l.beats;
     if (silentFlip && !flipped) applyPowerUp("flip-it");
     beats.forEach((b) => void live(b.say)); // prepare every beat while the first one plays
