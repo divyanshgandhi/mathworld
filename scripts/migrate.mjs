@@ -1,0 +1,20 @@
+// Applies drizzle/ migrations to the hosted database. Runs in the Vercel build (see vercel.json).
+// Plain ESM so it runs under Node or Bun. Locally, with no DATABASE_URL, the app uses PGlite and
+// migrates itself on first open, so this script has nothing to do.
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+
+const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+if (!url) {
+  console.log("migrate: no DATABASE_URL, skipping (local dev uses PGlite).");
+  process.exit(0);
+}
+
+const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
+try {
+  await migrate(drizzle(sql), { migrationsFolder: "drizzle" });
+  console.log("migrate: database is up to date.");
+} finally {
+  await sql.end();
+}
