@@ -90,6 +90,18 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
             </p>
           </div>
           {/* the outcome chip sits in a row under the plate that the stage keeps clear of the fleet */}
+          {/* Show Me How: the Card Name banner, with its WHY the first time */}
+          {ui.lesson && !o && (
+            <div role="status" className="flex max-w-[92vw] flex-col items-center rounded-2xl bg-sky-300 px-5 py-1 text-center text-[#06202b] shadow-lg">
+              <span className="font-mono text-sm font-bold tracking-[0.12em] md:text-base">⚡ {ui.lesson.card.toUpperCase()}</span>
+              {ui.lesson.why && <span className="text-xs font-medium md:text-sm">why? {ui.lesson.why}</span>}
+            </div>
+          )}
+          {ui.unlock && (
+            <div role="status" className="rounded-full border border-amber-300/70 bg-[#1a1406]/85 px-4 py-1 font-mono text-xs tracking-[0.14em] text-amber-200 shadow-lg">
+              TRICK CARD UNLOCKED · {ui.unlock.cards.join(" + ").toUpperCase()} · ON YOUR BELT
+            </div>
+          )}
           {o && (
             <div role="status" className={`rounded-full px-5 py-1 font-mono text-lg font-semibold tabular-nums shadow-lg ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
               {o.kind === "exact" ? `✓ Dead on · +${o.orbs} orbs` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
@@ -99,7 +111,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
       )}
 
       <div className="pointer-events-none absolute right-3 top-3 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {ui.orbs} orbs</div>
-      {dev && <div className="pointer-events-none absolute left-3 top-3 z-10 font-mono text-[11px] text-white/60">shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</div>}
+      {dev && (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 font-mono text-[11px] text-white/60">
+          <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
+          <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
+        </div>
+      )}
 
       {/* the cockpit: keypad docked right (bottom on phones) */}
       {w && (
@@ -107,7 +124,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
           {ui.belt.length > 0 && (
             <Toolbar aria-label="Tactical Belt" className="-mx-1 mb-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {ui.belt.map((t) => (
-                <ToolbarButton key={t.id} aria-label={`Power-Up ${t.card}`} aria-pressed={t.active} onClick={() => arena?.powerUp(t.id)} disabled={!ui.canFire}
+                <ToolbarButton key={t.id} aria-label={`Power-Up ${t.card}`} aria-pressed={t.active} onClick={() => arena?.powerUp(t.id)} disabled={!ui.canFire || !!ui.lesson}
                   className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40 ${t.active ? "bg-amber-300 text-[#1a1406]" : t.fits ? "border border-amber-300/60 bg-amber-300/10 text-amber-100 hover:bg-amber-300/25" : "border border-white/10 text-white/45"}`}>
                   ⚡ {t.card}
                 </ToolbarButton>
@@ -128,9 +145,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false }: { ar
             </div>
           )}
           {ui.lesson && (
-            <div className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center md:mb-2">
-              <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-sky-200">SHOW ME HOW · {ui.lesson.card.toUpperCase()}</p>
-              {ui.lesson.prompt && <p className="mt-0.5 text-sm text-sky-50">{ui.lesson.prompt}</p>}
+            <div className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center md:mb-2" aria-live="polite">
+              <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-sky-200">{ui.lesson.fallback ? "SAFETY NET" : "SHOW ME HOW"} · {ui.lesson.card.toUpperCase()}</p>
+              {ui.lesson.equation
+                ? <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-sky-50 md:text-3xl">{ui.lesson.equation}</p>
+                : <p className="mt-0.5 text-xs text-sky-100/70">Watch, or fire any time</p>}
+              {ui.lesson.prompt && <p className="mt-0.5 text-xs text-sky-100/80">We Do: load it and fire!</p>}
             </div>
           )}
           <div className="mb-1.5 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1 md:mb-2 md:py-2">

@@ -74,12 +74,22 @@ class SoundEngine {
     this.speaking = false;
   }
 
-  /** Play a baked line. Resolves when it ends (or at once if muted or missing). */
-  async say(id: string) {
+  /**
+   * Play a baked line. Resolves when it ends (or at once if muted or missing). `still`: checked once
+   * the clip has loaded, so a line cancelled while it was loading never starts late over the next one.
+   */
+  async say(id: string, still?: () => boolean) {
     await this.preload();
     const buf = this.ctx && !this.muted ? await this.load(id) : undefined;
+    if (still && !still()) return undefined;
     return buf ? this.play(buf) : undefined;
   }
+  /** The baked clip whose words match `key(text)` (so a lesson line with live numbers can still be a clip). */
+  clipFor(text: string, key: (t: string) => string) {
+    if (this.keyed?.n !== Object.keys(this.manifest).length) this.keyed = { n: Object.keys(this.manifest).length, map: new Map(Object.entries(this.manifest).filter(([, c]) => c.voice === "Zoey").map(([id, c]) => [key(c.text), id])) };
+    return this.keyed.map.get(key(text)) ?? null;
+  }
+  private keyed: { n: number; map: Map<string, string> } | null = null;
 
   /** Play live speech (an AudioBuffer from voice.ts) through the same lip-sync path. */
   play(buf: AudioBuffer) {

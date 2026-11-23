@@ -41,6 +41,17 @@ export const BATTLE_LINES = {
   pu_jump: "Jump One More! Start from what you know.",
   pu_mirror: "Empty and Mirror! Zero is empty, one is a mirror.",
   pu_half: "Half and Double! Same ships, an easier shape.",
+  // a Trick Card lands on the belt (the winning shot after its first Show Me How)
+  "unlock_empty-mirror": "Empty and Mirror is on your belt now!",
+  "unlock_fast-adding": "Fast Adding is on your belt now!",
+  "unlock_flip-it": "Flip It is on your belt now!",
+  "unlock_double-it": "Double It is on your belt now!",
+  "unlock_easy-5-10": "Easy fives and tens is on your belt now!",
+  "unlock_jump-one-more": "Jump One More is on your belt now!",
+  "unlock_split-and-add": "Split and Add is on your belt now!",
+  "unlock_borrow-take-back": "Borrow and Take Back is on your belt now!",
+  "unlock_big-small-split": "Big and Small Split is on your belt now!",
+  "unlock_half-double": "Half and Double is on your belt now!",
   captain_jump_mars: "Ace telemetry! Hyper-Jump straight to Mars?",
   "captain_jump_asteroid-belt": "Ace telemetry! Hyper-Jump straight to the Asteroid Belt?",
   captain_jump_jupiter: "Ace telemetry! Hyper-Jump straight to Jupiter?",
@@ -60,6 +71,7 @@ export const POWERUP_LINE: Record<TrickId, LineId> = {
   "jump-one-more": "pu_jump", "split-and-add": "pu_split", "borrow-take-back": "pu_borrow", "big-small-split": "pu_bigsmall", "half-double": "pu_half",
 };
 export const jumpLine = (to: PlanetId) => `captain_jump_${to}` as LineId;
+export const unlockLine = (t: TrickId) => `unlock_${t}` as LineId;
 
 export const PLANET_NAMES: Record<PlanetId, string> = {
   earth: "Earth · Cadet Bay", moon: "The Moon", mars: "Mars", "asteroid-belt": "Asteroid Belt", jupiter: "Jupiter", saturn: "Saturn", uranus: "Uranus", "deep-space": "Deep Space",

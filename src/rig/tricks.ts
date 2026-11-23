@@ -28,7 +28,8 @@ export type Show =
   | { kind: "sector"; x: number; y: number; value: number }
   | { kind: "reshape"; a: number; b: number }
   | { kind: "wedo"; answer: number };
-export interface Beat { say: string; show: Show }
+/** `why`: the beat that says WHY the trick works (docs/tricks.md: always answered on first sight). */
+export interface Beat { say: string; show: Show; why?: boolean }
 
 export interface Lesson {
   a: number; b: number;
@@ -43,6 +44,9 @@ export interface Lesson {
   /** Signed addends that make a × b (e.g. 4 × 9 → [40, -4]). */
   parts: number[];
   wedo: { prompt: string; answer: number };
+  /** In battle (shot budget): a one-line reminder for the Fast Replay, and the We-Do as a short question. */
+  brief: string;
+  ask: string;
 }
 
 const NINES = [9, 19, 29, 99, 199];
@@ -87,26 +91,27 @@ export function powerUpFits(t: TrickId, a: number, b: number): boolean {
   }
 }
 
-interface Built { trick: TrickId; full: Beat[]; repeat: Beat; parts: number[]; prompt: string }
-const say = (s: string, show: Show): Beat => ({ say: s, show });
+interface Built { trick: TrickId; full: Beat[]; repeat: Beat; parts: number[]; prompt: string; brief?: string; ask?: string }
+const say = (s: string, show: Show, why = false): Beat => (why ? { say: s, show, why } : { say: s, show });
 
 function emptyMirror(a: number, b: number): Built {
   if (a === 0 || b === 0) {
     const line = a === 0 ? "Zero squads means empty space — not a single invader!" : "Zero ships in every squad means empty space — not a single invader!";
-    return { trick: "empty-mirror", full: [say(line, { kind: "empty" })], repeat: say("Remember Empty & Mirror: times 0 is 0, times 1 stays the same!", { kind: "empty" }), parts: [0], prompt: "How many plasma balls do we need for empty space?" };
+    return { trick: "empty-mirror", full: [say(line, { kind: "empty" }, true)], repeat: say("Remember Empty & Mirror: times 0 is 0, times 1 stays the same!", { kind: "empty" }), parts: [0], prompt: "How many plasma balls do we need for empty space?", brief: "Times 0 is 0, times 1 stays the same!" };
   }
   const n = a === 1 ? b : a;
   const line = a === 1 ? "One squad is just a mirror — it keeps the exact same number." : "One ship in each squad is just a mirror — it keeps the exact same number.";
-  return { trick: "empty-mirror", full: [say(line, { kind: "mirror" })], repeat: say("Remember Empty & Mirror: times 0 is 0, times 1 stays the same!", { kind: "mirror" }), parts: [n], prompt: a === 1 ? `So 1 squad of ${fmt(b)} is… tap it!` : `So ${fmt(a)} squads of 1 is… tap it!` };
+  return { trick: "empty-mirror", full: [say(line, { kind: "mirror" }, true)], repeat: say("Remember Empty & Mirror: times 0 is 0, times 1 stays the same!", { kind: "mirror" }), parts: [n], prompt: a === 1 ? `So 1 squad of ${fmt(b)} is… tap it!` : `So ${fmt(a)} squads of 1 is… tap it!`, brief: "Times 0 is 0, times 1 stays the same!" };
 }
 
 function fastAdding(a: number, b: number): Built {
-  const full = [say(`Multiplication is just fast adding — ${a} squads of ${b}.`, { kind: "fleet" }), say(`First squad gives us ${b}.`, { kind: "rows", upTo: 1, total: b })];
+  const full = [say(`Multiplication is just fast adding — ${a} squads of ${b}.`, { kind: "fleet" }, true), say(`First squad gives us ${b}.`, { kind: "rows", upTo: 1, total: b })];
   for (let r = 2; r < a; r++) full.push(say(`Add the ${ORD[r] ?? `next`} squad: ${(r - 1) * b} plus ${b} is ${r * b}.`, { kind: "rows", upTo: r, total: r * b }));
   return {
     trick: "fast-adding", full, parts: Array(a).fill(b),
     repeat: say(`Fast Adding! Count one squad at a time: ${b}, ${2 * b}…`, { kind: "rows", upTo: Math.min(2, a - 1), total: Math.min(2, a - 1) * b }),
     prompt: `One last squad of ${b}! What is ${(a - 1) * b} plus ${b}?`,
+    brief: `Count one squad at a time: ${b}, ${2 * b}…`, ask: `What is ${(a - 1) * b} plus ${b}?`,
   };
 }
 
@@ -114,34 +119,35 @@ function doubleIt(a: number, b: number): Built {
   // ×2 doubles once, ×4 doubles twice. (×8 is taught by Split & Add or Jump One More instead.)
   const k = [2, 4].find((x) => (a === x || b === x) && ![5, 9, 10].includes(x === a ? b : a)) ?? (a === 2 || b === 2 ? 2 : 4);
   const n = k === a ? b : a;
-  if (k === 2) return { trick: "double-it", full: [say("Multiplying by 2? Just Double It!", { kind: "halves", tone: "cyan", value: n })], repeat: say(`Double It! Just add ${n} to itself.`, { kind: "halves", tone: "cyan", value: n }), parts: [n, n], prompt: `Double ${n}! What is ${n} plus ${n}?` };
+  if (k === 2) return { trick: "double-it", full: [say("Multiplying by 2? Just Double It!", { kind: "halves", tone: "cyan", value: n }, true)], repeat: say(`Double It! Just add ${n} to itself.`, { kind: "halves", tone: "cyan", value: n }), parts: [n, n], prompt: `Double ${n}! What is ${n} plus ${n}?`, brief: `Just add ${n} to itself!`, ask: `What is ${n} plus ${n}?` };
   return {
     trick: "double-it",
     full: [
-      say("Multiplying by 4? Just Double It — twice!", { kind: "fleet" }),
+      say("Multiplying by 4? Just Double It — twice!", { kind: "fleet" }, true),
       say(`First double ${n}: ${n} plus ${n} makes ${2 * n}.`, { kind: "halves", tone: "cyan", value: 2 * n }),
       say(`That's half the fleet! The other half is another ${2 * n}.`, { kind: "halves", tone: "amber", value: 2 * n }),
     ],
     repeat: say(`Double It! Double ${n} to get ${2 * n}, then double again!`, { kind: "halves", tone: "cyan", value: 2 * n }),
     parts: [2 * n, 2 * n], prompt: `Double ${2 * n} to clear them all! What is ${2 * n} plus ${2 * n}?`,
+    brief: `Double ${n} to get ${2 * n}, then double again!`, ask: `What is ${2 * n} plus ${2 * n}?`,
   };
 }
 
 function easy510(a: number, b: number): Built {
   if (a === 10 || b === 10) {
     const n = b === 10 ? a : b;
-    return { trick: "easy-5-10", full: [say("Every squad of 10 packs into one glowing Squadron Pod!", { kind: "pods", value: n })], repeat: say("Easy 5s & 10s! Each squad of 10 is one Pod — count the Pods!", { kind: "pods", value: n }), parts: [10 * n], prompt: `${n} Squadron Pods of 10 — how many ships?` };
+    return { trick: "easy-5-10", full: [say("Every squad of 10 packs into one glowing Squadron Pod!", { kind: "pods", value: n }, true)], repeat: say("Easy 5s & 10s! Each squad of 10 is one Pod — count the Pods!", { kind: "pods", value: n }), parts: [10 * n], prompt: `${n} Squadron Pods of 10 — how many ships?`, brief: "Each squad of 10 is one Pod!", ask: `${n} Pods of 10: how many ships?` };
   }
   const n = b === 5 ? a : b;
   return {
     trick: "easy-5-10",
     full: [
-      say("5 is the secret twin of 10 — it's exact half!", { kind: "fleet" }),
+      say("5 is the secret twin of 10 — it's exact half!", { kind: "fleet" }, true),
       say(`Easy! ${n} squads of 10 is ${10 * n}.`, { kind: "twin", value: 10 * n }),
       say(`Since 5 is half of 10, we just take half of ${10 * n}.`, { kind: "slice", left: 5, right: 5 }),
     ],
     repeat: say(`Easy 5s & 10s! ${n} × 10 is ${10 * n}, so ${n} × 5 is half of ${10 * n}!`, { kind: "twin", value: 10 * n }),
-    parts: [10 * n, -5 * n], prompt: `What is half of ${10 * n}?`,
+    parts: [10 * n, -5 * n], prompt: `What is half of ${10 * n}?`, brief: `${n} times 10 is ${10 * n}, and 5 is half of 10!`,
   };
 }
 
@@ -150,12 +156,13 @@ function borrow(a: number, b: number): Built {
   return {
     trick: "borrow-take-back",
     full: [
-      say(`${x} is just 1 shy of ${round}! Let's use Borrow & Take Back.`, { kind: "fleet" }),
+      say(`${x} is just 1 shy of ${round}! Let's use Borrow & Take Back.`, { kind: "fleet" }, true),
       say(`Borrow 1 ghost ship per row so every row has ${round}.`, { kind: "ghosts", perRow: 1, total: n }),
       say(`Easy! ${fmt(n)} rows of ${round} makes ${fmt(big)}.`, { kind: "block", tone: "cyan", value: big }),
     ],
     repeat: say(`Borrow & Take Back! ${fmt(n)} × ${round} is ${fmt(big)}, now take back ${fmt(n)}!`, { kind: "ghosts", perRow: 1, total: n }),
     parts: [big, -n], prompt: `Now zap away the ${fmt(n)} ghosts we borrowed! What is ${fmt(big)} minus ${fmt(n)}?`,
+    brief: "Borrow the ghosts, then take them back!", ask: `What is ${fmt(big)} minus ${fmt(n)}?`,
   };
 }
 
@@ -173,12 +180,13 @@ function jumpOneMore(a: number, b: number): Built {
   return {
     trick: "jump-one-more",
     full: [
-      say(intro, { kind: "fleet" }),
+      say(intro, { kind: "fleet" }, true),
       say(`Start with what you know: ${anchor[0]} squads of ${n} is ${av}.`, { kind: "block", tone: "cyan", value: av }),
       say(`Now jump 1 more squad of ${n}!`, { kind: "block", tone: "amber", value: n }),
     ],
     repeat: say(`Jump One More! Start at ${anchor[0]} × ${n} = ${av}, then add one more ${n}!`, { kind: "block", tone: "cyan", value: av }),
     parts: [av, n], prompt: `Add that last squad: what is ${av} plus ${n}?`,
+    brief: `${anchor[0]} times ${n} is ${av}, plus one more ${n}!`, ask: `What is ${av} plus ${n}?`,
   };
 }
 
@@ -189,12 +197,13 @@ function splitAndAdd(a: number, b: number): Built {
     trick: "split-and-add",
     full: [
       say(`${big} in a row feels big — let's use Split & Add!`, { kind: "fleet" }),
-      say(`Why split ${big} into 5 and ${rem}? Because times 5 is super fast!`, { kind: "slice", left: 5, right: rem }),
+      say(`Why split ${big} into 5 and ${rem}? Because times 5 is super fast!`, { kind: "slice", left: 5, right: rem }, true),
       say(`Left side: ${small} squads of 5 makes ${p1}.`, { kind: "block", tone: "cyan", value: p1 }),
       say(`Right side: ${small} squads of ${rem} makes ${p2}.`, { kind: "block", tone: "amber", value: p2 }),
     ],
     repeat: say(`Split & Add! Slice ${big} into 5 and ${rem}: ${small}×5 = ${p1}, ${small}×${rem} = ${p2}!`, { kind: "slice", left: 5, right: rem }),
     parts: [p1, p2], prompt: `Put both halves back together! What is ${p1} plus ${p2}?`,
+    brief: `Slice ${big} into 5 and ${rem}!`, ask: `What is ${p1} plus ${p2}?`,
   };
 }
 
@@ -210,11 +219,11 @@ function bigSmall(a: number, b: number): Built {
     const full: Beat[] = [];
     if (ps.length === 1) {
       const u = unitOf(hi);
-      full.push(say(`${fmt(hi)} is ${digit(hi)} ${UNIT[u] ?? `groups of ${fmt(u)}`} per lane: ${lo} times ${digit(hi)} is ${lo * digit(hi)} ${UNIT[u] ?? "groups"}.`, { kind: "pods", value: lo * digit(hi) }));
+      full.push(say(`${fmt(hi)} is ${digit(hi)} ${UNIT[u] ?? `groups of ${fmt(u)}`} per lane: ${lo} times ${digit(hi)} is ${lo * digit(hi)} ${UNIT[u] ?? "groups"}.`, { kind: "pods", value: lo * digit(hi) }, true));
       return { trick: "big-small-split", full, repeat: full[0], parts: prods, prompt: `So what is ${lo} times ${fmt(hi)}?` };
     }
     const names = ps.map((p) => ({ 1: "Ones", 10: "Tens", 100: "Hundreds", 1000: "Thousands", 10000: "Ten-Thousands" } as Record<number, string>)[unitOf(p)]);
-    full.push(say(`${fmt(hi)} looks huge — split it into ${names.join(" and ")}: ${ps.map(fmt).join(" and ")}!`, { kind: "slice", left: ps[0], right: hi - ps[0] }));
+    full.push(say(`${fmt(hi)} looks huge — split it into ${names.join(" and ")}: ${ps.map(fmt).join(" and ")}!`, { kind: "slice", left: ps[0], right: hi - ps[0] }, true));
     ps.forEach((p, i) => {
       const u = unitOf(p), d = digit(p), v = lo * p;
       const line = u === 1 ? `Now the Fighters on the right: ${lo} times ${p} is ${v}.`
@@ -227,15 +236,17 @@ function bigSmall(a: number, b: number): Built {
       trick: "big-small-split", full, parts: prods,
       repeat: say(`Big & Small Split! Multiply the ${big} first, then the ${small}, then add!`, { kind: "slice", left: ps[0], right: hi - ps[0] }),
       prompt: `${ps.length === 2 ? "Combine both parts of the armada!" : "Combine all the parts of the armada!"} What is ${prods.map(fmt).join(" plus ")}?`,
+      brief: `${big} first, then the ${small}!`, ask: ps.length === 2 ? `What is ${prods.map(fmt).join(" plus ")}?` : "Add them all up: what's the total?",
     };
   }
   const pa = placeParts(lo), pb = placeParts(hi), sectors = pa.flatMap((x) => pb.map((y) => ({ x, y, v: x * y })));
-  const full: Beat[] = [say(`Sector-Lock! Split ${fmt(lo)} into ${pa.map(fmt).join(" + ")} and ${fmt(hi)} into ${pb.map(fmt).join(" + ")}.`, { kind: "fleet" })];
+  const full: Beat[] = [say(`Sector-Lock! Split ${fmt(lo)} into ${pa.map(fmt).join(" + ")} and ${fmt(hi)} into ${pb.map(fmt).join(" + ")}.`, { kind: "fleet" }, true)];
   for (const s of sectors) full.push(say(`Sector ${fmt(s.x)} × ${fmt(s.y)} is ${fmt(s.v)}.`, { kind: "sector", x: s.x, y: s.y, value: s.v }));
   return {
     trick: "big-small-split", full, parts: sectors.map((s) => s.v),
     repeat: say("Big & Small Split! Crack each sector, then add them all up!", { kind: "fleet" }),
     prompt: `Lock all ${sectors.length} sectors together! What is ${sectors.map((s) => fmt(s.v)).join(" plus ")}?`,
+    brief: "Crack each sector, then add them up!", ask: "Add up the sectors: what's the total?",
   };
 }
 
@@ -246,10 +257,10 @@ function halfDouble(a: number, b: number): Built {
     trick: "half-double",
     full: [
       say("Secret pro move: cut one side in half, and double the other!", { kind: "fleet" }),
-      say(`Half of ${e} is ${h}. Double ${f} is ${d}. Same exact ships!`, { kind: "reshape", a: h, b: d }),
+      say(`Half of ${e} is ${h}. Double ${f} is ${d}. Same exact ships!`, { kind: "reshape", a: h, b: d }, true),
     ],
     repeat: say(`Half & Double! Turn ${a} × ${b} into ${h} × ${d}!`, { kind: "reshape", a: h, b: d }),
-    parts: [h * d], prompt,
+    parts: [h * d], prompt, brief: "Halve one side, double the other!", ask: `What is ${h} times ${d}?`,
   };
 }
 
@@ -263,7 +274,9 @@ const BUILD: Record<Exclude<TrickId, "flip-it">, (a: number, b: number) => Built
  * Seen before: one repeat line with the key visual, then the We-Do tap.
  */
 export function lesson(a: number, b: number, seen: Partial<Record<TrickId, number>> = {}, opts: { trick?: TrickId } = {}): Lesson {
-  const flip = !opts.trick && shouldFlip(a, b) && selectTrick(a, b) !== "empty-mirror" && selectTrick(a, b) !== "big-small-split";
+  // ×5 keeps its squads: the twin of "8 squads of 5" is "8 squads of 10", whichever way the fleet points
+  const t0 = selectTrick(a, b), times5 = t0 === "easy-5-10" && a !== 10 && b !== 10;
+  const flip = !opts.trick && shouldFlip(a, b) && t0 !== "empty-mirror" && t0 !== "big-small-split" && !times5;
   const [ra, rb] = flip ? [b, a] : [a, b];
   const trick = opts.trick && opts.trick !== "flip-it" ? opts.trick : selectTrick(ra, rb);
   const built = BUILD[trick as Exclude<TrickId, "flip-it">](ra, rb);
@@ -274,7 +287,7 @@ export function lesson(a: number, b: number, seen: Partial<Record<TrickId, numbe
       ? [say(`Flip It! Turn ${a} × ${b} sideways into ${b} × ${a} — exact same ships.`, { kind: "rotate" })]
       : [
         say(`${a} tiny squads feels long — let's use Flip It!`, { kind: "fleet" }),
-        say("Turn the fleet sideways! Same ships, just easier to count.", { kind: "rotate" }),
+        say("Turn the fleet sideways! Same ships, just easier to count.", { kind: "rotate" }, true),
         say(`Now it's just ${b} squads of ${a}!`, { kind: "fleet" }),
       ]));
   }
@@ -283,6 +296,7 @@ export function lesson(a: number, b: number, seen: Partial<Record<TrickId, numbe
   const out: Lesson = {
     a, b, tricks: flip ? ["flip-it", built.trick] : [built.trick], trick: built.trick, card: CARD[built.trick],
     mode: fast ? "fast" : "full", beats, flipBeats, parts: built.parts, wedo: { prompt: built.prompt, answer: a * b },
+    brief: built.brief ?? built.repeat.say, ask: built.ask ?? built.prompt,
   };
   const sum = out.parts.reduce((s, p) => s + p, 0);
   if (sum !== a * b) throw new Error(`${built.trick}: parts of ${a} × ${b} add to ${sum}`);

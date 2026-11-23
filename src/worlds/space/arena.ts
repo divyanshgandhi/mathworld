@@ -5,14 +5,17 @@ import { add, canvasTexture, fitText, PALETTE } from "@/engine/materials";
 import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { ease, seeded } from "@/engine/util";
-import { prepare, warmVoice } from "@/engine/voice";
+import { createBeatPlayer } from "@/engine/beatPlayer";
+import { warmVoice } from "@/engine/voice";
 import { fold, type LoggedEvent, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, scaffold, type Wave } from "@/director/next";
 import { classifyError, radarChoices } from "@/rig/errors";
 import { fleetOf, unitLabel, volley, type Fleet, type Ship } from "@/rig/fleet";
 import { factKey, PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/pools";
-import { CARD, lesson, powerUpFits, selectTrick, type Lesson, type TrickId } from "@/rig/tricks";
-import { BATTLE_LINES, ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, POWERUP_LINE } from "./lines";
+import { FLIP_SEC, planShowMeHow, safetyNetApplies, WHY, type Plan, type Step } from "@/rig/showme";
+import { CARD, powerUpFits, selectTrick, type TrickId } from "@/rig/tricks";
+import { makeNova } from "./cast";
+import { BATTLE_LINES, ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, POWERUP_LINE, unlockLine } from "./lines";
 import { BLASTERS, makeCarrier, makeDreadnought, makeFighterLite, makeGhost, makeInvader, makeRocket, makeTenSquadPod } from "./ships";
 import { mountSky } from "./skies";
 
@@ -37,12 +40,17 @@ export interface ArenaUi {
   belt: { id: TrickId; card: string; fits: boolean; active: boolean }[];
   sectors: { i: number; label: string; value: number | null; active: boolean }[] | null;
   lockTotal: number | null;
-  lesson: { card: string; prompt: string | null } | null;
+  /** Show Me How in progress: the Card Name banner (with its WHY on first sight), then the We-Do. */
+  lesson: { card: string; why: string | null; mode: "full" | "fast"; fallback: boolean; prompt: string | null; equation: string | null } | null;
+  /** Trick Cards just unlocked onto the belt (shown for a moment). */
+  unlock: { cards: string[] } | null;
   offer: { to: PlanetId; name: string } | null;
   done: { title: string; sub: string; next: PlanetId | null } | null;
   orbs: number;
   /** fire → ready again, in ms, for every shot so far (the 5–10 s rule, checked in the browser). */
   shots: number[];
+  /** Show Me How start → last line said, in ms (the keypad stays live throughout). */
+  lessons: number[];
 }
 
 export interface ArenaOpts {
@@ -72,7 +80,6 @@ type Ball = { m: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; t0: number;
 
 const CELL = 1.0, BIG = 2.4, GAP = 0.16, GUTTER = 0.75;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** A text plate that always faces the straight-on battle camera. */
@@ -131,18 +138,28 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   const shield = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x7dfcff, transparent: true, opacity: 0, depthWrite: false }));
   shield.position.z = 0.8;
   formation.add(shield);
+  // Show Me How: the background dims behind the fleet, and Nova hovers beside it (no glow in battle)
+  const dimPlane = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: 0x01030a, transparent: true, opacity: 0, depthWrite: false }));
+  dimPlane.position.set(0, 4.2, -6);
+  root.add(dimPlane);
+  const nova = makeNova(M, { glow: false });
+  nova.group.scale.setScalar(1.7);
+  nova.group.visible = false;
+  root.add(nova.group);
+  let novaX = -40;
 
   // ---- state ----
   let mode: "campaign" | "practice" = opts.force || s0.tier !== tier ? "practice" : "campaign";
   let practiceK = 0, declinedAt = -1, started = false, disposed = false;
   let wave: Wave | null = null, fleet: Fleet | null = null, views: ShipView[] = [], ghosts: THREE.Object3D[] = [];
   let attempts = 0, shownAt = 0, lastActivity = 0, shotStart = 0, scale = 1, fw = 8, fh = 5;
-  let usedRadar = false, active: TrickId | null = null, flipped = false, flipT = 0, pendingLesson: Lesson | null = null;
+  let usedRadar = false, active: TrickId | null = null, flipped = false, flipT = 0, pendingLesson: Plan | null = null;
+  let lessonOn = false, lessonId = 0, lessonsThisWave = 0, fallbackUsed = false, lessonT0 = 0, labelPulse = -1;
   let locked: Map<number, number> = new Map(), activeSector: number | null = null, sectorMode = false;
   let wild: number[] = [];
   let ui: ArenaUi = {
     planet, planetName: PLANET_NAMES[planet], mode, started: false, wave: null, canFire: false, outcome: null, radar: null, invite: false,
-    belt: [], sectors: null, lockTotal: null, lesson: null, offer: null, done: null, orbs: s0.orbs, shots: [],
+    belt: [], sectors: null, lockTotal: null, lesson: null, unlock: null, offer: null, done: null, orbs: s0.orbs, shots: [], lessons: [],
   };
   const setUi = (p: Partial<ArenaUi>) => { ui = { ...ui, ...p }; opts.onUi?.(ui); };
   const emit = (e: EventInput) => { log.push({ ...e, at: Date.now() }); opts.onEvent?.(e); if (e.type === "orb_earned") setUi({ orbs: ui.orbs + e.payload.amount }); };
@@ -161,6 +178,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
    * Resolves when the words stop plus a short breath.
    */
   async function say(id: string, { queue = false, speaker = "Nova" } = {}) {
+    if (lessonOn && !queue) return; // Nova is teaching: the HUD already shows what happened
     const now = performance.now();
     if (now < voiceUntil) { if (!queue) return; await wait(voiceUntil - now); }
     const text = lineText(id);
@@ -174,27 +192,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     captionTimer = window.setTimeout(() => overlay.caption("", ""), len * 1000 + 900);
     await wait(len * 1000 + 250);
   }
-  /** A live line (lesson beats with this fleet's numbers): a baked clip if the words match, else Phonon, else captions paced on reading time. */
-  const liveCache = new Map<string, Promise<AudioBuffer | null>>();
-  let liveSlow = false;
-  const live = (text: string) => { if (!liveCache.has(text)) liveCache.set(text, prepare(text, "Zoey")); return liveCache.get(text)!; };
-  async function speak(text: string) {
-    const baked = Object.entries(audio.manifest).find(([k, c]) => k.startsWith("nova") && norm(c.text) === norm(text))?.[0];
-    if (baked) return say(baked, { queue: true });
-    const now = performance.now();
-    if (now < voiceUntil) await wait(voiceUntil - now);
-    overlay.caption("Nova", text);
-    window.clearTimeout(captionTimer);
-    // wait a moment for live speech, but once it has missed a line, don't keep making the cadet wait
-    const buf = await Promise.race([live(text), wait(liveSlow ? 150 : 1200).then(() => null)]);
-    liveSlow = !buf;
-    const len = buf ? audio.spokenLength(buf) : readTime(text);
-    if (buf) void audio.play(buf);
-    voiceUntil = performance.now() + len * 1000 + 550;
-    window.clearTimeout(captionTimer);
-    captionTimer = window.setTimeout(() => overlay.caption("", ""), len * 1000 + 900); // never left hanging over the next wave
-    await wait(len * 1000 + 550); // pace on the end of speech plus a breath, so a line never cuts itself off
-  }
+  /** Show Me How's voice: the shared Beat Player (baked clip, else live Phonon, else captions). */
+  const player = createBeatPlayer({ caption: (who, text) => { window.clearTimeout(captionTimer); overlay.caption(who, text); } });
 
   // ---- fleet building ----
   const lite = (f: Fleet) => f.ships.length > 140;
@@ -329,11 +328,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   function split(axis: "col" | "row", at: number, tones: [keyof typeof TONE, keyof typeof TONE] = ["cyan", "amber"]) {
     const first = views.filter((v) => (axis === "col" ? v.gCol : v.gRow) < at), rest = views.filter((v) => (axis === "col" ? v.gCol : v.gRow) >= at);
     for (const v of rest) v.offset.set(axis === "col" ? 0.7 : 0, axis === "row" ? -0.7 : 0, 0);
-    plate(first, tones[0]); plate(rest, tones[1]);
-    if (!first.length || !rest.length) return { first, rest };
+    const plates = [plate(first, tones[0]), plate(rest, tones[1])];
+    if (!first.length || !rest.length) return { first, rest, plates };
     const edge = first.reduce((m, v) => (axis === "col" ? Math.max(m, v.home.x + v.size.x / 2) : Math.min(m, v.home.y - v.size.y / 2)), axis === "col" ? -Infinity : Infinity);
     if (axis === "col") laser(edge + 0.35 + GAP / 2, null); else laser(null, edge - 0.35 - GAP / 2);
-    return { first, rest };
+    return { first, rest, plates };
   }
   // trick tags sit below and to the right of the fleet, clear of the "3 squads" / "8 each" axis labels
   const axisTop = () => -fh / scale / 2 - 0.75, axisLeft = () => fw / scale / 2 + 0.9;
@@ -439,6 +438,178 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     }
   }
 
+  // ---- Show Me How visuals: each beat's typed Show, rendered on the live fleet ----
+  // Values are labelled here (this is I Do); the Power-Ups above never reveal them (We Do).
+  let lv: { plates: (THREE.Object3D | null)[]; block: number; rowsPlate: THREE.Object3D | null; banded: boolean; halved: boolean } = { plates: [], block: 0, rowsPlate: null, banded: false, halved: false };
+  /** A value badge for a lesson beat: bigger than a Power-Up tag, and it pops in. */
+  function badge(text: string, at: THREE.Vector3, color = "#fde68a") {
+    const t = textPlane(text, 1.1 / scale, color);
+    t.position.copy(at).setZ(0.75);
+    t.userData.upright = true;
+    t.userData.pop = stage.time;
+    visuals.add(t);
+    return t;
+  }
+  const centre = (vs: ShipView[]) => new THREE.Vector3(meanX(vs), meanY(vs), 0);
+  /** A point `d` under the fleet as the cadet sees it (the formation may be turned a quarter). */
+  const under = (d = 0) => (flipped ? new THREE.Vector3(-(fw / scale / 2 + 0.95 + d), 0, 0) : new THREE.Vector3(0, -(fh / scale / 2 + 0.95 + d), 0));
+  const show = (o: THREE.Object3D | null | undefined) => { if (o) { o.visible = true; o.userData.pop = stage.time; } };
+  const hide = (o: THREE.Object3D | null | undefined) => { if (o) o.visible = false; };
+  /** Place-value bands pulled apart (big ships on one side, small on the other), labelled with their parts. */
+  function bands() {
+    if (!fleet || lv.banded) return;
+    lv.banded = true;
+    for (const v of views) { const s = fleet.sectors[v.ship.sector]; v.offset.set(s.colBand * 0.9, -s.rowBand * 0.9, 0); }
+    const f = fleet;
+    f.colParts.forEach((c, i) => { const vs = views.filter((v) => f.sectors[v.ship.sector].colBand === i); if (vs.length && f.colParts.length > 1) tag(fmt(c), new THREE.Vector3(meanX(vs), axisTop() - 0.2, 0)); });
+    f.rowParts.forEach((r, i) => { const vs = views.filter((v) => f.sectors[v.ship.sector].rowBand === i); if (vs.length && f.rowParts.length > 1) tag(fmt(r), new THREE.Vector3(axisLeft(), meanY(vs), 0), undefined, true); });
+  }
+
+  function stageBeat(p: Plan, st: Step, id: number) {
+    if (!wave || !fleet) return;
+    const { a, b } = wave, sh = st.show, t = p.trick, f = fleet, has = (n: number) => a === n || b === n;
+    // the lesson's squads: a turned lesson (8 × 3 taught as 3 squads of 8) counts the fleet's columns, top first
+    const turned = p.silentFlip, perSquad = turned ? a : b;
+    const squad = (v: ShipView) => (turned ? b - 1 - v.gCol : v.gRow);
+    const rightOf = (vs: ShipView[]) => {
+      // just right of a squad as the cadet sees it (the formation may be turned a quarter)
+      const vis = vs.map((v) => (turned ? new THREE.Vector2(-v.home.y, v.home.x) : new THREE.Vector2(v.home.x, v.home.y)));
+      const x = Math.max(...vis.map((q) => q.x)) + 1.1, y = vis.reduce((s, q) => s + q.y, 0) / vis.length;
+      return turned ? new THREE.Vector3(y, -x, 0) : new THREE.Vector3(x, y, 0);
+    };
+    const rowsUpTo = (k: number) => {
+      if (lv.rowsPlate) visuals.remove(lv.rowsPlate);
+      lv.rowsPlate = plate(views.filter((v) => squad(v) < k), "cyan");
+      const row = views.filter((v) => squad(v) === k - 1);
+      if (row.length) badge(fmt(k * perSquad), rightOf(row));
+      audio.sfx("blip_ok");
+    };
+    const pulseAll = (vs: ShipView[]) => { pulses = vs.map((v, i) => ({ v, t0: stage.time + i * Math.min(0.04, 0.6 / vs.length) })); };
+    switch (sh.kind) {
+      case "fleet": labelPulse = stage.time; break;
+      case "empty": zeroRing.scale.setScalar(1.35); badge("0 ships", under(), "#a5f3fc"); break;
+      case "mirror": plate(views, "cyan"); badge(`mirror · ${fmt(a * b)}`, under(), "#a5f3fc"); pulseAll(views); break;
+      case "rotate": if (!flipped) applyPowerUp("flip-it"); break;
+      case "rows":
+        if (st.sweep) for (let k = 1; k <= sh.upTo; k++) timers.push({ at: stage.time + (k - 1) * 0.5, fn: () => { if (id === lessonId) rowsUpTo(k); } });
+        else rowsUpTo(sh.upTo);
+        break;
+      case "halves": {
+        const k = [2, 4].find((x) => has(x) && ![5, 9, 10].includes(x === a ? b : a)) ?? (has(2) ? 2 : 4), n = k === a ? b : a;
+        if (!lv.halved) {
+          lv.halved = true;
+          const r = split(a === k ? "row" : "col", k / 2);
+          lv.plates = r.plates;
+          if (k === 2) { badge(fmt(n), centre(r.first)); badge(fmt(n), centre(r.rest)); break; }
+          hide(r.plates[1]);
+          badge(fmt(sh.value), centre(r.first));
+        } else {
+          const rest = views.filter((v) => (a === k ? v.gRow : v.gCol) >= k / 2);
+          show(lv.plates[1]);
+          badge(fmt(sh.value), centre(rest), "#fcd34d");
+        }
+        break;
+      }
+      case "pods": {
+        const big = views.filter((v) => v.kind !== "fighter"), unit = 10 ** (String(Math.max(a, b)).length - 1);
+        plate(big.length ? big : views, "gold");
+        pulseAll(big.length ? big : views);
+        badge(t === "easy-5-10" ? `${fmt(sh.value)} Pods` : `${fmt(sh.value)} × ${fmt(unit)}`, under());
+        break;
+      }
+      case "twin": {
+        applyPowerUp("easy-5-10");
+        badge(`${fmt(sh.value / 10)} × 10 = ${fmt(sh.value)}`, under(0.9), "#a5f3fc");
+        break;
+      }
+      case "slice": {
+        if (t === "easy-5-10") {
+          // the borrowed twin half fades: 5 is half of 10
+          const real = b === 5 ? views.filter((v) => v.gCol === 4) : views.filter((v) => v.gRow === 4);
+          for (const g of ghosts) g.userData.fade = stage.time;
+          for (const c of visuals.children) if (!c.userData.upright && !c.userData.grow) c.userData.fade = stage.time; // the twin's plate goes with it
+          plate(views, "gold");
+          if (real.length) { if (b === 5) laser(Math.max(...real.map((v) => v.home.x)) + 0.5 + GAP / 2, null); else laser(null, Math.min(...real.map((v) => v.home.y)) - 0.5 - GAP / 2); }
+          badge(`½ of ${fmt(2 * p.answer)}`, under(2.2));
+        } else if (t === "split-and-add") {
+          const axis = b >= a ? "col" : "row", big = Math.max(a, b), r = split(axis, 5);
+          lv.plates = r.plates;
+          r.plates.forEach(hide);
+          if (axis === "col") { tag("5", new THREE.Vector3(meanX(r.first), axisTop(), 0)); tag(String(big - 5), new THREE.Vector3(meanX(r.rest), axisTop(), 0)); }
+          else { tag("5", new THREE.Vector3(axisLeft(), meanY(r.first), 0), undefined, true); tag(String(big - 5), new THREE.Vector3(axisLeft(), meanY(r.rest), 0), undefined, true); }
+          audio.sfx("blip_close");
+        } else bands();
+        break;
+      }
+      case "block": {
+        const i = lv.block++;
+        if (t === "split-and-add" || t === "jump-one-more") {
+          if (t === "jump-one-more" && i === 0) {
+            const r = Math.abs(a - b) === 1 && Math.min(a, b) >= 6 ? split(a > b ? "row" : "col", Math.min(a, b)) : (() => { const k = has(3) ? 3 : 6; return split(a === k ? "row" : "col", k - 1); })();
+            lv.plates = r.plates;
+            hide(r.plates[1]);
+          }
+          show(lv.plates[i]);
+          const sel = views.filter((v) => (lv.plates[0] ? v.offset.lengthSq() === 0 : true) === (i === 0));
+          badge(t === "jump-one-more" && i === 1 ? `+ ${fmt(sh.value)}` : fmt(sh.value), centre(sel.length ? sel : views), i === 0 ? "#fde68a" : "#fcd34d");
+        } else if (t === "borrow-take-back") {
+          plate(views, "cyan", ghosts);
+          badge(fmt(sh.value), centre(views));
+        } else {
+          // Big & Small Split: one place-value band at a time
+          bands();
+          const byCols = b === Math.max(a, b), band = (v: ShipView) => (byCols ? f.sectors[v.ship.sector].colBand : f.sectors[v.ship.sector].rowBand);
+          const sel = views.filter((v) => band(v) === i), ones = (byCols ? f.colParts : f.rowParts)[i] < 10;
+          plate(sel, ones ? "amber" : "cyan");
+          if (sel.length) badge(fmt(sh.value), centre(sel));
+        }
+        audio.sfx("blip_ok");
+        break;
+      }
+      case "ghosts": applyPowerUp("borrow-take-back"); audio.sfx("shield"); break;
+      case "sector": {
+        bands();
+        const lo = Math.min(a, b), [rp, cp] = lo === a ? [sh.x, sh.y] : [sh.y, sh.x];
+        const sec = f.sectors.find((x) => x.rowPart === rp && x.colPart === cp);
+        const sel = sec ? views.filter((v) => v.ship.sector === sec.i) : [];
+        plate(sel, "gold");
+        if (sel.length) badge(fmt(sh.value), centre(sel));
+        audio.sfx("blip_ok");
+        break;
+      }
+      case "reshape": {
+        // a hologram of the fleet's outline: cut in half, and the half slides beside (or under) the other
+        const W = fw / scale, H = fh / scale, rowsHalved = a % 2 === 0 && b % 10 === 5;
+        const outline = (w: number, h: number, x: number, y: number) => {
+          const box = new THREE.PlaneGeometry(w, h), line = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineDashedMaterial({ color: 0x9fe8ff, dashSize: 0.25, gapSize: 0.15, transparent: true, opacity: 0.95 }));
+          line.computeLineDistances();
+          const g = new THREE.Group().add(new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.08, depthWrite: false })), line);
+          g.position.set(x, y, 0.3);
+          g.userData.half = new THREE.Vector2(w / 2, h / 2);
+          formation.add(g);
+          ghosts.push(g);
+          return g;
+        };
+        if (rowsHalved) { outline(W, H / 2, 0, H / 4); const lower = outline(W, H / 2, 0, -H / 4); lower.userData.slide = { from: lower.position.clone(), to: new THREE.Vector3(W + 0.6, H / 4, 0.3), t0: stage.time }; laser(null, 0); }
+        else { outline(W / 2, H, -W / 4, 0); const right = outline(W / 2, H, W / 4, 0); right.userData.slide = { from: right.position.clone(), to: new THREE.Vector3(-W / 4, -H - 0.6, 0.3), t0: stage.time }; laser(0, null); }
+        badge(`${fmt(sh.a)} × ${fmt(sh.b)}`, under(0.3), "#a5f3fc");
+        break;
+      }
+      case "wedo": {
+        if (t === "borrow-take-back") {
+          for (const g of ghosts) g.traverse((o) => { const m = o as THREE.Mesh; if (m.material && "color" in m.material) { m.material = (m.material as THREE.MeshBasicMaterial).clone(); (m.material as THREE.MeshBasicMaterial).color.set(0xff8f70); } });
+          if (ghosts.length) badge(`− ${fmt(ghosts.length > 1 ? Math.abs(p.lesson.parts[1] ?? 0) : 1)}`, new THREE.Vector3(axisLeft() + 0.4, axisTop(), 0), "#ff8f70");
+        } else if (t === "fast-adding") {
+          const last = views.filter((v) => squad(v) === Math.max(...views.map(squad)));
+          if (last.length) { badge("+ ?", rightOf(last), "#a5f3fc"); pulseAll(last); }
+          break;
+        }
+        pulseAll(views.filter((v) => v.alive));
+        break;
+      }
+    }
+  }
+
   // ---- Sector-Lock (SPEC §3): crack each Battle Sector's sub-product; the sum is the plasma lock ----
   function sectorUi() {
     if (!fleet || !sectorMode) return { sectors: null, lockTotal: null };
@@ -530,7 +701,10 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       : practiceDraw(s);
     wave = w;
     lastKey = factKey(w.a, w.b);
+    endLesson();
+    player.cancel(); // a new fleet: lines for the last one are no longer wanted
     attempts = 0; usedRadar = false; active = null; flipped = false; flipT = 0; pendingLesson = null; sectorMode = false; locked = new Map(); activeSector = null; wild = [];
+    lessonsThisWave = 0; fallbackUsed = false;
     formation.rotation.z = 0;
     build(w.a, w.b);
     const index = mode === "campaign" ? s.mission.waves : practiceK;
@@ -539,6 +713,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       canFire: false, outcome: null, radar: null, invite: false, belt: beltFor(s, w), sectors: null, lockTotal: null, lesson: null, offer: null,
     });
     audio.sfx("flyby");
+    prefetchLesson(false); // Beat 1 of this fleet's Show Me How, while the cadet thinks
     if (s.waves === 0 && mode === "campaign" && opts.lines?.intro) await say(opts.lines.intro, { queue: true });
     else if (index === 0) void say("nova_incoming_short");
     await after(0.75); // the fleet flies in
@@ -582,10 +757,18 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     setUi({ canFire: false, outcome: null, radar: o.radar ? null : ui.radar });
     attempts++;
     usedRadar ||= !!o.radar;
+    let unlocked: TrickId[] = [];
     if (pendingLesson) {
-      for (const t of pendingLesson.tricks) emit({ type: "explanation_completed", payload: { trickId: t, a: w.a, b: w.b, mode: pendingLesson.mode, wedoCorrect: n === p } });
+      const l = pendingLesson, before = state().seenTricks;
+      unlocked = l.tricks.filter((t) => !(before[t] ?? 0));
+      for (const t of l.tricks) emit({ type: "explanation_completed", payload: { trickId: t, a: w.a, b: w.b, mode: l.mode, wedoCorrect: n === p } });
       pendingLesson = null;
-      setUi({ lesson: null });
+      endLesson();
+      if (unlocked.length) {
+        // the Trick Card lands on the belt: free and unlimited from now on
+        setUi({ unlock: { cards: unlocked.map((t) => CARD[t]) }, belt: beltFor(state(), w) });
+        timers.push({ at: stage.time + 3.2, fn: () => setUi({ unlock: null }) });
+      }
     }
     const errorType = classifyError(w.a, w.b, n);
     emit({ type: "attempt_submitted", payload: { a: w.a, b: w.b, planetId: planet, guess: n, latencyMs: latency, errorType, attemptIndex: attempts, usedRadar, powerUpUsed: active, isTransferCheck: w.isTransferCheck, waveRole: mode === "practice" ? "practice" : w.role } });
@@ -613,7 +796,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       const orbs = attempts === 1 ? 5 : 3;
       emit({ type: "orb_earned", payload: { amount: orbs, reason: "wave_clear" } });
       setUi({ outcome: { kind: "exact", value: p, orbs }, radar: null, invite: false, sectors: null, lockTotal: null });
-      void say(EXACT_LINES[(state().waves + attempts) % EXACT_LINES.length]);
+      void say(unlocked.length ? unlockLine(unlocked[unlocked.length - 1]) : EXACT_LINES[(state().waves + attempts) % EXACT_LINES.length]);
       await after(0.9);
       if (mode === "practice") practiceK++;
       return startWave();
@@ -627,13 +810,19 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const misses = attempts, sc = scaffold(misses, w.a, w.b, n);
     const mash = errorType === "wild_guess" && wild.length >= 3 && latency < 4000;
     if (mash) wild = [];
-    // predictive pre-fetch (SPEC §6): a miss makes Show Me How likely, so voice its beats now
-    if (misses === 1) try { lesson(w.a, w.b, state().seenTricks).beats.forEach((b) => void live(b.say)); } catch { /* no lesson for this fleet */ }
-    if (sc.showMeHow && !pendingLesson) {
+    // predictive pre-fetch (SPEC §6): a miss makes Show Me How likely, so voice all its lines now
+    if (misses === 1) prefetchLesson(true);
+    // stuck after a trick on an early level: the safety net drops to Fast Adding (once a wave)
+    if (lessonsThisWave > 0 && !fallbackUsed && safetyNetApplies(tier, w.a, w.b)) {
+      await after(0.7);
+      restore();
+      return void showMeHow({ auto: true, fallback: true });
+    }
+    if (sc.showMeHow && lessonsThisWave === 0) {
       // third miss: no reaction line (Nova's lesson is the reaction), shields up, straight into Show Me How
       await after(0.7);
       restore();
-      return void showMeHow(true);
+      return void showMeHow({ auto: true });
     }
     const radar = sc.radar ? radarChoices(w.a, w.b, seeded(mix(seed, w.a, w.b, attempts))) : null;
     setUi({ radar: radar ?? ui.radar, invite: sc.invite });
@@ -705,40 +894,66 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     setUi({ belt: beltFor(state(), wave) });
   }
 
-  /** I Do (Phase 2 form): Nova walks the trick's beats over this live fleet, then hands back the winning shot. */
-  async function showMeHow(auto = false) {
-    if (!wave || pendingLesson || ui.lesson || (!auto && !ui.canFire)) return;
-    const w = wave, s = state(), l = lesson(w.a, w.b, s.seenTricks);
-    setUi({ canFire: false, radar: null, invite: false, lesson: { card: l.card, prompt: null } });
-    if (sectorMode) { sectorMode = false; setUi({ sectors: null, lockTotal: null }); }
-    emit({ type: "explanation_started", payload: { trickId: l.trick, a: w.a, b: w.b, mode: l.mode } });
-    // The fleet turns without its own spoken beats (so the lesson keeps to the shot budget) when:
-    // - Flip It is a repeat (its single reminder line): the turn itself is the reminder, and a Fast
-    //   Replay stays at ONE line + the We-Do (SPEC §4.4: ≤ 8 s);
-    // - 10 × b: the Base-10 fleet is already b pods, so the turn is a quarter-turn of pods that the
-    //   pod line explains ("every squad of 10 is one pod"). A first Flip It elsewhere keeps its beats.
-    const silentFlip = l.flipBeats === 1 || (l.flipBeats > 0 && w.a === 10 && l.trick === "easy-5-10");
-    const beats = silentFlip ? l.beats.slice(l.flipBeats) : l.beats;
-    if (silentFlip && !flipped) applyPowerUp("flip-it");
-    beats.forEach((b) => void live(b.say)); // prepare every beat while the first one plays
-    let shown = false;
-    for (const beat of beats) {
-      if (wave !== w) return;
-      const k = beat.show.kind;
-      if (k === "rotate" && !flipped) applyPowerUp("flip-it");
-      else if (!shown && k !== "fleet" && k !== "wedo" && k !== "rotate") {
-        shown = true;
-        if (visualFits(l.trick, w.a, w.b)) applyPowerUp(l.trick, { lockMode: false });
-      }
-      if (k === "wedo") {
-        pendingLesson = l;
-        setUi({ lesson: { card: l.card, prompt: beat.say } });
-        void speak(beat.say);
-        break;
-      }
-      await speak(beat.say);
+  /**
+   * I Do: the Beat Player walks the trick over this live fleet (dimmed background, camera pushed in,
+   * Nova beside it), one visual move per beat, and ends on the We-Do question. The keypad stays live
+   * the whole time: firing at any moment ends the lesson cleanly (the shot budget, SPEC §4.1).
+   * `fallback`: the early-level safety net, Fast Adding.
+   */
+  async function showMeHow({ auto = false, fallback = false } = {}) {
+    if (!wave || lessonOn || (!auto && !ui.canFire)) return;
+    const w = wave, s = state();
+    let p: Plan;
+    try { p = planShowMeHow(w.a, w.b, s.seenTricks, { fallback }); } catch { return; }
+    const id = ++lessonId;
+    lessonOn = true; pendingLesson = p; lessonsThisWave++; fallbackUsed ||= fallback;
+    if (sectorMode) { sectorMode = false; locked = new Map(); activeSector = null; sectorPlate = null; }
+    active = null;
+    clearVisuals();
+    lv = { plates: [], block: 0, rowsPlate: null, banded: false, halved: false };
+    for (const t of p.tricks) emit({ type: "explanation_started", payload: { trickId: t, a: w.a, b: w.b, mode: p.mode } });
+    const firstFlip = p.tricks.includes("flip-it") && !(s.seenTricks["flip-it"] ?? 0);
+    const banner = (card: string, why: string | null) => setUi({ lesson: { card, why, mode: p.mode, fallback, prompt: null, equation: null } });
+    setUi({ radar: null, invite: false, sectors: null, lockTotal: null, outcome: null });
+    banner(p.silentFlip !== flipped && p.tricks.includes("flip-it") ? CARD["flip-it"] : p.banner.card, p.silentFlip !== flipped && p.tricks.includes("flip-it") ? (firstFlip ? WHY["flip-it"] : null) : p.banner.why);
+    setUi({ belt: beltFor(s, w) });
+    if (!fallback && safetyNetApplies(tier, w.a, w.b)) try { player.prefetch(planShowMeHow(w.a, w.b, s.seenTricks, { fallback: true }).steps.map((x) => x.speech)); } catch { /* none */ }
+    lessonT0 = performance.now();
+    ready(); // the keypad is live from here on: the cadet may fire the moment they see it
+    if (p.silentFlip !== flipped) {
+      applyPowerUp("flip-it");
+      await after(FLIP_SEC);
+      if (id !== lessonId) return;
+      banner(p.banner.card, p.banner.why);
     }
-    ready();
+    const done = await player.play(p.steps, (st) => {
+      if (id !== lessonId) return;
+      if (st.show.kind === "wedo") setUi({ lesson: { ...ui.lesson!, card: st.card, prompt: st.caption, equation: p.equation } });
+      stageBeat(p, st, id);
+    });
+    if (done && id === lessonId) setUi({ lessons: [...ui.lessons, Math.round(performance.now() - lessonT0)] });
+  }
+
+  /** Close the lesson: voice, caption, pending lines and its visuals (the fleet keeps its turn). */
+  function endLesson() {
+    if (!lessonOn) return;
+    lessonOn = false;
+    lessonId++;
+    player.stop(); // lines already being synthesised for this fleet are kept: a safety net may need them
+    window.clearTimeout(captionTimer);
+    overlay.caption("", "");
+    voiceUntil = 0;
+    clearVisuals();
+    setUi({ lesson: null });
+  }
+
+  /** Predictive pre-fetch (SPEC §6): speak the lesson's lines into buffers while the cadet thinks. */
+  function prefetchLesson(all: boolean) {
+    if (!wave) return;
+    try {
+      const steps = planShowMeHow(wave.a, wave.b, state().seenTricks).steps.filter((x) => x.speech);
+      player.prefetch((all ? steps : steps.slice(0, 1)).map((x) => x.speech));
+    } catch { /* no lesson for this fleet */ }
   }
 
   // ---- the frame ----
@@ -776,10 +991,19 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     }
     for (const c of [...visuals.children, ...ghosts]) {
       if (c.userData.upright) c.rotation.z = -formation.rotation.z;
+      const pop = c.userData.pop as number | undefined;
+      if (pop !== undefined) { const k = Math.min(1, (stage.time - pop) / 0.25); c.scale.setScalar(0.55 + 0.45 * ease(k) + Math.sin(Math.PI * k) * 0.12); if (k >= 1) delete c.userData.pop; }
+      const slide = c.userData.slide as { from: THREE.Vector3; to: THREE.Vector3; t0: number } | undefined;
+      if (slide) { const k = Math.min(1, Math.max(0, (stage.time - slide.t0 - 0.35) / 0.9)); c.position.lerpVectors(slide.from, slide.to, ease(k)); }
+      const fade = c.userData.fade as number | undefined;
+      if (fade !== undefined) { const k = Math.min(1, (stage.time - fade) / 0.45); c.scale.setScalar(Math.max(0.001, 1 - k)); if (k >= 1) c.visible = false; }
       const grow = c.userData.grow as { t0: number; axis: "x" | "y" } | undefined;
       if (grow) { const k = Math.max(0.01, Math.min(1, (stage.time - grow.t0) / 0.35)); c.scale.set(grow.axis === "x" ? k : 1, grow.axis === "y" ? k : 1, 1); }
     }
-    for (const g of ghosts) g.position.y += Math.sin(T * 2.4) * 0.002;
+    for (const g of ghosts) if (!g.userData.slide) g.position.y += Math.sin(T * 2.4) * 0.002;
+    // the "3 squads" / "8 each" labels pulse when a beat points at the whole fleet
+    const lp = labelPulse >= 0 ? stage.time - labelPulse : 9;
+    for (const c of labels.children) if (!c.userData.rail) c.scale.setScalar(1 + (lp < 0.8 ? Math.sin((lp / 0.8) * Math.PI) * 0.18 : 0));
     const sh = shield.userData.t0 as number | undefined;
     (shield.material as THREE.MeshBasicMaterial).opacity = sh === undefined ? 0 : Math.max(0, 0.28 * (1 - (stage.time - sh) / 0.5));
     zeroRing.rotation.z += dt * 0.6;
@@ -804,12 +1028,31 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     let ex = fw / scale / 2, ey = fh / scale / 2;
     for (const v of views) { ex = Math.max(ex, Math.abs(v.home.x + v.offset.x) + v.size.x / 2); ey = Math.max(ey, Math.abs(v.home.y + v.offset.y) + v.size.y / 2); }
     for (const g of ghosts) { const hs = g.userData.half as THREE.Vector2; ex = Math.max(ex, Math.abs(g.position.x) + hs.x); ey = Math.max(ey, Math.abs(g.position.y) + hs.y); }
+    // labels on the fleet (running totals, parts) are framed too, so none hides behind the keypad
+    for (const c of visuals.children) {
+      const pg = (c as THREE.Mesh).geometry as THREE.PlaneGeometry | undefined;
+      if (!c.visible || !c.userData.upright || !pg?.parameters) continue;
+      const [hw, hh] = flipped ? [pg.parameters.height / 2, pg.parameters.width / 2] : [pg.parameters.width / 2, pg.parameters.height / 2];
+      ex = Math.max(ex, Math.abs(c.position.x) + hw + 0.2); ey = Math.max(ey, Math.abs(c.position.y) + hh + 0.2);
+    }
     const h = (flipped ? ex : ey) * 2 * scale, w = (flipped ? ey : ex) * 2 * scale;
     const bottom = 4.2 - h / 2;
     rocket.group.position.set(Math.sin(T * 0.9) * 0.12, bottom - 2.1 + Math.sin(T * 1.6) * 0.06, 1.8);
     rocket.group.rotation.z = Math.sin(T * 0.9) * 0.05;
     rocket.flicker(T, 1);
-    const ymin = bottom - 2.9, ymax = 4.2 + h / 2 + 1.0, xmin = -w / 2 - 2.4, xmax = w / 2 + 0.5;
+    // Nova: in beside the fleet's top-left corner for a lesson, away otherwise; she lip-syncs to the voice
+    const novaY = 4.2 + h / 2 + 0.35, novaTo = lessonOn ? -w / 2 - 1.7 : -w / 2 - 16;
+    novaX += (novaTo - novaX) * Math.min(1, dt * 3.2);
+    nova.group.visible = lessonOn || novaX > -w / 2 - 14;
+    nova.group.position.set(novaX, 0, 1.4);
+    nova.animate(T, dt, novaY, lessonOn ? audio.level() : 0);
+    const dm = dimPlane.material as THREE.MeshBasicMaterial;
+    dm.opacity += ((lessonOn ? 0.62 : 0) - dm.opacity) * Math.min(1, dt * 4);
+    // a lesson pushes the camera in: frame the fleet and Nova, leave the rocket at the bottom edge
+    // (the bottom keeps room for Nova's caption, which floats over the rocket's place)
+    const ymin = lessonOn ? bottom - 1.9 : bottom - 2.9, xmax = w / 2 + 0.5;
+    let ymax = 4.2 + h / 2 + 1.0, xmin = -w / 2 - 2.4;
+    if (lessonOn) { xmin = Math.min(xmin, novaTo - 1.5); ymax = Math.max(ymax, novaY + 1.1); }
     const W = stage.renderer.domElement.clientWidth || 1, H = stage.renderer.domElement.clientHeight || 1;
     const fwPx = Math.max(120, W - safe.left - safe.right), fhPx = Math.max(120, H - safe.top - safe.bottom), tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const d = Math.max(((ymax - ymin) * H) / (2 * tan * fhPx * 0.94), ((xmax - xmin) * H) / (2 * tan * fwPx * 0.94), 7);
@@ -854,6 +1097,10 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     radar: (n: number) => fire(n, { radar: true }),
     powerUp,
     showMeHow: () => void showMeHow(),
+    /** Dev: the lesson plan this fleet would get now. */
+    plan: () => (wave ? planShowMeHow(wave.a, wave.b, state().seenTricks) : null),
+    /** Dev: where Show Me How's lines came from (baked clip, live Phonon, captions only). */
+    voice: () => ({ ...player.stats, slow: player.slow }),
     selectSector,
     lockSector,
     /** The cadet is typing: the idle Radar waits. */
@@ -873,6 +1120,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     log: () => log,
     dispose() {
       disposed = true;
+      endLesson();
+      player.cancel();
       stop();
       clearFleet();
       overlay.dispose();

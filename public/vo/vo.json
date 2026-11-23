@@ -502,5 +502,327 @@
     "duration": 3.84,
     "end": 3.251,
     "src": "/vo/captain_jump_deep-space.mp3"
+  },
+  "tr_sectors_total": {
+    "voice": "Zoey",
+    "text": "Add up the sectors: what's the total?",
+    "duration": 2.8,
+    "end": 2.205,
+    "src": "/vo/tr_sectors_total.mp3"
+  },
+  "tr_total": {
+    "voice": "Zoey",
+    "text": "What's the total?",
+    "duration": 1.6,
+    "end": 0.868,
+    "src": "/vo/tr_total.mp3"
+  },
+  "tr_all_total": {
+    "voice": "Zoey",
+    "text": "Add them all up: what's the total?",
+    "duration": 2.56,
+    "end": 1.932,
+    "src": "/vo/tr_all_total.mp3"
+  },
+  "tr_left": {
+    "voice": "Zoey",
+    "text": "What's left?",
+    "duration": 1.52,
+    "end": 0.767,
+    "src": "/vo/tr_left.mp3"
+  },
+  "tr_sector_brief": {
+    "voice": "Zoey",
+    "text": "Crack each sector, then add them up!",
+    "duration": 2.88,
+    "end": 2.264,
+    "src": "/vo/tr_sector_brief.mp3"
+  },
+  "tr_tens_ones_brief": {
+    "voice": "Zoey",
+    "text": "Ten Squads first, then the Fighters!",
+    "duration": 2.96,
+    "end": 2.404,
+    "src": "/vo/tr_tens_ones_brief.mp3"
+  },
+  "tr_carriers_ones_brief": {
+    "voice": "Zoey",
+    "text": "Carriers first, then the Fighters!",
+    "duration": 2.8,
+    "end": 2.244,
+    "src": "/vo/tr_carriers_ones_brief.mp3"
+  },
+  "tr_carriers_tens_brief": {
+    "voice": "Zoey",
+    "text": "Carriers first, then the Ten Squads!",
+    "duration": 2.96,
+    "end": 2.412,
+    "src": "/vo/tr_carriers_tens_brief.mp3"
+  },
+  "tr_half_brief": {
+    "voice": "Zoey",
+    "text": "Halve one side, double the other!",
+    "duration": 2.56,
+    "end": 1.95,
+    "src": "/vo/tr_half_brief.mp3"
+  },
+  "tr_borrow_brief": {
+    "voice": "Zoey",
+    "text": "Borrow the ghosts, then take them back!",
+    "duration": 2.96,
+    "end": 2.283,
+    "src": "/vo/tr_borrow_brief.mp3"
+  },
+  "tr_mirror_brief": {
+    "voice": "Zoey",
+    "text": "Times zero is zero, times one stays the same!",
+    "duration": 3.52,
+    "end": 2.944,
+    "src": "/vo/tr_mirror_brief.mp3"
+  },
+  "tr_zero_each": {
+    "voice": "Zoey",
+    "text": "Zero ships in every squad means empty space. Not a single invader!",
+    "duration": 4.8,
+    "end": 4.217,
+    "src": "/vo/tr_zero_each.mp3"
+  },
+  "tr_mirror_each": {
+    "voice": "Zoey",
+    "text": "One ship in each squad is just a mirror. It keeps the exact same number.",
+    "duration": 4.64,
+    "end": 4.01,
+    "src": "/vo/tr_mirror_each.mp3"
+  },
+  "tr_pods_why": {
+    "voice": "Zoey",
+    "text": "Every squad of ten packs into one glowing Squadron Pod!",
+    "duration": 3.76,
+    "end": 3.121,
+    "src": "/vo/tr_pods_why.mp3"
+  },
+  "tr_pods_brief": {
+    "voice": "Zoey",
+    "text": "Each squad of ten is one Pod!",
+    "duration": 2.56,
+    "end": 1.95,
+    "src": "/vo/tr_pods_brief.mp3"
+  },
+  "tr_twin_why": {
+    "voice": "Zoey",
+    "text": "Five is the secret twin of ten. It's exact half!",
+    "duration": 3.76,
+    "end": 3.012,
+    "src": "/vo/tr_twin_why.mp3"
+  },
+  "tr_double2_why": {
+    "voice": "Zoey",
+    "text": "Multiplying by two? Just Double It!",
+    "duration": 3.28,
+    "end": 2.555,
+    "src": "/vo/tr_double2_why.mp3"
+  },
+  "tr_double4_why": {
+    "voice": "Zoey",
+    "text": "Multiplying by four? Just Double It, twice!",
+    "duration": 3.84,
+    "end": 3.284,
+    "src": "/vo/tr_double4_why.mp3"
+  },
+  "tr_jump3_why": {
+    "voice": "Zoey",
+    "text": "Three is just one more than easy two!",
+    "duration": 2.56,
+    "end": 1.927,
+    "src": "/vo/tr_jump3_why.mp3"
+  },
+  "tr_jump6_why": {
+    "voice": "Zoey",
+    "text": "Six is just one more than easy five!",
+    "duration": 2.64,
+    "end": 1.96,
+    "src": "/vo/tr_jump6_why.mp3"
+  },
+  "tr_jump7_why": {
+    "voice": "Zoey",
+    "text": "Seven is just one more than six!",
+    "duration": 2.4,
+    "end": 1.874,
+    "src": "/vo/tr_jump7_why.mp3"
+  },
+  "tr_jump8_why": {
+    "voice": "Zoey",
+    "text": "Eight is just one more than seven!",
+    "duration": 2.24,
+    "end": 1.683,
+    "src": "/vo/tr_jump8_why.mp3"
+  },
+  "tr_shy9": {
+    "voice": "Zoey",
+    "text": "Nine is just one shy of ten!",
+    "duration": 2.24,
+    "end": 1.626,
+    "src": "/vo/tr_shy9.mp3"
+  },
+  "tr_shy19": {
+    "voice": "Zoey",
+    "text": "19 is just one shy of 20!",
+    "duration": 2.72,
+    "end": 2.093,
+    "src": "/vo/tr_shy19.mp3"
+  },
+  "tr_shy29": {
+    "voice": "Zoey",
+    "text": "29 is just one shy of 30!",
+    "duration": 2.72,
+    "end": 2.13,
+    "src": "/vo/tr_shy29.mp3"
+  },
+  "tr_shy99": {
+    "voice": "Zoey",
+    "text": "99 is just one shy of 100!",
+    "duration": 2.8,
+    "end": 2.233,
+    "src": "/vo/tr_shy99.mp3"
+  },
+  "tr_shy199": {
+    "voice": "Zoey",
+    "text": "199 is just one shy of 200!",
+    "duration": 3.04,
+    "end": 2.422,
+    "src": "/vo/tr_shy199.mp3"
+  },
+  "tr_pods_ask_2": {
+    "voice": "Zoey",
+    "text": "Two Pods of ten: how many ships?",
+    "duration": 2.8,
+    "end": 2.256,
+    "src": "/vo/tr_pods_ask_2.mp3"
+  },
+  "tr_pods_ask_3": {
+    "voice": "Zoey",
+    "text": "Three Pods of ten: how many ships?",
+    "duration": 2.8,
+    "end": 2.251,
+    "src": "/vo/tr_pods_ask_3.mp3"
+  },
+  "tr_pods_ask_4": {
+    "voice": "Zoey",
+    "text": "Four Pods of ten: how many ships?",
+    "duration": 2.8,
+    "end": 2.251,
+    "src": "/vo/tr_pods_ask_4.mp3"
+  },
+  "tr_pods_ask_5": {
+    "voice": "Zoey",
+    "text": "Five Pods of ten: how many ships?",
+    "duration": 2.88,
+    "end": 2.309,
+    "src": "/vo/tr_pods_ask_5.mp3"
+  },
+  "tr_pods_ask_6": {
+    "voice": "Zoey",
+    "text": "Six Pods of ten: how many ships?",
+    "duration": 2.88,
+    "end": 2.296,
+    "src": "/vo/tr_pods_ask_6.mp3"
+  },
+  "tr_pods_ask_7": {
+    "voice": "Zoey",
+    "text": "Seven Pods of ten: how many ships?",
+    "duration": 2.88,
+    "end": 2.36,
+    "src": "/vo/tr_pods_ask_7.mp3"
+  },
+  "tr_pods_ask_8": {
+    "voice": "Zoey",
+    "text": "Eight Pods of ten: how many ships?",
+    "duration": 2.88,
+    "end": 2.309,
+    "src": "/vo/tr_pods_ask_8.mp3"
+  },
+  "tr_pods_ask_9": {
+    "voice": "Zoey",
+    "text": "Nine Pods of ten: how many ships?",
+    "duration": 2.8,
+    "end": 2.252,
+    "src": "/vo/tr_pods_ask_9.mp3"
+  },
+  "tr_pods_ask_10": {
+    "voice": "Zoey",
+    "text": "Ten Pods of ten: how many ships?",
+    "duration": 2.88,
+    "end": 2.313,
+    "src": "/vo/tr_pods_ask_10.mp3"
+  },
+  "unlock_empty-mirror": {
+    "voice": "Zoey",
+    "text": "Empty and Mirror is on your belt now!",
+    "duration": 2.56,
+    "end": 1.9,
+    "src": "/vo/unlock_empty-mirror.mp3"
+  },
+  "unlock_fast-adding": {
+    "voice": "Zoey",
+    "text": "Fast Adding is on your belt now!",
+    "duration": 2.32,
+    "end": 1.704,
+    "src": "/vo/unlock_fast-adding.mp3"
+  },
+  "unlock_flip-it": {
+    "voice": "Zoey",
+    "text": "Flip It is on your belt now!",
+    "duration": 2.08,
+    "end": 1.456,
+    "src": "/vo/unlock_flip-it.mp3"
+  },
+  "unlock_double-it": {
+    "voice": "Zoey",
+    "text": "Double It is on your belt now!",
+    "duration": 2.16,
+    "end": 1.492,
+    "src": "/vo/unlock_double-it.mp3"
+  },
+  "unlock_easy-5-10": {
+    "voice": "Zoey",
+    "text": "Easy fives and tens is on your belt now!",
+    "duration": 2.8,
+    "end": 2.198,
+    "src": "/vo/unlock_easy-5-10.mp3"
+  },
+  "unlock_jump-one-more": {
+    "voice": "Zoey",
+    "text": "Jump One More is on your belt now!",
+    "duration": 2.64,
+    "end": 1.965,
+    "src": "/vo/unlock_jump-one-more.mp3"
+  },
+  "unlock_split-and-add": {
+    "voice": "Zoey",
+    "text": "Split and Add is on your belt now!",
+    "duration": 2.4,
+    "end": 1.797,
+    "src": "/vo/unlock_split-and-add.mp3"
+  },
+  "unlock_borrow-take-back": {
+    "voice": "Zoey",
+    "text": "Borrow and Take Back is on your belt now!",
+    "duration": 2.72,
+    "end": 2.116,
+    "src": "/vo/unlock_borrow-take-back.mp3"
+  },
+  "unlock_big-small-split": {
+    "voice": "Zoey",
+    "text": "Big and Small Split is on your belt now!",
+    "duration": 2.72,
+    "end": 2.116,
+    "src": "/vo/unlock_big-small-split.mp3"
+  },
+  "unlock_half-double": {
+    "voice": "Zoey",
+    "text": "Half and Double is on your belt now!",
+    "duration": 2.4,
+    "end": 1.729,
+    "src": "/vo/unlock_half-double.mp3"
   }
 }

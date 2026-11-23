@@ -311,16 +311,20 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   }
 }
 
-/** Nova, the co-pilot: a hovering clay drone with a face screen that brightens as she speaks. */
-export function makeNova(M: Materials) {
+/**
+ * Nova, the co-pilot: a hovering clay drone with a face screen that brightens as she speaks.
+ * `glow: false` (battle): her screen and ring stay under the bloom threshold, so no halo.
+ */
+export function makeNova(M: Materials, { glow = true } = {}) {
+  const k = glow ? 1 : 0.32;
   const g = new THREE.Group(), nc = { cast: false };
   add(g, new THREE.SphereGeometry(0.32, 48, 32), M.clay(PALETTE.clay, { roughness: 0.4 }));
   add(g, new THREE.SphereGeometry(0.245, 40, 24), M.clay(PALETTE.ink2, { roughness: 0.2 }), 0, 0.02, 0.16, nc).scale.set(1, 0.76, 0.56);
-  const screen = new THREE.MeshStandardMaterial({ color: PALETTE.cyan, emissive: PALETTE.cyan, emissiveIntensity: 2.6 });
+  const screen = new THREE.MeshStandardMaterial({ color: PALETTE.cyan, emissive: PALETTE.cyan, emissiveIntensity: 2.6 * k });
   for (const s of [-1, 1]) add(g, new THREE.CapsuleGeometry(0.028, 0.045, 6, 12), screen, s * 0.085, 0.06, 0.3, nc);
   const smile = add(g, new THREE.TorusGeometry(0.06, 0.014, 8, 20, Math.PI), screen, 0, -0.04, 0.3, nc);
   smile.rotation.z = Math.PI;
-  const ringMat = new THREE.MeshStandardMaterial({ color: PALETTE.invader, emissive: PALETTE.invader, emissiveIntensity: 2.4 });
+  const ringMat = new THREE.MeshStandardMaterial({ color: PALETTE.invader, emissive: PALETTE.invader, emissiveIntensity: 2.4 * k });
   const ring = add(g, new THREE.TorusGeometry(0.46, 0.018, 10, 96), ringMat, 0, 0, 0, nc);
   ring.rotation.x = Math.PI / 2.3;
   add(g, new THREE.CylinderGeometry(0.012, 0.012, 0.2, 8), M.clay(PALETTE.dark), 0, 0.38, 0);
@@ -335,7 +339,7 @@ export function makeNova(M: Materials) {
       g.position.y = baseY + Math.sin(T * 2) * 0.08;
       ring.rotation.z += dt * (1.5 + voice * 4);
       g.rotation.y = Math.sin(T * 0.7) * 0.4;
-      screen.emissiveIntensity = 2.2 + voice * 3.5;
+      screen.emissiveIntensity = (2.2 + voice * 3.5) * k;
       smile.scale.y = 1 + voice * 1.6;
     },
   };
