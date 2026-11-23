@@ -32,7 +32,7 @@ export function CadetSignUp({ onDone, cta = "▶ Start (sound on)" }: { onDone: 
       <p className="font-mono text-xs tracking-[0.3em] text-lime-300">CADET SIGN-UP</p>
       <Field name="name">
         <FieldLabel className="text-sm text-white/70">Your name</FieldLabel>
-        <Input required maxLength={24} value={name} onValueChange={setName} autoComplete="given-name" className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-lg outline-none focus:border-lime-300" />
+        <Input autoFocus required maxLength={24} value={name} onValueChange={setName} autoComplete="given-name" className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-lg outline-none focus:border-lime-300" />
       </Field>
       <Field name="avatar">
         <FieldLabel className="text-sm text-white/70">Pick your colour</FieldLabel>

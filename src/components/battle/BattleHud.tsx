@@ -98,9 +98,9 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       <XRay arena={arena} ui={ui} />
       {/* the multiplication: big, centred, both axes named */}
       {w && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-14 md:px-0">
           <div ref={plateRef} className={`${glass} px-5 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="font-mono text-[11px] tracking-[0.3em] text-lime-200/80">{ui.planetName.toUpperCase()} · {ui.mode === "academy" ? "TRICK FILM" : `${ui.mode === "practice" ? "PRACTICE" : "WAVE"} ${Math.min(w.index + 1, w.of)}/${w.of}`}</p>
+            <p className="whitespace-nowrap font-mono text-[11px] tracking-[0.14em] text-lime-200/80 md:tracking-[0.3em]">{ui.planetName.toUpperCase()} · {ui.mode === "academy" ? "TRICK FILM" : `${ui.mode === "practice" ? "PRACTICE" : "WAVE"} ${Math.min(w.index + 1, w.of)}/${w.of}`}</p>
             <p className="mt-0.5 font-mono text-5xl font-semibold tabular-nums md:mt-1 md:text-7xl">
               {fmt(ra)}<span className="mx-3 text-lime-300">×</span>{fmt(rb)}
             </p>
