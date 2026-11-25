@@ -31,7 +31,7 @@ import { createBackdrop } from "@/battle/systems/backdrop";
 import { createCameraRig, frameBox, measure, type Safe } from "@/battle/systems/camera";
 import { createCannon } from "@/battle/systems/cannon";
 import { createCharge } from "@/battle/systems/charge";
-import { AXIS_H, createFleetView, fmt, type AxisShow } from "@/battle/systems/fleetView";
+import { AXIS_H, createFleetView, FLEET_Y, fmt, type AxisShow } from "@/battle/systems/fleetView";
 import { createFx } from "@/battle/systems/fx";
 import { createKillFx } from "@/battle/systems/kill";
 import { createMisses } from "@/battle/systems/misses";
@@ -654,6 +654,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
 
   // ---- the frame ----
   const rocketAt = new THREE.Vector3(), rectAt = new THREE.Vector3(), rectP = new THREE.Vector3(), rectBox = new THREE.Box3();
+  /** How far (px) the rocket is lifted so its flame clears the bottom of the free area. */
+  let rocketLift = 0;
   /** A world box as the cadet sees it: its screen box in CSS px, or null if it is empty or off the canvas. */
   function onScreen(box: THREE.Box3): DOMRect | null {
     const r = stage.renderer.domElement.getBoundingClientRect();
@@ -677,18 +679,26 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     misses.update();
     // the camera frames the fleet (and the labels on show) in the HUD's free area, above the rocket's band
     const m = measure(fv);
-    const nv = nova.update(dt, T, m.w, m.h, bs.lessonOn);
+    const nv = nova.update(dt, T, m.w, (m.top - FLEET_Y) * 2, bs.lessonOn); // she hovers at the fleet's top edge
     // a ship's cell stays at most ~120 px (less on a short screen), so 1 × 4 does not fill the sky with four giants
     const cellMax = Math.min(120, cam.free.fh * 0.2);
     // the room for the axis words is kept from the first frame (structure "discover" reveals them later)
     const pad = structure === "discover" ? fv.wordsPad() : fv.visiblePad();
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale);
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift);
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
       cannon.scale = (cam.band * ROCKET_SHARE) / ppuR / ROCKET_MODEL_H;
-      cam.bottomCentre(cam.band * 0.3, ROCKET_Z, rocketAt);
+      cam.bottomCentre(cam.band * 0.3 + rocketLift, ROCKET_Z, rocketAt);
       cannon.pose(T, rocketAt);
+      // the whole rocket, flame included, rests inside the free area: Nova's caption band below it is never
+      // drawn over the rocket. The flame's reach depends on the model, so it is measured, not guessed
+      rectBox.setFromObject(cannon.rocket.group);
+      const rr = onScreen(rectBox), fr = cam.free, canvasTop = stage.renderer.domElement.getBoundingClientRect().top;
+      if (rr) {
+        const over = rr.bottom - (canvasTop + cam.safe.top + fr.fh - 2);
+        if (over > 0.5 || (over < -6 && rocketLift > 0)) rocketLift = Math.max(0, Math.min(cam.band * 0.6, rocketLift + over * Math.min(1, dt * 8)));
+      }
     }
     // the typed number rides the nose: its figures 28–30 px tall on a phone, 44 px on a larger screen
     const el = stage.renderer.domElement, phone = Math.min(el.clientWidth || 800, el.clientHeight || 800) < 600;
