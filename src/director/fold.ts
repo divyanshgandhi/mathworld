@@ -38,6 +38,8 @@ export interface WaveRecord {
   a: number; b: number; key: string; factTier: number; tier: number; role: WaveRole; outcome: Outcome; transfer: boolean;
   /** The trick this fleet calls for, and whether it had been explained before this wave (telemetry: transfer). */
   trick: TrickId; afterLesson: boolean;
+  /** The mission it was played in (`mission.n` at the time; the planner's memory for repeats). */
+  mission?: number;
 }
 interface OpenWave { a: number; b: number; role: WaveRole; transfer: boolean; attempts: number; usedRadar: boolean; powerUp: boolean; explained: boolean; firstLatencyMs: number; lessons: TrickId[] }
 
@@ -73,6 +75,11 @@ export interface PlayerState {
   goldStreak: number;
   /** The last wave was a Gold probe from the next planet: the Hyper-Jump is earned. */
   probePassed: boolean;
+  /**
+   * The cadet's record on this planet since arriving: wrong answers and Show Me Hows. A Hyper-Jump is
+   * offered only on a clean record (see `cleanRecord`), so a struggling cadet is never sent ahead.
+   */
+  record: { misses: number; shown: number };
   struggleStreak: number;
   lastStruggle: Fact | null;
   transferQueue: { trick: TrickId; key: string; tier: number; due: number }[];
@@ -89,7 +96,7 @@ const freshMission = (n: number) => ({ n, waves: 0, inTier: 0, solved: 0, passed
 export const initialState = (): PlayerState => ({
   introCompleted: false, tier: 0, unlocked: 0, cleared: [], aceCleared: [], facts: {}, seenTricks: {}, orbs: 0,
   ledger: [], firstTryStreak: 0, goldEver: {}, lastSeen: {}, patrol: { lastDay: null, done: 0 }, equipped: {}, owned: [], warmups: { answered: 0, correct: 0 },
-  waves: 0, history: [], mission: freshMission(0), goldStreak: 0, probePassed: false, struggleStreak: 0, lastStruggle: null,
+  waves: 0, history: [], mission: freshMission(0), goldStreak: 0, probePassed: false, record: { misses: 0, shown: 0 }, struggleStreak: 0, lastStruggle: null,
   transferQueue: [], transfer: { checks: 0, passes: 0 }, antiMashNudges: 0, seen: {}, open: null,
   offers: { hyperJumpTo: null, cushion: false, clear: false },
 });
@@ -103,6 +110,17 @@ export const initialState = (): PlayerState => ({
  * longer. The second one moves mastery as usual but pays no orbs.
  */
 export const MIN_SHOT_MS = 1000;
+
+/** A record clean enough for a Hyper-Jump: at most one wrong answer on this planet and no Show Me How. */
+export const MAX_MISSES_FOR_JUMP = 1;
+export const cleanRecord = (s: Pick<PlayerState, "record">) => s.record.misses <= MAX_MISSES_FOR_JUMP && s.record.shown === 0;
+
+/**
+ * Where a Hyper-Jump would go, or null: a Gold run of GOLD_STREAK_FOR_JUMP ending in a Gold probe from
+ * the planet it skips, on a clean record. Three quick clears after a string of misses earn nothing.
+ */
+export const jumpOffer = (s: Pick<PlayerState, "record" | "probePassed" | "goldStreak" | "tier">) =>
+  s.probePassed && s.goldStreak >= GOLD_STREAK_FOR_JUMP && cleanRecord(s) && s.tier < MAX_TIER ? Math.min(MAX_TIER, s.tier + JUMP) : null;
 
 export function fold(events: LoggedEvent[]): PlayerState {
   const s = initialState();
@@ -147,6 +165,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
     s.mission = freshMission(0);
     s.goldStreak = 0;
     s.probePassed = false;
+    s.record = { misses: 0, shown: 0 };
     s.struggleStreak = 0;
   };
 
@@ -176,7 +195,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
       return;
     }
     const trick = selectTrick(w.a, w.b), lessonsBefore = (s.seenTricks[trick] ?? 0) - w.lessons.filter((t) => t === trick).length;
-    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer, trick, afterLesson: lessonsBefore > 0 });
+    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer, trick, afterLesson: lessonsBefore > 0, mission: s.mission.n });
     s.waves++;
 
     const inTier = factTier === s.tier || w.role === "tutorial";
@@ -231,6 +250,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
         w.powerUp ||= !!p.powerUpUsed;
         if (at !== undefined) s.lastSeen[factKey(p.a, p.b)] = at;
         if (p.guess === p.a * p.b) { complete(w); break; }
+        if (w.role !== "practice" && w.role !== "academy") s.record.misses++;
         if (classifyError(p.a, p.b, p.guess) === "wild_guess" && e.at !== undefined) {
           wild = [...wild.filter((t) => e.at! - t < 4000), e.at];
           if (wild.length >= 3) { s.antiMashNudges++; wild = []; }
@@ -241,6 +261,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
       case "explanation_completed": {
         const w = openFor(e.payload.a, e.payload.b);
         w.explained = true;
+        if (w.role !== "practice" && w.role !== "academy") s.record.shown++;
         w.lessons.push(e.payload.trickId);
         s.seenTricks[e.payload.trickId] = (s.seenTricks[e.payload.trickId] ?? 0) + 1;
         break;
@@ -260,7 +281,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
         // only a jump the log has earned (the offer the director makes after a Gold run and a Gold probe),
         // and only to where that offer goes: a jump posted without one moves nothing
         const from = tierOfPlanet(e.payload.fromPlanet), to = tierOfPlanet(e.payload.toPlanet);
-        const offered = s.probePassed && s.goldStreak >= GOLD_STREAK_FOR_JUMP && s.tier < MAX_TIER ? Math.min(MAX_TIER, s.tier + JUMP) : null;
+        const offered = jumpOffer(s);
         if (from === s.tier && to === offered) { for (let t = from; t < to; t++) s.aceCleared.push(t); move(to); }
         break;
       }
@@ -312,7 +333,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
   }
 
   s.offers = {
-    hyperJumpTo: s.probePassed && s.goldStreak >= GOLD_STREAK_FOR_JUMP && s.tier < MAX_TIER ? Math.min(MAX_TIER, s.tier + JUMP) : null,
+    hyperJumpTo: jumpOffer(s),
     cushion: s.struggleStreak >= STRUGGLES_FOR_CUSHION,
     clear: s.mission.passed,
   };
