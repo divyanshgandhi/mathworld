@@ -15,6 +15,7 @@ export interface Cadet { name: string; avatar: string }
 const COLOURS = Object.keys(CADET) as CadetColor[];
 /** sessionStorage: present while the sign-up form is on screen, holding the name typed so far. */
 export const SIGNUP_KEY = "mw:signup-name";
+const restoredName = () => { try { return limitName(sessionStorage.getItem(SIGNUP_KEY) ?? "").value; } catch { return ""; } };
 const FAILED = "That did not save. Check the connection and press Begin again.";
 
 /**
@@ -28,13 +29,14 @@ const FAILED = "That did not save. Check the connection and press Begin again.";
  * - Escape and Back call `onBack` (when given).
  * - It creates the cadet (POST /api/player sets this device's cookie) and hands them to `onDone`.
  */
-export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
+export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "", remember = false }: {
   onDone: (p: Cadet) => void;
+  remember?: boolean;
   onBack?: () => void;
   cta?: string;
   className?: string;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => (remember ? restoredName() : ""));
   const [avatar, setAvatar] = useState<CadetColor>("cadet-1");
   const [tried, setTried] = useState(false);
   const [cut, setCut] = useState(false);
@@ -43,12 +45,13 @@ export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
   const sending = useRef(false);
   const field = useRef<HTMLInputElement>(null);
 
-  // a reload on this form comes back to it with the name still typed (this tab only); leaving it forgets
+  // `remember` (the Title, where this form is drawn only in the browser): a reload on it comes back
+  // with the name still typed (this tab only); leaving the form forgets it
   useEffect(() => {
-    try { const v = sessionStorage.getItem(SIGNUP_KEY); if (v) setName(limitName(v).value); } catch { /* storage off */ }
+    if (!remember) return;
     return () => { try { sessionStorage.removeItem(SIGNUP_KEY); } catch { /* storage off */ } };
-  }, []);
-  useEffect(() => { try { sessionStorage.setItem(SIGNUP_KEY, name); } catch { /* storage off */ } }, [name]);
+  }, [remember]);
+  useEffect(() => { if (remember) try { sessionStorage.setItem(SIGNUP_KEY, name); } catch { /* storage off */ } }, [remember, name]);
 
   const { problem } = checkName(name);
   // symbols show at once (the child can see them); an empty field only after they press Begin

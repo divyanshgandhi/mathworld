@@ -155,7 +155,7 @@ export function TitleScreen() {
       </>
     );
   } else if (phase === "signup") {
-    body = <CadetSignUp className="mw-title-form" onDone={() => router.push("/intro")} onBack={me?.player ? () => go("back") : () => go("new")} />;
+    body = <CadetSignUp remember className="mw-title-form" onDone={() => router.push("/intro")} onBack={me?.player ? () => go("back") : () => go("new")} />;
   } else if (phase === "back") {
     body = (
       <>
