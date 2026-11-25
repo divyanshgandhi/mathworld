@@ -6,7 +6,7 @@ Every spoken line that wave 2 added or changed, gathered from the handoff notes.
 
 | Id | Text | Where it plays | From |
 | --- | --- | --- | --- |
-| `nova_greet_battle` | Welcome to Cadet Bay! Let's clear these ships. | The first battle's first wave, once (`greet:battle`). Live now: it replaced `nova_l0_intro` | manual |
+| `nova_greet_battle` | Let's clear these ships, cadet! | The first battle's first wave, once (`greet:battle`). Live now: it replaced `nova_l0_intro`. Changed in the fix pass: "Cadet Bay" is not said on a battle (decision 7) | manual, fix pass |
 | `nova_guide_count` | Count the ships. | Guided first shot, step 1 | manual |
 | `nova_guide_type` | Type how many. | Guided first shot, step 2 | manual |
 | `nova_guide_fire` | Now press Fire. | Guided first shot, step 3 | manual |
@@ -16,7 +16,13 @@ Every spoken line that wave 2 added or changed, gathered from the handoff notes.
 | `nova_greet_flashcards` | Type the answer. There is no timer, so take your time. | First flashcard deck | manual |
 | `nova_greet_bay` | This is your Resting Bay. Press Launch to fly. | First visit to the Resting Bay, inside `bay.first` below | manual |
 | `nova_err_way_off` | Way off! Count the squads with me. | A wild guess | combat |
-| `nova_invite_v2` | Sneaky squad! Try a Power-Up, or ask me to show you how. | The second miss | combat |
+| `nova_invite_power` | Tricky one! Try a Power-Up, or tap Show me how. | The second miss, when the belt has a Power-Up that fits (it pulses) | fix pass |
+| `nova_invite_help` | Stuck? Tap Show me how. | The second miss, with no Power-Up to try yet (Show me how pulses) | fix pass |
+| `nova_ships_incoming` | Ships incoming! | The first wave of a mission, every planet (replaces `nova_incoming_short`, which said "squads" before any miss) | fix pass |
+| `nova_too_few` | Too few! Some got away. | A near miss, too few (replaces `nova_err_under`) | fix pass |
+| `nova_too_many` | Too many! Some flew past. | A near miss, too many (replaces `nova_err_over`) | fix pass |
+| `nova_earth_clear` | Earth is clear! The Moon is open. | Earth cleared (replaces `nova_l0_clear`, "Cadet Bay is clear!") | fix pass |
+| `nova_jump_<planet>` | You know these. Jump ahead to <planet>? | The Hyper-Jump offer, six lines, one per planet (replace the Captain's `captain_jump_*`, "Ace telemetry!") | fix pass |
 
 The guide's three lines are captions in the guide's own plate. If they are baked, the guide should start each clip with its step.
 
@@ -54,7 +60,13 @@ These clips exist and say words the glossary retired, or say too much at once. E
 | `nova_l0_intro` | Replaced by `nova_greet_battle` (three ideas, retired words, an 8 s wait before the keypad woke) |
 | `captain_brief3`, `captain_brief4` | Cut from the film's hangar at mounting: the miss rule is shown in the first battle, not told before it |
 | `nova_radar` | The Targeting Radar is gone (decision 1) |
-| `nova_invite` | Replaced by `nova_invite_v2` |
+| `nova_invite` | Replaced by `nova_invite_v2`, itself replaced in the fix pass |
+| `nova_invite_v2` | Never baked. Replaced by `nova_invite_power` and `nova_invite_help` ("Sneaky squad" was vague, and it offered a Power-Up to a cadet with none) |
+| `nova_incoming_short` | Replaced by `nova_ships_incoming` (decision 2) |
+| `nova_err_under`, `nova_err_over` | Replaced by `nova_too_few` and `nova_too_many` (so their rewrites above are no longer needed) |
+| `nova_l0_clear` | Replaced by `nova_earth_clear` |
+| `captain_jump_*` | Replaced by `nova_jump_*` (Nova is the only voice in battle; "Ace" and "telemetry" are out) |
+| `nova_bullseye`, `nova_perfect` | No longer played: a right answer always gets `nova_dead_on` (one praise word) |
 
 ## Not for baking
 

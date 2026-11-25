@@ -42,19 +42,19 @@ The film should not explain plasma balls, squads or misses. The battle shows the
 
 | # | What they see | The one new idea | Shown, not told | Caption | Time |
 | --- | --- | --- | --- | --- | --- |
-| 7 | The fleet warps in above Earth. Nova greets them | You are here to clear ships | The ships fly in as rows with gaps, one tone per row and a leader at the start of each | Greeting: "Welcome to Cadet Bay! Let's clear these ships." | 3.9 s, then it goes |
+| 7 | The fleet warps in above Earth. Nova greets them | You are here to clear ships | The ships fly in as rows with gaps, one tone per row and a leader at the start of each | Greeting: "Let's clear these ships, cadet!" | 3.9 s, then it goes |
 | 8 | The fleet is ringed and the rest dims | Count the ships | A hairline ring round the fleet. The rows are already the squads: nobody says "squad" yet | Guide: "Count the ships." | 2.4 s at least |
 | 9 | The keypad is ringed | Type the number | Ring and cut-out round the keypad. The keypad was live all along | Guide: "Type how many." | until a digit |
 | 10 | The first digit appears on the rocket's nose and on Fire | Fire sends that many plasma balls | "Fire 4" on the button and "4" on the rocket. Fire is ringed | Guide: "Now press Fire." | until Fire |
 | 11 | The volley | One plasma ball for each ship | Each ball flies to one ship and pops it | none | the volley |
 | 12a | Right answer: the fleet is gone | You did it | Every ship pops. "Dead on" appears, with orbs | Nova: "Dead on!" | 1.4 s |
-| 12b | Too few: some ships are still flying | The miss shows the error | The ships that no ball reached stay, and they are easy to count | Nova: "Too few! Some got away. Try again." | 2.7 s |
-| 12c | Too many: some balls fly past | The miss shows the error | The extra balls fly on past the fleet into space | Nova: "Too many! Some flew past. Try again." | 2.7 s |
+| 12b | Too few: some ships are still flying | The miss shows the error | The ships that no ball reached stay, and they are easy to count | Nova: "Too few! Some got away." (the strip says how many, and "Try again.") | 2.7 s |
+| 12c | Too many: some balls fly past | The miss shows the error | The extra balls fly on past the fleet into space | Nova: "Too many! Some flew past." | 2.7 s |
 | 13 | Wave 2, with no guide. A miss brings the squad scan, then the each scan | Ships come in squads | The scan counts the rows aloud. This is the first time the word "squad" appears, as a hint | the hint ladder's lines | per the ladder |
 | 14 | A third miss, or tapping it | Help is always there | Show Me How sits on the console from the start. The ladder starts it by itself on miss 3 | Nova: "Watch this, cadet." | the lesson |
-| 15 | A Power-Up lands on the belt after its first Show Me How | Power-Ups change the shape | The trick acts on the live fleet: the same ships, an easier shape | "Flip It is on your belt now!" | 3 s |
+| 15 | A Power-Up lands on the belt after its first Show Me How | Power-Ups change the shape | The trick acts on the live fleet: the same ships, an easier shape. Its slot pulses; there is no card (fix pass) | "Flip It is on your belt now!" | 3 s |
 | 16 | A first-try right answer | Orbs | The orb count goes up by the amount on the chip | "+3 orbs" on the chip | with step 12a |
-| 17 | Cadet Bay clear | The next planet opens | The clear card names the Moon | "Cadet Bay clear" / "The Moon is open" | until a tap |
+| 17 | Earth clear | The next planet opens | The clear card names the Moon; Fly to the Moon is the one primary | "Earth is clear" / "The Moon is open" | until a tap |
 
 Steps 13 to 16 happen when the player needs them, not on a timer. A player who never misses meets them later.
 
@@ -69,7 +69,7 @@ Each hub greets the player once (`<Greeting>`, seen key `greet:<screen>`). The l
 | Hangar | `greet:hangar` | "Spend your orbs here to change how your rocket looks." | 4.5 s |
 | Academy | `greet:academy` | "Pick a trick. I will show it on real ships." | 4.2 s |
 | Flashcards | `greet:flashcards` | "Type the answer. There is no timer, so take your time." | 4.8 s |
-| First battle | `greet:battle` | "Welcome to Cadet Bay! Let's clear these ships." | 3.9 s |
+| First battle | `greet:battle` | "Let's clear these ships, cadet!" | 3.9 s |
 
 Help is one tap away everywhere: the top bar's help button opens the Field Manual (`<FieldManual>`) on the page that fits the screen.
 
@@ -87,7 +87,7 @@ These come in when the player needs them, never in the first five minutes:
 
 This is what I saw in the code and the baked lines, not in play. Each item names the owner.
 
-**Status after mounting (wave 2 sign-off).** Fixed: 4 (the greeting replaced `nova_l0_intro`), 5 (the first fleet is `1 × b`), 6 (the console shows structure only from the hint ladder), 8 (no empty-fleet line on the guided wave), 9 in part (no Nova line or first-sight scan during the guide; the fleet's idle bob, about 0.015 units, still runs), 10, 11, 12 (the Hangar's line is child size now), 13 (the Academy's line waits for the second visit), 14. The film's hangar no longer tells the miss rule (part of 1). Open, because they need a re-bake: 1 (`captain_brief2`), 2, 3, 7 (see `docs/overhaul/lines-to-bake.md`).
+**Status after mounting (wave 2 sign-off).** Fixed: 4 (the greeting replaced `nova_l0_intro`), 5 (the first fleet is `1 × b`), 6 (the console shows structure only from the hint ladder), 8 (no empty-fleet line on the guided wave), 9 in part (no Nova line or first-sight scan during the guide; the fleet's idle bob, about 0.015 units, still runs), 10, 11, 12 (the Hangar's line is child size now), 13 (the Academy's line waits for the second visit), 14, 7 in battle (fix pass: "Ships incoming!", "Too few! Some got away.", "Too many! Some flew past." are new caption-first lines; the Radar lines are no longer played). Also from the fix pass: a new cadet meets no empty fleet until two Earth fleets are cleared, so zero and "squads" never arrive together. The film's hangar no longer tells the miss rule (part of 1). Open, because they need a re-bake: 1 (`captain_brief2`), 2, 3, 7 (see `docs/overhaul/lines-to-bake.md`).
 
 1. **The hangar briefing teaches four ideas by telling** (film). `captain_brief2`:
    - it is 30 words in 4 sentences, with 11.9 s of audio;
