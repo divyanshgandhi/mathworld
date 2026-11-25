@@ -69,3 +69,77 @@ export const MOTION = {
 
 /** A token colour as a three.js hex number. */
 export const hex = (c: string) => parseInt(c.slice(1), 16);
+
+/* ---- Added by the kit track (additions only; nothing above is renamed or removed) ---- */
+
+/** Font stacks. `sans` is the one game face; `code` is only for the adult /admin dashboard. */
+export const FONT = {
+  sans: `"${TYPE.family}", system-ui, sans-serif`,
+  code: `ui-monospace, "SF Mono", Menlo, Consolas, monospace`,
+} as const;
+
+/** Fills between the void and a panel: the hover/pressed inside of a pill, and a hovered tile. */
+export const FILL = {
+  /** The inside of a primary pill when hovered or pressed. */
+  lift: "#10121c",
+  /** A hovered or opened tile on the void (shadow at 55%). */
+  raised: "rgba(26,31,51,0.55)",
+  /** A sheet's fill when it floats over a 3D scene (panel at 92%). */
+  sheet: "rgba(10,12,20,0.92)",
+  /** The scrim behind a modal sheet. */
+  scrim: "rgba(7,7,10,0.72)",
+} as const;
+
+/**
+ * The type scale in px. Every step is at or above its voice's minimum in `TYPE.min`:
+ * labels never go under 13, body never under 16, and anything a child must read is 17 or more.
+ */
+export const SIZE = {
+  "label-sm": 13,
+  label: 15,
+  "body-sm": 16,
+  body: 17,
+  child: 19,
+  title: 26,
+  display: 56,
+} as const;
+
+/** The colours a cadet can pick at sign-up (none is the invaders' green). */
+export const CADET = {
+  "cadet-1": COLOR.sky,
+  "cadet-2": COLOR.gold,
+  "cadet-3": COLOR.ember,
+  "cadet-4": COLOR.approach,
+  "cadet-5": "#b59cff",
+  "cadet-6": "#f07a95",
+} as const;
+export type CadetColor = keyof typeof CADET;
+
+/**
+ * Every design value as a CSS custom property, in the exact form globals.css declares it.
+ * `tests/design-tokens.test.ts` fails if the stylesheet and this map ever disagree.
+ * Names in Tailwind 4 theme namespaces (`--color-*`, `--radius-*`, `--font-*`, `--ease-*`,
+ * `--transition-duration-*`, `--text-*`) also generate utilities: `bg-void`, `text-ink-2`,
+ * `border-line-1`, `rounded-panel`, `ease-out`, `duration-route`, `text-body`.
+ */
+export const CSS_VARS: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(COLOR).map(([k, v]) => [`--color-${k}`, v])),
+  ...Object.fromEntries(Object.entries(INK).map(([k, v]) => [`--color-ink-${k}`, v])),
+  ...Object.fromEntries(Object.entries(LINE).map(([k, v]) => [`--color-line-${k}`, v])),
+  ...Object.fromEntries(Object.entries(FILL).map(([k, v]) => [`--color-${k}`, v])),
+  ...Object.fromEntries(Object.entries(MASTERY).map(([k, v]) => [`--color-mastery-${k}`, v.color])),
+  ...Object.fromEntries(Object.entries(RADIUS).map(([k, v]) => [`--radius-${k}`, `${v}px`])),
+  ...Object.fromEntries(Object.entries(SIZE).map(([k, v]) => [`--text-${k}`, `${v}px`])),
+  "--text-xs": `${TYPE.min.label}px`,
+  "--font-sans": FONT.sans,
+  "--font-mono": FONT.sans,
+  "--font-code": FONT.code,
+  "--ease-out": MOTION.ease,
+  "--default-transition-timing-function": MOTION.ease,
+  "--default-transition-duration": `${MOTION.quick}ms`,
+  "--transition-duration-quick": `${MOTION.quick}ms`,
+  "--transition-duration-route": `${MOTION.route}ms`,
+  "--transition-duration-moment": `${MOTION.moment}ms`,
+  "--edge-rest": EDGE.rest,
+  "--edge-hot": EDGE.hot,
+};

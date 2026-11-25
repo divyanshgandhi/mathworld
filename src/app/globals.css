@@ -12,20 +12,215 @@
   font-display: swap;
 }
 
+/*
+  Void and Gold, as CSS. Every value below is copied from src/design/tokens.ts (CSS_VARS) and
+  tests/design-tokens.test.ts fails if the two drift. `static` keeps every variable on :root, used or not,
+  so inline styles and three.js-adjacent code can read them too.
+*/
+@theme static {
+  /* colours: one void, a few raised fills, one ink, one gold key, a cool rim and the heat of the edge */
+  --color-void: #07070a;
+  --color-panel: #0a0c14;
+  --color-shadow: #1a1f33;
+  --color-horizon: #2b2f3d;
+  --color-approach: #e6f1ff;
+  --color-sky: #8fb4ec;
+  --color-disk: #4a79bb;
+  --color-gold: #ffc857;
+  --color-ember: #ff6a3d;
+  --color-recede: #ff3e1f;
+
+  /* ink and hairlines at three strengths */
+  --color-ink-1: #e6f1ff;
+  --color-ink-2: rgba(230,241,255,0.78);
+  --color-ink-3: rgba(230,241,255,0.55);
+  --color-line-1: rgba(230,241,255,0.14);
+  --color-line-2: rgba(230,241,255,0.24);
+  --color-line-3: rgba(230,241,255,0.5);
+
+  /* fills between the void and a panel */
+  --color-lift: #10121c;
+  --color-raised: rgba(26,31,51,0.55);
+  --color-sheet: rgba(10,12,20,0.92);
+  --color-scrim: rgba(7,7,10,0.72);
+
+  /* mastery marks */
+  --color-mastery-gold: #ffc857;
+  --color-mastery-got: #e6f1ff;
+  --color-mastery-learn: #8fb4ec;
+  --color-mastery-new: rgba(230,241,255,0.18);
+
+  /* shapes */
+  --radius-panel: 16px;
+  --radius-chip: 14px;
+  --radius-pill: 999px;
+
+  /* type: one family. font-mono is Saira too, so legacy monospace text changes at once */
+  --font-sans: "Saira", system-ui, sans-serif;
+  --font-mono: "Saira", system-ui, sans-serif;
+  --font-code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 13px;
+  --text-label-sm: 13px;
+  --text-label: 15px;
+  --text-body-sm: 16px;
+  --text-body: 17px;
+  --text-child: 19px;
+  --text-title: 26px;
+  --text-display: 56px;
+
+  /* motion: one curve, three durations */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  --default-transition-duration: 180ms;
+  --transition-duration-quick: 180ms;
+  --transition-duration-route: 240ms;
+  --transition-duration-moment: 1100ms;
+
+  /* the primary action's edge */
+  --edge-rest: linear-gradient(90deg, #8fb4ec 0%, #4a79bb 38%, #c2473a 72%, #ff3e1f 100%);
+  --edge-hot: linear-gradient(90deg, #ffe2a1, #ffc857 45%, #ff6a3d);
+}
+
+/* legacy names, kept so nothing that still reads them breaks */
 :root {
-  --background: #0d0e1a;
-  --foreground: #f3f1ea;
+  --background: var(--color-void);
+  --foreground: var(--color-approach);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--color-void);
+  color: var(--color-approach);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-stretch: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
+
+/* the three voices of TYPE (src/design/tokens.ts). Sizes never go under the voice's minimum. */
+@utility type-display {
+  font-family: var(--font-sans);
+  font-weight: 200;
+  font-stretch: 125%;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+@utility type-label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-stretch: 115%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: var(--text-label);
+  line-height: 1.25;
+}
+@utility type-label-sm {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-stretch: 115%;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: var(--text-label-sm);
+  line-height: 1.25;
+}
+@utility type-body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-stretch: 100%;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+@utility type-body-sm {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-stretch: 100%;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--text-body-sm);
+  line-height: 1.5;
+}
+@utility type-child {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-stretch: 100%;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--text-child);
+  line-height: 1.45;
+}
+/* sentence-case names on controls: a label's weight and width without the tracked capitals */
+@utility type-name {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-stretch: 110%;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+/* numbers that change in place (orbs, the readout, a × b): equal-width digits */
+@utility type-number {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-stretch: 112%;
+}
+/* legacy font-mono: Saira in the label's width, digits equal-width (no slashed zero) */
+@utility font-mono {
+  font-stretch: 115%;
+  font-variant-numeric: tabular-nums;
+}
+/* the adult /admin dashboard keeps a real monospace for its tables, through this class only */
+@utility font-code {
+  font-family: var(--font-code);
+}
+
+/* the shared route fade (RouteFade): the old screen dips to void, the new one rises from it */
+@keyframes mw-fade-out {
+  to { opacity: 0; }
+}
+@keyframes mw-fade-in {
+  from { opacity: 0; }
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(.mw-route) {
+  animation: mw-fade-out calc(var(--transition-duration-route) * 0.45) var(--ease-out) both;
+}
+::view-transition-new(.mw-route) {
+  animation: mw-fade-in calc(var(--transition-duration-route) * 0.6) var(--ease-out) calc(var(--transition-duration-route) * 0.4) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+  ::view-transition-old(.mw-route),
+  ::view-transition-new(.mw-route) {
+    animation: none;
+  }
 }

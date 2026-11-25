@@ -1,0 +1,224 @@
+/*
+  The kit's component styles (Void and Gold). Every value is a token variable from globals.css.
+  They live in the components layer, so a utility class passed in `className` still wins.
+*/
+@layer components {
+  /* ---------- buttons ---------- */
+  .mw-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink-1);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-stretch: 110%;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition-property: border-color, background, color, transform;
+    transition-duration: var(--transition-duration-quick);
+    transition-timing-function: var(--ease-out);
+  }
+  .mw-btn:active:not([data-disabled]):not([aria-disabled="true"]) {
+    transform: translateY(1px);
+  }
+  .mw-btn[data-disabled],
+  .mw-btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    color: var(--color-ink-3);
+  }
+
+  /* sizes: every one is at least a 44 px touch target */
+  .mw-sm { min-height: 44px; padding: 0 18px; font-size: var(--text-label); }
+  .mw-md { min-height: 52px; padding: 0 26px; font-size: var(--text-body); }
+  .mw-lg { min-height: 72px; padding: 0 38px; font-size: 18px; }
+  .mw-sm.mw-has-glyph { padding-right: 8px; }
+  .mw-md.mw-has-glyph { padding-right: 10px; }
+  .mw-lg.mw-has-glyph { padding-right: 14px; gap: 22px; }
+
+  /* primary: the gradient-edge pill on black, gold when hovered; one per screen */
+  .mw-primary {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--color-void), var(--color-void)) padding-box, var(--edge-rest) border-box;
+    font-weight: 600;
+    font-stretch: 118%;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .mw-primary:hover:not([data-disabled]):not([aria-disabled="true"]),
+  .mw-primary[data-armed] {
+    background: linear-gradient(var(--color-lift), var(--color-lift)) padding-box, var(--edge-hot) border-box;
+  }
+  .mw-primary:active:not([data-disabled]):not([aria-disabled="true"]) {
+    background: linear-gradient(var(--color-shadow), var(--color-shadow)) padding-box, var(--edge-hot) border-box;
+  }
+  .mw-primary[data-disabled],
+  .mw-primary[aria-disabled="true"] {
+    background: linear-gradient(var(--color-void), var(--color-void)) padding-box, linear-gradient(var(--color-line-1), var(--color-line-1)) border-box;
+  }
+  .mw-glyph {
+    transition: transform var(--transition-duration-moment) var(--ease-out);
+  }
+  .mw-btn:hover:not([data-disabled]) .mw-glyph {
+    transform: translateY(-4px);
+  }
+  .mw-btn[data-disabled] .mw-glyph,
+  .mw-btn[aria-disabled="true"] .mw-glyph {
+    filter: grayscale(1);
+    opacity: 0.45;
+  }
+
+  /* secondary: a hairline pill, sentence case */
+  .mw-secondary {
+    border-color: var(--color-line-2);
+  }
+  .mw-secondary:hover:not([data-disabled]) {
+    border-color: var(--color-gold);
+  }
+  .mw-secondary:active:not([data-disabled]) {
+    background: var(--color-raised);
+  }
+  .mw-secondary[data-disabled],
+  .mw-secondary[aria-disabled="true"] {
+    border-color: var(--color-line-1);
+  }
+
+  /* quiet: words only, for the third-most-important thing */
+  .mw-quiet {
+    color: var(--color-ink-2);
+  }
+  .mw-quiet:hover:not([data-disabled]) {
+    color: var(--color-ink-1);
+    background: var(--color-raised);
+  }
+
+  /* icon: round, 44 px */
+  .mw-icon {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    flex: none;
+    border-color: var(--color-line-2);
+  }
+  .mw-icon:hover:not([data-disabled]) {
+    border-color: var(--color-line-3);
+  }
+  .mw-icon:active:not([data-disabled]) {
+    background: var(--color-raised);
+  }
+
+  /* a chosen option (aria-pressed, a selected tab) */
+  .mw-btn[aria-pressed="true"],
+  .mw-btn[data-selected] {
+    border-color: var(--color-ink-1);
+    background: var(--color-raised);
+  }
+
+  /* ---------- the rare raised panel ---------- */
+  .mw-sheet {
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-panel);
+    background: var(--color-sheet);
+    color: var(--color-ink-1);
+  }
+
+  /* ---------- a tile on the void (a times table, a trick, a shop item) ---------- */
+  .mw-tile {
+    border: 1px solid var(--color-line-1);
+    border-radius: var(--radius-chip);
+    background: transparent;
+    color: var(--color-ink-1);
+    transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
+  }
+  .mw-tile:hover:not([data-disabled]),
+  .mw-tile[aria-expanded="true"],
+  .mw-tile[aria-pressed="true"],
+  .mw-tile[data-selected] {
+    border-color: var(--color-line-3);
+    background: var(--color-raised);
+  }
+
+  /* ---------- a text field ---------- */
+  .mw-input {
+    min-height: 52px;
+    width: 100%;
+    padding: 0 16px;
+    border: 1px solid var(--color-line-2);
+    border-radius: var(--radius-chip);
+    background: var(--color-panel);
+    color: var(--color-ink-1);
+    font: inherit;
+    font-size: var(--text-child);
+    outline: none;
+    transition: border-color var(--transition-duration-quick) var(--ease-out);
+  }
+  .mw-input::placeholder { color: var(--color-ink-3); }
+  .mw-input:focus,
+  .mw-input:focus-visible { border-color: var(--color-gold); outline: none; }
+
+  /* ---------- mastery marks: each reads without colour ---------- */
+  .mw-mark {
+    display: inline-block;
+    flex: none;
+    width: var(--mark, 8px);
+    height: var(--mark, 8px);
+    border-radius: 50%;
+  }
+  /* Gold: filled, with a hairline ring around it */
+  .mw-mark-gold {
+    background: var(--color-mastery-gold);
+    box-shadow: 0 0 0 1.5px var(--color-void), 0 0 0 2.5px var(--color-mastery-gold);
+  }
+  /* Got it: filled */
+  .mw-mark-got { background: var(--color-mastery-got); }
+  /* Learning: an outline */
+  .mw-mark-learn { border: 1.5px solid var(--color-mastery-learn); }
+  /* New: a small dim dot */
+  .mw-mark-new {
+    background: var(--color-mastery-new);
+    transform: scale(0.72);
+  }
+
+  /* ---------- wave dots ---------- */
+  .mw-wave {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-line-3);
+  }
+  .mw-wave[data-state="won"] {
+    border-color: var(--color-gold);
+    background: var(--color-gold);
+  }
+  .mw-wave[data-state="now"] {
+    border-color: var(--color-ink-1);
+    border-width: 2px;
+  }
+
+  /* ---------- the top bar ---------- */
+  .mw-topbar {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 64px;
+    padding: 0 16px;
+  }
+  @media (min-width: 900px) {
+    .mw-topbar {
+      gap: 16px;
+      height: 76px;
+      padding: 0 clamp(20px, 3.4vw, 56px);
+    }
+  }
+}
