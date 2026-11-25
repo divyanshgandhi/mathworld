@@ -10,6 +10,8 @@ import type { HangarBay, ShipStyle } from "@/worlds/space/hangarBay";
 import { Button, buttonClass, HomeLink, Icon, PillLink, TopBar } from "./kit";
 import { useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
+import { FieldManual } from "./teach/FieldManual";
+import { Greeting } from "./teach/Greeting";
 
 /**
  * The Hangar (/hangar): the cadet's rocket on show, and a shop of looks bought with orbs.
@@ -92,7 +94,8 @@ function StateWords({ st }: { st: ReturnType<typeof itemState> }) {
 }
 
 export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
-  const { log } = useCadet();
+  const { log, emit } = useCadet();
+  const [help, setHelp] = useState(false);
   // purchases this screen has saved: folded on top of the cadet's log, so the screen updates at once
   const [mine, setMine] = useState<LoggedEvent[]>([]);
   const state = useMemo(() => (log ? fold([...log, ...mine]) : null), [log, mine]);
@@ -238,7 +241,9 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
       {/* the part of the screen the rocket is framed in (the scene reads its size) */}
       <div ref={frameEl} aria-hidden className="pointer-events-none absolute inset-x-0 top-16 h-[calc(45dvh-4rem)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bottom-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:right-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:h-auto [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]" />
 
-      <TopBar left={<HomeLink />} title="Hangar" orbs={orbs} onHelp={onHelp} className="absolute inset-x-0 top-0" />
+      <TopBar left={<HomeLink />} title="Hangar" orbs={orbs} onHelp={onHelp ?? (() => setHelp(true))} className="absolute inset-x-0 top-0" />
+      {state && <Greeting screen="hangar" edge="top" seen={{ seen: state.seen, emit }} />}
+      {state && <FieldManual open={help} onClose={() => setHelp(false)} topic="orbs" seen={{ seen: state.seen, emit }} replayFrom="/hangar" />}
 
       <section
         aria-label="Shop"

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import type { PlayerState } from "@/director/fold";
 import { HomeLink, Icon, masterySummary, PillLink, Pips, RocketGlyph, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
+import { FieldManual } from "./teach/FieldManual";
+import { Greeting } from "./teach/Greeting";
 import { hereIndex, hyperJump, journey, stopMarks, type JourneyStop } from "./world/journey";
 import { PlanetSprite } from "./world/PlanetSprite";
 import { preloadSprites } from "./world/spriteStore";
@@ -44,7 +46,8 @@ const spriteFilter = (s: JourneyStop): CSSProperties["filter"] => (s.locked ? "b
  */
 export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   const router = useRouter();
-  const { state } = useCadet();
+  const { state, emit } = useCadet();
+  const [help, setHelp] = useState(false);
   const stops = useMemo(() => (state ? journey(state) : null), [state]);
   const here = stops ? hereIndex(stops) : 0;
   const [picked, setPicked] = useState<number | null>(null);
@@ -113,10 +116,12 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-void text-approach">
       <Starfield />
-      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Star map" orbs={state.orbs} onHelp={onHelp} />
+      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Star map" orbs={state.orbs} onHelp={onHelp ?? (() => setHelp(true))} />
       {wide
         ? <WideMap stops={stops} sel={sel} state={state} stopProps={stopProps} />
         : <NarrowMap stops={stops} sel={sel} state={state} stopProps={stopProps} />}
+      <Greeting screen="map" seen={{ seen: state.seen, emit }} />
+      <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/map" />
     </div>
   );
 }

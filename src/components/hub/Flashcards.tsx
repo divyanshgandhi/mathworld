@@ -9,6 +9,7 @@ import { Button, buttonClass } from "../kit/Button";
 import { EmptyState } from "../kit/Empty";
 import { Icon } from "../kit/Icon";
 import { Keypad } from "../kit/Keypad";
+import { Greeting } from "../teach/Greeting";
 import { deckFor } from "./deck";
 
 type Result = { a: number; b: number; guess: number; ok: boolean };
@@ -25,6 +26,7 @@ const LOOK_MS = 1200;
  * - The end: "4 of 5 right", the five facts with their answers, and Done.
  * Every card appends `flashcard_answered` (the fold gives a fast, right card a gentle mastery nudge).
  * Pass `table` to practise one times table ("Practise the 7s"); leave it out for the mixed deck.
+ * The first deck ever opens with Nova's one-line greeting under the header (seen key `greet:flashcards`).
  */
 export function Flashcards({ state, emit, onClose, table = null }: { state: PlayerState; emit: (e: EventInput) => void; onClose: () => void; table?: number | null }) {
   const [deck] = useState(() => deckFor(state, seeded(Math.floor(Math.random() * 1e6) + 1), table));
@@ -77,6 +79,12 @@ export function Flashcards({ state, emit, onClose, table = null }: { state: Play
           <DialogClose aria-label="Close flashcards" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
         </header>
 
+        {/* laid over the top of the card, so nothing moves when it goes */}
+        {deck.length > 0 && !finished && (
+          <div className="relative z-10 h-0">
+            <Greeting screen="flashcards" placement="inline" seen={{ seen: state.seen, emit }} className="absolute inset-x-0 top-1 mx-auto w-fit max-w-[min(92%,520px)] rounded-panel border border-line-1 bg-panel px-4 py-3" />
+          </div>
+        )}
         {deck.length === 0 ? (
           <div className="grid flex-1 place-items-center px-6">
             <EmptyState icon="cards" title="No cards yet" action={<Button variant="primary" onClick={onClose}>Done</Button>}>

@@ -10,6 +10,9 @@ import { MASTERY, type MasteryKey } from "@/design/tokens";
 import { BODY_NAME } from "@/worlds/space/bodies";
 import { Button, buttonClass, Loading, masterySummary, MasteryKeyLegend, MasteryMark, NovaLine, PillLink, Pips, RingLogo, SheetClose, SheetDialog, TopBar, WaveDots } from "./kit";
 import { Flashcards } from "./hub/Flashcards";
+import { FieldManual } from "./teach/FieldManual";
+import { GREETINGS } from "@/teach/greetings";
+import { greetKey } from "@/teach/keys";
 import { useCadet } from "./hub/useCadet";
 import { PlanetSprite } from "./world/PlanetSprite";
 import "./hub/hub.css";
@@ -19,7 +22,7 @@ const LEVEL: Record<Band, MasteryKey> = { gold: "gold", understood: "got", pract
 /** "The Moon" leads a label; mid-sentence it is "the Moon". */
 const inLine = (name: string) => name.replace(/^The /, "the ");
 /** The seen key for the bay's first-arrival line (shared with the teaching layer). */
-const GREET = "greet:bay";
+const GREET = greetKey("bay");
 
 /** A quiet field of stars on the void, drawn once per resize (no animation to compete with the page). */
 function Stars() {
@@ -93,7 +96,8 @@ function MissionPlanet({ planet }: { planet: PlanetId }) {
 
 /** What Nova says when the cadet arrives: true to where they are. Plain words, one or two sentences. */
 function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boolean, planet: string, ps: Poster[]): string {
-  if (first) return `Welcome to the Resting Bay, ${name}! This is home between missions. Launch when you are ready.`;
+  // the first arrival is the bay's greeting (the teaching layer's line): what this place is, and the one thing to do
+  if (first) return `Hi, ${name}! ${GREETINGS.bay.text}`;
   const all = s.cleared.includes(MAX_TIER);
   const last = [...log].reverse().find((e) => e.type === "planet_cleared" || e.type === "hyper_jump_taken" || e.type === "attempt_submitted");
   if (last?.type === "planet_cleared" && !all) {
@@ -116,7 +120,9 @@ function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boole
  * - The times tables as ten rows of mastery marks: one opens in place to its ten facts and
  *   "Practise the 7s", which starts flashcards on that table.
  * - Places to go (Star map, Hangar, Academy), and a quiet Switch cadet that asks first.
- * - `onHelp` opens the Field Manual; without it, help opens a short "How to play" sheet.
+ * - Help opens the Field Manual (`onHelp` replaces it), with a quiet "Watch the film again".
+ * - Nova's line is the bay's greeting on the first arrival (seen key `greet:bay`), so the bay never
+ *   floats a second greeting over it.
  */
 export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patrol?: ReactNode } = {}) {
   const router = useRouter();
@@ -144,9 +150,10 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
     if (open === null) return;
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.getElementById("facts")?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+    // capture phase: a sheet on top (flashcards, the manual) is still open when we look, so its Escape is its own
     const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open], [data-slot=dialog-content][data-open], [data-slot=alert-dialog-content][data-open]")) setOpen(null); };
-    addEventListener("keydown", key);
-    return () => removeEventListener("keydown", key);
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
   }, [open]);
 
   if (!state || !ps || !log) {
@@ -258,14 +265,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
           <Button onClick={() => void switchCadet()} disabled={leaving} focusableWhenDisabled>New cadet</Button>
         </>} />
 
-      <SheetDialog open={help} onOpenChange={setHelp} title="How to play" presentation="auto"
-        actions={<SheetClose className={`${buttonClass("primary", "md")} justify-center`}>Got it</SheetClose>}>
-        <div className="flex flex-col gap-3 type-child text-ink-2">
-          <p className="m-0">Launch flies you to your next mission. Count the ships, then fire exactly that many plasma balls.</p>
-          <p className="m-0">Your times tables fill with marks as you play: <MasteryMark level="gold" size={10} /> Gold, <MasteryMark level="got" size={10} /> Got it, <MasteryMark level="learn" size={10} /> Learning, <MasteryMark level="new" size={10} /> New.</p>
-          <p className="m-0">Spend orbs on your rocket in the Hangar. Watch any trick in the Academy.</p>
-        </div>
-      </SheetDialog>
+      <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/bay" />
 
       {deck !== null && <Flashcards state={state} emit={emit} table={deck} onClose={() => setDeck(null)} />}
     </div>

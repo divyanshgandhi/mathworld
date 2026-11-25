@@ -4,7 +4,7 @@ import {
 } from "@ui-sdk/react/carousel";
 import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { buttonClass } from "@/components/kit/Button";
+import { buttonClass, PillLink } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
 import { manualKey } from "@/teach/keys";
 import { MANUAL_PAGES, pageOf, type ManualTopic } from "@/teach/manual";
@@ -22,8 +22,10 @@ import { ManualPicture } from "./ManualScenes";
  * - Close is always on screen, and Escape closes it too.
  * - Each page the player lands on is recorded as seen (`manual:<page>`), once.
  * - `seen` is optional: without it the manual reads and writes the log itself (see src/teach/seen.ts).
+ * - `replayFrom` (a hub's path, such as "/bay") adds a quiet "Watch the film again", which plays the
+ *   intro film and comes back there. Battles leave it out: the film is not for the middle of a fight.
  */
-export function FieldManual({ open, onClose, topic, seen }: { open: boolean; onClose: () => void; topic?: ManualTopic | null; seen?: SeenSource }) {
+export function FieldManual({ open, onClose, topic, seen, replayFrom }: { open: boolean; onClose: () => void; topic?: ManualTopic | null; seen?: SeenSource; replayFrom?: string }) {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogBackdrop className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-scrim p-0" />
@@ -31,7 +33,7 @@ export function FieldManual({ open, onClose, topic, seen }: { open: boolean; onC
         initialFocus='[data-slot="carousel-viewport"]'
         className="mw-sheet fixed inset-0 m-0 flex h-dvh max-h-none w-screen max-w-none flex-col rounded-none border-0 bg-panel p-0 text-approach sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[min(92dvh,720px)] sm:w-[min(92vw,620px)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-panel sm:border"
       >
-        <ManualBody topic={topic} seen={seen} />
+        <ManualBody topic={topic} seen={seen} replayFrom={replayFrom} />
       </DialogContent>
     </Dialog>
   );
@@ -47,7 +49,7 @@ function PageSeen({ id, active, seen }: { id: ManualTopic; active: boolean; seen
 const dotClass = "group grid size-11 shrink-0 place-items-center rounded-full outline-none focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-gold";
 
 /** The sheet's inside. Mounted each time the manual opens, so it starts on the asked-for page. */
-function ManualBody({ topic, seen }: { topic?: ManualTopic | null; seen?: SeenSource }) {
+function ManualBody({ topic, seen, replayFrom }: { topic?: ManualTopic | null; seen?: SeenSource; replayFrom?: string }) {
   const [page, setPage] = useState(() => pageOf(topic) + 1);
   const [carousel] = useState(createCarouselController);
   const last = page === MANUAL_PAGES.length;
@@ -60,11 +62,20 @@ function ManualBody({ topic, seen }: { topic?: ManualTopic | null; seen?: SeenSo
     if (e.key === "ArrowRight") carousel.next(); else carousel.previous();
   };
 
+  // the film link: in the header where there is room beside the title (a sheet, a phone on its side), else under the pages
+  const film = replayFrom ? `/intro?replay&from=${encodeURIComponent(replayFrom)}` : null;
+  const filmLink = (where: string) => film && (
+    <PillLink href={film} variant="quiet" size="sm" icon="play" className={where}>Watch the film again</PillLink>
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKey}>
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 pl-5 pr-3 sm:h-[72px] sm:pl-7 sm:pr-4">
         <DialogTitle className="m-0 type-display text-[22px] sm:text-[26px]">How to play</DialogTitle>
-        <DialogClose aria-label="Close" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
+        <span className="flex items-center gap-2">
+          {filmLink("hidden sm:inline-flex [@media(max-height:520px)]:inline-flex")}
+          <DialogClose aria-label="Close" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
+        </span>
       </header>
 
       <Carousel aria-label="How to play" controller={carousel} page={page} onPageChange={(p) => setPage(p)} className="flex min-h-0 flex-1 flex-col">
@@ -84,7 +95,7 @@ function ManualBody({ topic, seen }: { topic?: ManualTopic | null; seen?: SeenSo
           </CarouselContent>
         </CarouselViewport>
 
-        <footer className="flex shrink-0 flex-col items-center gap-2 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 min-[440px]:flex-row min-[440px]:justify-between sm:px-5 sm:pb-5">
+        <footer className="flex shrink-0 flex-col items-center gap-2 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 min-[440px]:flex-row min-[440px]:flex-wrap min-[440px]:justify-between sm:px-5 sm:pb-5">
           <CarouselIndicatorGroup aria-label="Pages" className="order-1 flex items-center min-[440px]:order-2">
             {MANUAL_PAGES.map((p, i) => (
               <CarouselIndicator key={p.id} page={i + 1} aria-label={p.name} className={dotClass}>
@@ -104,6 +115,7 @@ function ManualBody({ topic, seen }: { topic?: ManualTopic | null; seen?: SeenSo
               </CarouselNext>
             )}
           </div>
+          {filmLink("order-3 justify-center sm:hidden min-[440px]:order-4 min-[440px]:basis-full [@media(max-height:520px)]:hidden")}
         </footer>
       </Carousel>
     </div>

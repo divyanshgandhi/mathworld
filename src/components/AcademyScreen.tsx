@@ -11,6 +11,8 @@ import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { BattleHud } from "./battle/BattleHud";
 import { Button, HomeLink, Icon, IconButton, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
+import { FieldManual } from "./teach/FieldManual";
+import { Greeting } from "./teach/Greeting";
 import { PlanetSprite } from "./world/PlanetSprite";
 import { preloadSprites } from "./world/spriteStore";
 import { Starfield } from "./world/Starfield";
@@ -47,6 +49,7 @@ export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
   const highlight = useSyncExternalStore(subscribeUrl, trickParam, noParam);
   const [override, setOverride] = useState<Playing | null>(null);
   const pushed = useRef(false);
+  const [help, setHelp] = useState(false);
 
   const base = watching ? filmOf(watching) : null;
   const film: Playing | null = !base ? null : override?.trick === base.trick ? override : { trick: base.trick, a: base.a, b: base.b, watch: true, n: 0 };
@@ -75,7 +78,10 @@ export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-void text-approach">
       <Starfield seed={23} />
-      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Academy" orbs={state.orbs} onHelp={onHelp} />
+      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Academy" orbs={state.orbs} onHelp={onHelp ?? (() => setHelp(true))} />
+      {/* the list only: a trick film has Nova's own voice and captions */}
+      <Greeting screen="academy" seen={{ seen: state.seen, emit }} />
+      <FieldManual open={help} onClose={() => setHelp(false)} topic="help" seen={{ seen: state.seen, emit }} replayFrom="/academy" />
       <main className="relative z-10 mx-auto w-full max-w-[920px] px-4 pb-16 pt-4 sm:px-8 md:pt-10">
         <h2 className="m-0 type-display text-[clamp(44px,7vw,80px)] leading-[0.95]">{ACADEMY_WORDS.heading}</h2>
         <p className="m-0 mt-4 max-w-[36ch] type-child text-ink-2">{ACADEMY_WORDS.intro}</p>

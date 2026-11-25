@@ -18,9 +18,10 @@ import { readMs } from "@/teach/words";
  *   time it is enabled on a screen the player has not met.
  * - While the seen state is loading it shows nothing, so a returning player is never greeted twice.
  * - `inline` reserves no space once it has gone: put it where a gap closing does not move a control.
+ * - `edge="top"` floats it just under the top bar instead (a screen whose bottom holds the words to read, such as the Hangar's dock).
  */
-export function Greeting({ screen, seen, enabled = true, placement = "float", className = "", onDone }: {
-  screen: GreetScreen; seen?: SeenSource; enabled?: boolean; placement?: "float" | "inline"; className?: string; onDone?: () => void;
+export function Greeting({ screen, seen, enabled = true, placement = "float", edge = "bottom", className = "", onDone }: {
+  screen: GreetScreen; seen?: SeenSource; enabled?: boolean; placement?: "float" | "inline"; edge?: "bottom" | "top"; className?: string; onDone?: () => void;
 }) {
   const line = GREETINGS[screen];
   const { seen: met, mark } = useSeen(line.key, seen);
@@ -58,7 +59,7 @@ export function Greeting({ screen, seen, enabled = true, placement = "float", cl
   );
   if (placement === "inline") return <div data-greeting={screen} className={`pointer-events-none ${fade} ${className}`} style={style}>{body}</div>;
   return (
-    <div data-greeting={screen} className={`pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-30 flex justify-center px-4 ${className}`}>
+    <div data-greeting={screen} className={`pointer-events-none fixed inset-x-0 ${edge === "top" ? "top-[max(76px,calc(env(safe-area-inset-top)+64px))]" : "bottom-[max(20px,env(safe-area-inset-bottom))]"} z-30 flex justify-center px-4 ${className}`}>
       <div className={`max-w-[min(100%,520px)] rounded-panel border border-line-1 bg-panel px-4 py-3 ${fade}`} style={style}>{body}</div>
     </div>
   );
