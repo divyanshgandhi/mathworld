@@ -226,7 +226,7 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     height: 64px;
     padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   }
@@ -237,9 +237,9 @@
     color: var(--color-ink-2);
     font-family: var(--font-sans);
     font-weight: 500;
-    font-stretch: 112%;
+    font-stretch: 100%;
     font-size: var(--text-label-sm);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.07em;
     line-height: 1.2;
     text-transform: uppercase;
     text-wrap: balance;
@@ -303,6 +303,7 @@
   .mw-dialog {
     position: fixed;
     margin: 0;
+    background: var(--color-panel); /* opaque: nothing behind a question should read through it */
     width: min(calc(100vw - 24px), 520px);
     max-height: calc(100dvh - 24px);
     overflow-y: auto;
@@ -323,11 +324,10 @@
     translate: 0 10px;
   }
   /* as a sheet (presentation="sheet" or "auto" on a small touch screen) it rises from the bottom edge */
+  /* ui-sdk places and moves the sheet itself (top, translate, swipe): only shape it here */
   .mw-dialog[data-presentation="sheet"] {
-    left: 0;
-    right: 0;
-    bottom: 0;
     width: 100%;
+    max-height: none;
     border-bottom: 0;
     border-radius: var(--radius-panel) var(--radius-panel) 0 0;
     padding-bottom: max(24px, env(safe-area-inset-bottom));

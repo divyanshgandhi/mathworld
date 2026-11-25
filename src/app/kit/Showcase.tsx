@@ -1,10 +1,11 @@
 "use client";
 import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@ui-sdk/react/dialog";
 import { useState, type ReactNode } from "react";
-import { backdrop, CadetSignUp, dialogBox, ghost, glass, Keypad, lime } from "@/components/battle/ui";
+import { CadetSignUp } from "@/components/hub/CadetSignUp";
 import {
-  Button, buttonClass, HomeLink, Icon, IconButton, ICON_NAMES, MasteryKeyLegend, MasteryMark, NovaLine, NovaPortrait, OrbCount,
-  Pips, PillLink, RingLogo, RocketGlyph, Sheet, TopBar, WaveDots, Wordmark, type ButtonSize, type ButtonVariant,
+  Button, buttonClass, dialogClass, EmptyState, HomeLink, Icon, IconButton, ICON_NAMES, Keypad, Loading, MasteryKeyLegend, MasteryMark, NovaLine, NovaPortrait, OrbCount,
+  PLANET_STATUS, PlanetStatusMark, Pips, PillLink, RingLogo, RocketGlyph, scrimClass, Sheet, SheetClose, SheetDialog, TopBar, WaveDots, Wordmark,
+  type ButtonSize, type ButtonVariant, type PlanetStatus,
 } from "@/components/kit";
 import { contrast, over } from "@/design/contrast";
 import { COLOR, EDGE, FILL, INK, LINE, MASTERY, MOTION, RADIUS, SIZE, TYPE, type MasteryKey } from "@/design/tokens";
@@ -83,6 +84,9 @@ export function KitShowcase() {
   const [table, setTable] = useState<number | null>(7);
   const [lastFire, setLastFire] = useState<number | null>(null);
   const [signUp, setSignUp] = useState(false);
+  const [entry, setEntry] = useState("");
+  const [dialog, setDialog] = useState(false);
+  const [sheet, setSheet] = useState(false);
 
   return (
     <div className="min-h-dvh bg-void text-approach">
@@ -184,7 +188,7 @@ export function KitShowcase() {
             ))}
           </div>
           <div className="mt-8 flex flex-wrap items-end gap-10">
-            <figure className="m-0"><div className="flex gap-3"><MasteryMark level="gold" size={7} /><MasteryMark level="got" size={7} /><MasteryMark level="learn" size={7} /><MasteryMark level="new" size={7} /></div><Caption>7 px, the pip size</Caption></figure>
+            <figure className="m-0"><div className="flex gap-3"><MasteryMark level="gold" size={8} /><MasteryMark level="got" size={8} /><MasteryMark level="learn" size={8} /><MasteryMark level="new" size={8} /></div><Caption>8 px, the pip size (Pips default)</Caption></figure>
             <figure className="m-0 grayscale"><div className="flex gap-3"><MasteryMark level="gold" size={12} /><MasteryMark level="got" size={12} /><MasteryMark level="learn" size={12} /><MasteryMark level="new" size={12} /></div><Caption>without colour (greyscale)</Caption></figure>
           </div>
           <h3 className="mt-10 type-label text-ink-2">Your times tables (Pips)</h3>
@@ -246,6 +250,7 @@ export function KitShowcase() {
             <div className="rounded-panel border border-dashed border-line-1"><TopBar left={<HomeLink />} title="Star map" orbs={142} onHelp={() => setPressed((n) => n + 1)} /></div>
             <div className="rounded-panel border border-dashed border-line-1"><TopBar left={<IconButton icon="menu" label="Menu" />} title="The Moon" orbs={9} /></div>
             <div className="rounded-panel border border-dashed border-line-1"><TopBar left={<Wordmark />} orbs={1250} onHelp={() => setPressed((n) => n + 1)} /></div>
+            <Caption>Under 600 px wide the name drops to 13 px with tighter tracking and may take two balanced lines inside the same 64 px, so it never ends in an ellipsis. Open this page at 360 px to see it. Keep names short: a screen name, not a sentence.</Caption>
           </div>
           <div className="mt-6 flex items-center gap-6"><OrbCount n={142} /><Caption>orb count</Caption></div>
         </Section>
@@ -262,40 +267,61 @@ export function KitShowcase() {
               </div>
             </Sheet>
             <div className="flex flex-col items-start gap-4">
+              <Button onClick={() => setDialog(true)}>Open a dialog</Button>
+              <Button onClick={() => setSheet(true)}>Open a sheet (bottom on phones)</Button>
               <Dialog>
-                <DialogTrigger className={buttonClass("secondary", "md")}>Open a sheet as a dialog</DialogTrigger>
-                <DialogBackdrop className={backdrop} />
-                <DialogContent className={`${dialogBox} w-[min(92vw,380px)] p-6`}>
+                <DialogTrigger className={buttonClass("quiet", "md")}>Compose your own from the parts</DialogTrigger>
+                <DialogBackdrop className={scrimClass} />
+                <DialogContent className={`${dialogClass} p-6`} data-size="sm">
                   <DialogTitle className="m-0 type-display text-[32px]">The 7s</DialogTitle>
-                  <DialogDescription className="mt-2 type-body text-ink-2">4 of 10 Gold.</DialogDescription>
+                  <DialogDescription className="mt-2 type-child text-ink-2">4 of 10 Gold.</DialogDescription>
                   <DialogClose className={`${buttonClass("primary", "md")} mt-6 w-full`}>Done</DialogClose>
                 </DialogContent>
               </Dialog>
-              <p className="m-0 type-body-sm text-ink-3">Dialog parts take the kit&apos;s class strings: buttonClass(), sheetClass, and backdrop / dialogBox from battle/ui.</p>
+              <p className="m-0 type-body-sm text-ink-3">SheetDialog: a plain scrim (the void at 72%, no blur), a sheet with a title, one sentence, the content and the actions. Escape, the scrim and Close all close it. Use it only for a real interruption.</p>
+            </div>
+          </div>
+          <SheetDialog open={dialog} onOpenChange={setDialog} size="sm" title="Start as a new cadet?"
+            description={<>This device will forget <b className="font-medium text-ink-1">Kit</b>. Kit&apos;s orbs and Gold facts cannot be brought back.</>}
+            actions={<><SheetClose className={buttonClass("primary", "md")}>Keep playing</SheetClose><SheetClose className={buttonClass("secondary", "md")}>New cadet</SheetClose></>} />
+          <SheetDialog open={sheet} onOpenChange={setSheet} presentation="auto" title="How to play"
+            actions={<SheetClose className={buttonClass("primary", "md")}>Got it</SheetClose>}>
+            <p className="m-0 type-child text-ink-2">Launch flies you to your next mission. Count the ships, then fire exactly that many plasma balls.</p>
+          </SheetDialog>
+        </Section>
+
+        <Section id="keypad" title="Keypad" note="The number pad for 2D screens: 56 px keys, Delete, 0 and the submit key, plus the keyboard (digits, Backspace, Enter). It draws no readout: put the number where the eyes are. Mashing, held keys and a double Enter are safe.">
+          <div className="grid items-center gap-8 md:grid-cols-[1fr_360px]">
+            <p className="m-0 text-center type-display type-number text-[72px]" aria-live="polite">7 × 8 = <span className={entry ? "" : "text-ink-3"}>{entry || "?"}</span></p>
+            <div>
+              <Keypad value={entry} onValueChange={setEntry} onSubmit={setLastFire} submitLabel="Check" keyboard={false} maxLength={3} />
+              <Caption>{lastFire === null ? "Tap the keys, then Check. 0 is a fine answer." : `Checked ${lastFire}`}</Caption>
             </div>
           </div>
         </Section>
 
-        <Section id="legacy" title="Older screens" note="The shared strings in battle/ui.tsx keep their names (btn, ghost, lime, glass, backdrop, dialogBox) and now draw in this language, so every older screen changed at once. The keypad and the sign-up card live there too.">
-          <div className="grid gap-8 md:grid-cols-2">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-3">
-                <button type="button" className={`${lime} px-6 py-3 text-base`}>lime</button>
-                <button type="button" className={`${ghost} px-5 py-3 text-base`}>ghost</button>
-                <button type="button" className={`${lime} px-6 py-3 text-base`} data-disabled="">lime disabled</button>
-              </div>
-              <div className={`${glass} p-5`}><p className="m-0 type-body">glass is now a sheet.</p></div>
-              <div className={`${glass} w-full max-w-[320px] p-3`}>
-                <Keypad onFire={setLastFire} />
-                <p className="mt-2 text-center type-body-sm text-ink-3" role="status">{lastFire === null ? "Type or tap, then Fire. 0 is a fine answer." : `Fired ${lastFire}`}</p>
-              </div>
-            </div>
-            <div className="relative grid min-h-[520px] place-items-center rounded-panel border border-dashed border-line-1">
-              {/* the card takes focus when it mounts, so it waits for a press instead of jumping the page */}
-              {signUp ? <CadetSignUp cta="Start" onDone={() => setSignUp(false)} /> : <Button onClick={() => setSignUp(true)}>Show the sign-up card</Button>}
-            </div>
+        <Section id="states" title="Empty, loading and planet status" note="An empty state says what will fill the place and how, with one way forward. Loading is a slowly turning dashed orbit; its words arrive only if the wait runs long. Planet status marks read without colour.">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-panel border border-dashed border-line-1"><EmptyState icon="trick" title="No tricks yet" action={<Button>Watch in the Academy</Button>}>Win a Show Me How in battle to earn your first trick.</EmptyState></div>
+            <div className="grid min-h-64 place-items-center rounded-panel border border-dashed border-line-1"><Loading label="Opening the Star map" /></div>
           </div>
-          <p className="mt-4 type-body-sm text-ink-3">The sign-up card is live: submitting it creates a cadet on this device.</p>
+          <ul className="m-0 mt-8 flex list-none flex-wrap gap-x-10 gap-y-4 p-0">
+            {(Object.keys(PLANET_STATUS) as PlanetStatus[]).map((k) => (
+              <li key={k} className="flex items-center gap-3"><PlanetStatusMark status={k} label /><span className="type-name text-[17px]">{PLANET_STATUS[k]}</span></li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section id="signup" title="Sign-up" note="CadetSignUp has no card of its own: on the Title it stands where the words stood. One question, a name of 1 to 16 letters, numbers and spaces, six named colours and Begin. Try an empty name, an emoji or a long paste.">
+          <div className="relative grid min-h-[480px] place-items-center rounded-panel border border-dashed border-line-1 p-6">
+            {/* the field takes focus when it mounts, so it waits for a press instead of jumping the page */}
+            {signUp ? <CadetSignUp onBack={() => setSignUp(false)} onDone={() => setSignUp(false)} /> : <Button onClick={() => setSignUp(true)}>Show the sign-up</Button>}
+          </div>
+          <p className="mt-4 type-body-sm text-ink-3">The sign-up is live: Begin creates a cadet on this device.</p>
+        </Section>
+
+        <Section id="legacy" title="Older screens" note="battle/ui.tsx keeps its exported class strings so older screens keep working until they move to the kit: btn is a pill base, ghost is secondary, lime and primary are the primary pill, quiet is quiet, glass is a sheet, backdrop is the scrim, dialogBox is a centred sheet, padKey is a keypad key. New code uses the kit components above instead." >
+          <p className="m-0 type-body text-ink-2">Their replacements: <b className="font-medium">Button</b> and <b className="font-medium">buttonClass()</b>, <b className="font-medium">Sheet</b>, <b className="font-medium">SheetDialog</b> with <b className="font-medium">scrimClass</b> and <b className="font-medium">dialogClass</b>, <b className="font-medium">Keypad</b> and <b className="font-medium">CadetSignUp</b> (in components/hub).</p>
         </Section>
 
         <Section id="motion" title="Motion" note={`One curve (${MOTION.ease}), three durations: quick ${MOTION.quick} ms for controls, route ${MOTION.route} ms for the fade between screens, moment ${MOTION.moment} ms for the one authored moment per screen. Reduced motion turns them off.`}>
