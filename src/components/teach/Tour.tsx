@@ -162,7 +162,12 @@ const PAD = 6;
 const PLATE_W = 340;
 /** A short screen (a phone on its side) gets a wide, low plate: one row. */
 const COMPACT_W = 580, COMPACT_BELOW_H = 480;
-const isCompact = (view: Box) => view.h < COMPACT_BELOW_H && view.w >= 520;
+/** The one-row plate's height, about (portrait, line and buttons on one row). */
+const COMPACT_H = 76;
+/** One row where it sits beside the ring without covering it, or where nothing fits (it is the lower plate); else the usual plate. */
+const isCompact = (view: Box, ring: Box) =>
+  view.h < COMPACT_BELOW_H && view.w >= 520 &&
+  (placePlate(ring, { w: Math.min(COMPACT_W, view.w), h: COMPACT_H }, view).fits || !placePlate(ring, { w: PLATE_W, h: 142 }, view).fits);
 
 function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour>) {
   const reduced = useReducedMotion();
@@ -178,8 +183,8 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
     const el = findAnchor(anchor);
     if (!el) return;
     const r = el.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) el.scrollIntoView({ block: "center", inline: "nearest", behavior: reduced ? "auto" : "smooth" });
-  }, [anchor, reduced]);
+    if (r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) el.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" }); // at once: a smooth scroll can stall, and the ring must find its target
+  }, [anchor]);
 
   // follow the target and the screen every frame (resize, scroll, rotation, a target that moves)
   useLayoutEffect(() => {
@@ -188,9 +193,14 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
       const el = findAnchor(anchor);
       if (el) {
         const view = viewBox(probe.current);
-        const r = el.getBoundingClientRect();
+        let r = el.getBoundingClientRect();
+        // a rotation or resize can leave the target out of view: bring it back, so the ring is never lost
+        if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) {
+          el.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+          r = el.getBoundingClientRect();
+        }
         const ring = clipTo(ringOf({ x: r.left, y: r.top, w: r.width, h: r.height }, PAD), { x: 0, y: 0, w: innerWidth, h: innerHeight });
-        const size = { w: Math.min(isCompact(view) ? COMPACT_W : PLATE_W, view.w), h: plate.current?.offsetHeight ?? 120 };
+        const size = { w: Math.min(isCompact(view, ring) ? COMPACT_W : PLATE_W, view.w), h: plate.current?.offsetHeight ?? 120 };
         const key = [ring.x, ring.y, ring.w, ring.h, view.w, view.h, size.w, size.h].map((n) => Math.round(n)).join(",");
         if (key !== prev) { prev = key; setGeo({ ring, view, size }); }
       }
@@ -240,7 +250,7 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
   }, [next, skip]);
 
   const place = geo ? placePlate(geo.ring, geo.size, geo.view) : null;
-  const compact = geo ? isCompact(geo.view) : false;
+  const compact = geo ? isCompact(geo.view, geo.ring) : false;
 
   // no side has room (a big target on a short screen): bring the target to the top once, so the plate fits below it
   const tried = useRef("");

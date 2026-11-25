@@ -104,6 +104,8 @@ function novaLine(s: PlayerState, log: LoggedEvent[], name: string, planet: stri
   if (s.mission.passed) return `Great flying, ${name}! Launch to see what is next.`;
   const near = ps.filter((p) => p.gold >= 6 && p.gold < 10).sort((a, b) => b.gold - a.gold || a.table - b.table)[0];
   if (near) return `Welcome back, ${name}! Your ${near.table}s are nearly Gold.`;
+  // a cadet who has not flown a wave yet has not been here before: no "welcome back" (the tour shows the screen)
+  if (!last) return "";
   return `Welcome back, ${name}! Ready for ${inLine(planet)}?`;
 }
 
@@ -151,6 +153,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
   const waves = missionLength(tier) - 1, need = solvesToClear(tier), won = Math.min(state.mission.solved, waves);
   const all = state.cleared.includes(MAX_TIER);
   const who = cadet?.name ?? "cadet";
+  const nova = novaLine(state, log, `\u2068${who}\u2069`, name, ps);
   const status = state.mission.passed && nextPlanet ? <>Mission won. Launch to fly on to <b>{inLine(nextPlanet)}</b>.</>
     : !nextPlanet ? (all ? <>You cleared every planet. The fleets out here keep growing.</> : <>The last frontier. The fleets out here keep growing.</>)
     : tier === 0 ? <>Your first mission. Win <b>both waves</b> to unlock {inLine(nextPlanet)}.</>
@@ -180,7 +183,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
             <div data-slot="daily-patrol" className="empty:hidden">{typeof patrol === "function" ? patrol({ state, log, emit }) : patrol}</div>
-            <NovaLine className="mw-bay-nova">{novaLine(state, log, `\u2068${who}\u2069`, name, ps)}</NovaLine>
+            {nova && <NovaLine className="mw-bay-nova">{nova}</NovaLine>}
           </div>
         </section>
 

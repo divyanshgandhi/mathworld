@@ -43,7 +43,7 @@ export const TOURS: Record<TourId, TourStep[]> = {
     s("map-launch", "Launch when you are ready."),
   ],
   hangar: [
-    s("hangar-list", "Looks for your rocket."),
+    s("hangar-list", "Paint, blasters and thrusters for your rocket."),
     s("hangar-rocket", "Tap one to try it on."),
     s("hangar-buy", "Buy it with orbs."),
   ],
