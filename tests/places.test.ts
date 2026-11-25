@@ -3,6 +3,7 @@ import { TRICKS } from "@/db/events";
 import { fold, type LoggedEvent } from "@/director/fold";
 import { canLaunch } from "@/director/hub";
 import { FILMS, FILMS_BY_JOURNEY, FIRST_MET } from "@/rig/academy";
+import { missionLength } from "@/rig/adaptive";
 import { drawFrom, factsOf, ENUMERABLE_TIERS, MAX_TIER, PLANETS_BY_TIER, type PlanetId } from "@/rig/pools";
 import { lesson, type TrickId } from "@/rig/tricks";
 import { seeded } from "@/engine/util";
@@ -11,10 +12,19 @@ import { layoutPicture, solidDots, trickPicture } from "@/components/world/trick
 import { STOP_WORDS, TRICK_REASON } from "@/components/world/words";
 import { spriteDisc, BODY_IDS } from "@/worlds/space/bodies";
 
-const cleared = (p: PlanetId): LoggedEvent => ({ type: "planet_cleared", payload: { planetId: p } });
+// A planet clear counts only when its mission really passed (decision 4), so each clear is earned:
+// a mission's worth of slow, correct answers on the planet in play, then the director's planet_cleared.
+const cleared = (p: PlanetId): LoggedEvent[] => {
+  const tier = PLANETS_BY_TIER.indexOf(p), rng = seeded(tier + 3);
+  const shots = Array.from({ length: missionLength(tier) }, (): LoggedEvent => {
+    const { a, b } = drawFrom(tier, rng);
+    return { type: "attempt_submitted", payload: { a, b, planetId: p, guess: a * b, latencyMs: 9000, errorType: null, attemptIndex: 1, usedRadar: false, powerUpUsed: null, isTransferCheck: false, waveRole: tier === 0 ? "tutorial" : "discovery" } };
+  });
+  return [...shots, { type: "planet_cleared", payload: { planetId: p } }];
+};
 const intro: LoggedEvent = { type: "intro_completed", payload: {} };
-const onMars = () => fold([intro, cleared("earth"), cleared("moon")]);
-const allCleared = () => fold([intro, ...PLANETS_BY_TIER.map(cleared)]);
+const onMars = () => fold([intro, ...cleared("earth"), ...cleared("moon")]);
+const allCleared = () => fold([intro, ...PLANETS_BY_TIER.flatMap(cleared)]);
 
 describe("Star map journey", () => {
   it("runs from Mercury out to Deep Space, ten stops, with words for each", () => {
