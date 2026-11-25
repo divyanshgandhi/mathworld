@@ -161,10 +161,12 @@ describe("scans", () => {
     expect(s0.y).toBeGreaterThan(s1.y);
     expect(s1.y).toBeGreaterThan(s10.y);
   });
-  it("a whole scan takes 2.5 s or less however many steps; a soft one is quicker", () => {
+  it("a scan counts about 0.4 s a step, faster above nine, and takes 4 s or less in all", () => {
+    for (let n = 1; n <= 9; n++) expect(scanTiming(n).step).toBeCloseTo(0.4);
+    for (let n = 10; n <= 24; n++) expect(scanTiming(n).step).toBeLessThan(0.4);
     for (let n = 1; n <= 24; n++) {
-      expect(scanTiming(n).total).toBeLessThanOrEqual(2.5 + 1e-9);
-      expect(scanTiming(n, { soft: true }).total).toBeLessThan(scanTiming(n).total);
+      expect(scanTiming(n).total).toBeLessThanOrEqual(4 + 1e-9);
+      expect(scanTiming(n).settle).toBeGreaterThan(0); // a short beat before the total lands
     }
   });
 });

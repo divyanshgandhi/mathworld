@@ -36,6 +36,7 @@ import { createFx } from "@/battle/systems/fx";
 import { createKillFx } from "@/battle/systems/kill";
 import { createMisses } from "@/battle/systems/misses";
 import { createScan } from "@/battle/systems/scan";
+import { COUNT_PX, LANE, textAspect } from "@/battle/lanes";
 import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
 import { attachTelemetry } from "@/battle/telemetry";
@@ -49,6 +50,12 @@ const AXIS_PX = 26;
 const ROCKET_SHARE = 0.44, ROCKET_MODEL_H = 2.1, ROCKET_Z = 1.8;
 /** The last kill's hit-stop (s) and the miss beats: survivors gather, the bracket lands, the fleet comes back. */
 const HIT_STOP = 0.065, GATHER = 0.45, RESTORE_AT = 1.65, READY_AFTER = 0.35;
+/** A scan never starts sooner than this after the strip's miss line (s). */
+const SCAN_AFTER_STRIP = 0.6;
+/** Px kept clear above a small rocket band for the number on its nose (phones). */
+const NOSE_ROOM = 30;
+/** Nova's reactions that only say again what the strip and the world already show (dropped before a scan). */
+const REPEATS_STRIP = new Set<string>(["nova_too_few", "nova_too_many", "nova_err_way_off"]);
 /** Two presses of Power-Ups closer than this are one press (a double tap on a touch screen). */
 const POWERUP_DEBOUNCE_MS = 400;
 
@@ -231,38 +238,44 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
   function hintUi(): NonNullable<ArenaUi["hint"]> {
     const h = bs.hint;
-    return { level: h.level, squads: h.squads ? (h.level >= 1 ? "on" : "soft") : "off", each: h.each ? "on" : "off", powerUp: h.powerUp ? fittingPowerUp() : null };
+    return { level: h.level, squads: h.squads ? "on" : "off", each: h.each ? "on" : "off", powerUp: h.powerUp ? fittingPowerUp() : null };
   }
   /**
    * Show a rung. Its label settles at the end of a scan (squads: the bracket steps down the fleet; each:
    * along the first squad), and only then does the HUD hear about it (`ui.hint`), so nothing is spoiled
    * early. Show Me How reveals both labels at once (the lesson is the show).
    */
-  function showHint(step: HintStep) {
+  function showHint(step: HintStep, then?: () => void) {
     if (!wave) return;
     const before = hintUi();
     dispatch({ type: "hint", step });
     const h = hintUi(), wn = bs.waveNo;
-    bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: step.soft, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
-    const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); };
+    bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: false, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
+    const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); then?.(); };
     if (step.id === "show-me-how") { scan.skip(); return reveal(); }
     // what was already up stays up while the new label is scanned; the label being scanned waits for its scan
-    fv.showAxis(step.id === "squads" ? "off" : before.squads, step.id === "each" ? "off" : before.each);
+    // (the squads label stays, quiet, while the ships of a squad are counted)
+    fv.showAxis(step.id === "squads" ? "off" : before.squads === "on" ? "soft" : before.squads, step.id === "each" ? "off" : before.each);
     const [ra, rb] = fv.flipped ? [wave.b, wave.a] : [wave.a, wave.b];
-    scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal, { soft: step.soft });
+    scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal);
   }
+  /** The fleet as the cadet sees it (squads x each), for the ladder's 1 x n and empty rules. */
+  const seenShape = () => (wave ? (fv.flipped ? { a: wave.b, b: wave.a } : { a: wave.a, b: wave.b }) : undefined);
+  /** The rung this moment would show (null: none), without showing it. */
+  const pendingHint = () => (structure === "discover" && wave ? nextHint(hintState(bs), factBand(wave), seenShape()) : null);
   /**
-   * Climb the ladder if it has a rung for now. After a miss every scan waits for the full fleet to be
-   * back (`back`), and rung 1 also waits for Nova's reaction (`afterLine`), so voice and scan never overlap.
+   * Climb the ladder if it has a rung for now. Never before a miss or an ask (decision 1). After a miss
+   * the scan waits for the full fleet to be back (`back`) and for any line still being said (`afterLine`);
+   * `then` runs when the scan's label has landed (Nova's line goes there, so one voice at a time).
    */
-  function climb(afterLine?: Promise<unknown>, back?: Promise<unknown>) {
+  function climb(afterLine?: Promise<unknown> | null, back?: Promise<unknown>, then?: () => void) {
     if (structure !== "discover" || !wave) return;
-    const step = nextHint(hintState(bs), factBand(wave));
-    if (!step) return;
+    const step = pendingHint();
+    if (!step) return void then?.();
     const wait = [step.afterLine ? afterLine : null, back].filter(Boolean);
-    if (!wait.length) return showHint(step);
+    if (!wait.length) return showHint(step, then);
     const wn = bs.waveNo, missed = bs.attempts;
-    void Promise.all(wait).then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && !bs.lessonOn) showHint(step); });
+    void Promise.all(wait).then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && !bs.lessonOn) showHint(step, then); });
   }
 
   // ---- the director: which wave comes next ----
@@ -347,14 +360,26 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       await say(opts.lines.intro, { queue: true });
       if (guided) voice.hush(); // its caption goes now, so it never sits beside the guide's first line
     } else if (index === 0 && mode !== "academy" && !guided) void say(theme.briefing);
-    // an empty fleet is a strange picture the first time: Nova says what it shows (never the answer)
-    if ((w.a === 0 || w.b === 0) && mode !== "academy" && !guided && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
+    // nothing is drawn or said about the fleet before the first answer (review round, decision 1);
+    // an empty fleet gets its honest line after a miss instead
     // the fleet warps in squad by squad (the first structure cue); the keypad goes live as the last squad lands
     await sched.after(Math.max(0.3, fv.landed - stage.time - 0.15));
     if (disposed || bs.waveNo !== wn) return;
     ready();
-    if (!guided) climb(); // a fact never met: a soft, quick squad scan (not while the guide says "Count the ships.")
     if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });
+  }
+
+  /** Room for a scan's count lanes (left: two figures; top: one line), in world units at the fleet. */
+  let lastPpu = 0;
+  function lanePad(p: { left: number; top: number }) {
+    if (!(lastPpu > 0)) return p;
+    // capped by the fleet's own size: room asked for in px grows as the camera pulls back, so uncapped it
+    // would pull the camera back further every frame on a small phone
+    const h = COUNT_PX / lastPpu;
+    return {
+      left: Math.max(p.left, Math.min(LANE.gap + h * textAspect("00") + 0.1, fv.fw * 0.3)),
+      top: Math.max(p.top, Math.min(LANE.topGap + h + 0.1, fv.fh * 0.15)),
+    };
   }
 
   function ready() {
@@ -503,6 +528,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const over = n > p, value = over ? plan.extra : plan.remaining;
     bus.emit("resolved", { correct: false, n, product: p, attempt: bs.attempts });
     setUi({ outcome: { kind: over ? "over" : "under", value } });
+    kill.clearTicks(); // the volley's squad counts go before the miss is counted in the world
     if (over) misses.over(value);
     else {
       const alive = fv.gather(order), gathered = alive.length > 0 && fv.views.every((v) => v.kind === "fighter");
@@ -522,10 +548,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       return void showMeHow({ auto: true, fallback: route.kind === "safety-net" });
     }
     setUi({ radar: null, invite: route.invite });
-    // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help") : missLine(errorType, over, n, w), { queue: route.mash });
-    const back = sched.after(RESTORE_AT + READY_AFTER);
-    climb(line, back);
+    // one voice at a time (decision 3): the strip says the miss now; a scan, if one is due, starts once the
+    // whole fleet is back (2 s on, so 0.6 s or more after the strip's line); Nova speaks after its label
+    // lands, or not at all when her line would only repeat the strip or the count
+    const id = route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help")
+      : w.a === 0 || w.b === 0 ? (w.a === 0 ? "nova_zero_squads" : "nova_zero_each") : missLine(errorType, over, n, w);
+    const back = sched.after(Math.max(RESTORE_AT + READY_AFTER, SCAN_AFTER_STRIP));
+    const rung = pendingHint();
+    if (route.mash || !rung || rung.showMeHow) climb(say(id, { queue: route.mash }), back); // the calming line waits its turn
+    else climb(null, back, REPEATS_STRIP.has(id) ? undefined : () => { if (wave === w && !bs.lessonOn) void say(id); });
     await sched.after(RESTORE_AT);
     if (wave !== w) return;
     restore();
@@ -553,6 +584,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     root.worldToLocal(p);
     const isLeader = lead.kind === "fighter" && lead.leader;
     if (isLeader) kill.pennant(p.clone().add(new THREE.Vector3(0, 0.5 * fv.scale, 0.2)), fv.scale * 0.78);
+    // the left lane holds one thing at a time: with "7 squads" on show there, the squads are not counted again
+    if (fv.words && fv.axis.squads !== "off") return void (key >= 0 && cue("tick"));
     const h = 20 * unitsPerPx() * fv.scale;
     kill.tick(p.clone().add(new THREE.Vector3(-(lead.size.x / 2 + 0.45) * fv.scale, 0, 0.6)), fmt(count), h);
     if (key >= 0) cue("tick");
@@ -675,14 +708,19 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     kill.update(dt);
     scan.update();
     misses.update();
+    // Show me how: its plates and tags say the squads and the each, so the axis words step back while it
+    // runs (the play area holds the fleet, its plates, the divide, the two tags and the rocket)
+    fv.labels.visible = !bs.lessonOn;
     // the camera frames the fleet (and the labels on show) in the HUD's free area, above the rocket's band
     const m = measure(fv);
     const nv = nova.update(dt, T, m.w, (m.top - FLEET_Y) * 2, bs.lessonOn); // she hovers at the fleet's top edge
     // a ship's cell stays at most ~120 px (less on a short screen), so 1 × 4 does not fill the sky with four giants
     const cellMax = Math.min(120, cam.free.fh * 0.2);
     // the room for the axis words is kept from the first frame (structure "discover" reveals them later)
-    const pad = structure === "discover" ? fv.wordsPad() : fv.visiblePad();
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift);
+    // and, with no words beside the fleet (a phone), the lanes a scan's one number needs (src/battle/lanes.ts)
+    const pad = structure === "discover" ? lanePad(fv.wordsPad()) : fv.visiblePad();
+    // a small band leaves the number on the nose reaching above it: the fleet keeps clear of that number too
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift + (cam.band < 70 ? NOSE_ROOM : 0));
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
@@ -704,6 +742,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (ppuN > 0) charge.update(1 / ppuN, phone ? (cam.band < 100 ? 28 : 30) : 44);
     // axis labels ("7 squads", "8 in each squad") keep at least ~26 px on screen, on a phone too
     const ppu = cam.pxPerUnit();
+    lastPpu = ppu;
     if (ppu > 0) {
       const want = Math.min(2.2, Math.max(AXIS_H, AXIS_PX / ppu));
       if (Math.abs(want - fv.axisH) / fv.axisH > 0.04) fv.axisSize(fv.axisH + (want - fv.axisH) * Math.min(1, dt * 4));
@@ -801,6 +840,56 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         rectBox.expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z));
       }
       return onScreen(rectBox);
+    },
+    /**
+     * Dev (the playfield review, docs/overhaul/playfield.md): every mark drawn round the fleet now, as a
+     * screen rectangle in CSS px (labels, hairlines, scan counts and bracket, miss marks, Power-Up marks,
+     * kill ticks), the fleet, the rocket, one ship's size, and every pair of marks that overlap.
+     */
+    playfield() {
+      type R = { id: string; text: string | null; x: number; y: number; w: number; h: number };
+      const out: R[] = [], box = new THREE.Box3();
+      const visible = (o: THREE.Object3D) => { for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false; return true; };
+      const push = (id: string, o: THREE.Object3D) => {
+        if (!visible(o)) return;
+        const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (m && "opacity" in m && m.opacity < 0.05) return;
+        box.setFromObject(o);
+        const r = onScreen(box);
+        if (r && r.width > 0.5 && r.height > 0.5) out.push({ id, text: (o.userData.text as string) ?? null, x: r.x, y: r.y, w: r.width, h: r.height });
+      };
+      for (const c of fv.labels.children) push(`axis:${c.userData.axis ?? "?"}${c.userData.axisText ? ":label" : ":hairline"}`, c);
+      for (const c of fv.overlay.children) push(c.userData.text ? "overlay:text" : (c as THREE.Line).isLine ? "overlay:dot" : "overlay:bracket", c);
+      for (const c of fv.visuals.children) push(c.userData.text ? "visual:text" : "visual", c);
+      for (const c of root.children) if (c.userData.text) push("world:text", c);
+      const rocket = this.rocketRect();
+      // the fleet's box from every ship in place (an instanced fleet draws its fighters without their groups)
+      box.makeEmpty();
+      for (const v of fv.views) {
+        if (!v.alive) continue;
+        v.g.getWorldPosition(rectAt);
+        const hx = (v.size.x * fv.scale) / 2, hy = (v.size.y * fv.scale) / 2;
+        box.expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z));
+      }
+      const fleet = wave ? onScreen(box) : null;
+      const ship = fv.views.find((v) => v.alive);
+      let shipPx: number | null = null;
+      if (ship) { ship.g.getWorldPosition(rectAt); const hy = (ship.size.y * fv.scale) / 2; const hx = (ship.size.x * fv.scale) / 2; box.makeEmpty().expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z)); shipPx = onScreen(box)?.height ?? null; }
+      const hit: [string, string][] = [];
+      const all = [...out, ...(fleet ? [{ id: "fleet", text: null, x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }] : [])];
+      for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+        const p = all[i], q = all[j];
+        if (p.x < q.x + q.w - 1 && q.x < p.x + p.w - 1 && p.y < q.y + q.h - 1 && q.y < p.y + p.h - 1) {
+          // a scan's bracket and the visual marks are meant to sit on the fleet
+          if ((p.id === "fleet" || q.id === "fleet") && /bracket|visual|dot/.test(p.id + q.id)) continue;
+          // a lesson's tags sit on its own plates by design
+          if (/^visual/.test(p.id) && /^visual/.test(q.id)) continue;
+          // lines crossing lines (a bracket round its fizz dots) are not words colliding
+          if (!p.text && !q.text && p.id !== "fleet" && q.id !== "fleet") continue;
+          hit.push([`${p.id}${p.text ? ` "${p.text}"` : ""}`, `${q.id}${q.text ? ` "${q.text}"` : ""}`]);
+        }
+      }
+      return { time: stage.time, fleet: fleet && { x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }, rocket: rocket && { x: rocket.x, y: rocket.y, w: rocket.width, h: rocket.height }, shipPx, marks: out, overlaps: hit, scan: scan.debug(), hint: ui.hint, words: fv.words, safe: cam.safe, band: cam.band, lift: rocketLift, pad: lanePad(fv.wordsPad()), fw: fv.fw, fh: fv.fh };
     },
     /** The rocket and the number on its nose, as a box on screen in CSS px (the guide keeps its captions off them). */
     rocketRect(): DOMRect | null {

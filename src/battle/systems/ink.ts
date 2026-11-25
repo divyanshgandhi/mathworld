@@ -50,6 +50,7 @@ export function inkText(text: string, o: { color?: string; weight?: string; stre
     texture.needsUpdate = true;
     ink.aspect = w / c.height;
     ink.text = t;
+    mesh.userData.text = t; // the playfield review reads it
     mesh.scale.set(h * ink.aspect, h, 1);
   };
   const ink: InkText = {

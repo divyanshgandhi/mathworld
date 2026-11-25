@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { eachLabelAt, LANE, squadsLabelAt } from "../lanes";
 import { add } from "@/engine/materials";
 import type { Stage } from "@/engine/stage";
 import { ease, type Rng } from "@/engine/util";
@@ -190,8 +191,8 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       left.userData.axisText = top.userData.axisText = true;
       labels.add(left, top);
       const brk = new THREE.MeshBasicMaterial({ color: LOOK.bracket.color, transparent: true, toneMapped: false });
-      add(labels, new THREE.PlaneGeometry(0.035, Math.max(h, 0.6)), brk, -w / 2 - 0.22, FLEET_Y, 0.3, { cast: false }).userData.axis = "squads";
-      add(labels, new THREE.PlaneGeometry(Math.max(w, 0.6), 0.035), brk, 0, FLEET_Y + h / 2 + 0.22, 0.3, { cast: false }).userData.axis = "each";
+      add(labels, new THREE.PlaneGeometry(0.035, Math.max(h, 0.6)), brk, -w / 2 - LANE.line, FLEET_Y, 0.3, { cast: false }).userData.axis = "squads";
+      add(labels, new THREE.PlaneGeometry(Math.max(w, 0.6), 0.035), brk, 0, FLEET_Y + h / 2 + LANE.line, 0.3, { cast: false }).userData.axis = "each";
       fv.axisBox = { w, h, left, top };
       fv.axisSize(fv.axisH);
       fv.showAxis(fv.axis.squads, fv.axis.each);
@@ -207,8 +208,10 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       if (!b) return;
       const k = height / AXIS_H, lw = holoWidth(b.left) * k;
       b.left.userData.k = b.top.userData.k = k;
-      b.left.position.set(-b.w / 2 - 0.35 - lw / 2, FLEET_Y, 0.4);
-      b.top.position.set(0, FLEET_Y + b.h / 2 + 0.3 + height / 2, 0.4);
+      // the lanes (src/battle/lanes.ts): squads left of the fleet, each above it, never on it
+      const L = squadsLabelAt(b.w, lw, height), T = eachLabelAt(b.h, holoWidth(b.top) * k, height);
+      b.left.position.set(L.x, FLEET_Y + L.y, 0.4);
+      b.top.position.set(T.x, FLEET_Y + T.y, 0.4);
       fv.axisPad = { left: Math.max(2.4, 0.35 + lw + 0.3), top: Math.max(1.0, 0.3 + height + 0.25) };
     },
     /** Show, soften or hide each axis label with its bracket (structure "discover"). */

@@ -6,10 +6,12 @@ import type { Band } from "@/rig/adaptive";
  * reveals a little more. With `structure: "labels"` (the default) the labels are always shown and
  * the ladder only decides nothing; Radar, invite and Show Me How still follow `scaffold()`.
  *
- * - Miss 1: the outcome plays, Nova names the mistake, then the squads label shows.
- * - Miss 2: the each label shows and the Power-Up that fits is flagged.
+ * - Nothing before the first answer, for any fleet (review round, decision 1): no first-sight hint.
+ * - Miss 1: the strip says the miss, then the squads are counted one at a time, then the squads label.
+ * - Miss 2: the ships of the first squad are counted, then the each label; the Power-Up that fits is flagged.
  * - Miss 3, or asking: Show Me How.
- * - A fact never met gets the squads label softly at once. A known fact gets nothing unprompted.
+ * - 1 x n: a count that says "1 squad" tells nothing, so miss 1 counts the ships (the each rung).
+ * - 0 x n and n x 0: there is nothing to count, so there is no scan rung (Show Me How still comes).
  */
 export type HintId = "squads" | "each" | "show-me-how";
 export type Reveal = "squads" | "each";
@@ -36,25 +38,33 @@ export const LADDER: readonly Rung[] = [
   { id: "show-me-how", level: 3, misses: 3, reveal: ["squads", "each"], flagPowerUp: true, showMeHow: true, afterLine: false },
 ];
 
+/** `soft` is always false now (the first-sight hint is retired); kept so old readers still compile. */
 export interface HintStep extends Rung { trigger: HintTrigger; soft: boolean }
 
 /**
  * Where the cadet is on the ladder for this fleet. `level`: the highest rung already shown (0: none).
- * `soft`: the first-sight squads label is up (it does not count as a rung, so miss 1 still firms it).
+ * `soft`: unused (the first-sight hint is retired); accepted so old callers still compile.
  */
 export interface HintState { misses: number; level: number; asked: boolean; soft?: boolean }
 
+/** The fleet as the cadet sees it (squads x each), when the shape changes the ladder. */
+export interface HintShape { a: number; b: number }
+
 /**
- * The next rung to show, or null. `tier` is the fact's mastery band (`band()` in src/rig/adaptive.ts):
- * only a fact never met ("unseen") gets a hint before any miss, and it is soft.
+ * The next rung to show, or null. Never before a miss or an ask (decision 1); `tier` is kept for callers
+ * but no longer changes anything. `shape` (optional): 1 x n skips the squads rung, an empty fleet has no
+ * scan rung.
  */
-export function nextHint(s: HintState, tier: Band): HintStep | null {
-  if (s.asked) {
-    const top = LADDER[LADDER.length - 1];
-    return s.level < top.level ? { ...top, trigger: "asked", soft: false } : null;
-  }
-  if (s.misses <= 0) return s.level === 0 && !s.soft && tier === "unseen" ? { ...LADDER[0], trigger: "first-sight", soft: true, afterLine: false } : null;
-  const rung = [...LADDER].reverse().find((r) => r.misses <= s.misses);
+export function nextHint(s: HintState, tier?: Band, shape?: HintShape): HintStep | null {
+  void tier;
+  const top = LADDER[LADDER.length - 1];
+  if (s.asked) return s.level < top.level ? { ...top, trigger: "asked", soft: false } : null;
+  if (s.misses <= 0) return null;
+  const empty = !!shape && (shape.a === 0 || shape.b === 0), single = !!shape && shape.a === 1 && !empty;
+  const ladder: Rung[] = empty ? [top]
+    : single ? [{ ...LADDER[1], misses: 1, reveal: ["each"], flagPowerUp: false }, top]
+    : [...LADDER];
+  const rung = [...ladder].reverse().find((r) => r.misses <= s.misses);
   if (!rung || rung.level <= s.level) return null;
   return { ...rung, trigger: "miss", soft: false };
 }

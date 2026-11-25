@@ -81,6 +81,7 @@ export function createKillFx(stage: Stage, root: THREE.Object3D, rnd: Rng) {
     },
     /** One small count ticks at `at` (root space), `h` world units tall: the squads counted again without a word. */
     tick(at: THREE.Vector3, text: string, h: number) {
+      fx.clearTicks(); // one count on screen at a time: the one before it goes
       const ink = inkText(text, { color: LOOK.scan.ink, weight: "500" });
       ink.height(h);
       ink.mesh.position.copy(at);
@@ -139,6 +140,8 @@ export function createKillFx(stage: Stage, root: THREE.Object3D, rnd: Rng) {
       shards.count = on ? 1 : 0;
       if (on && !shards.instanceColor) shards.setColorAt(0, color.setHex(LOOK.kill.ring));
     },
+    /** The squad counts go (a miss is about to be shown and counted in the world). */
+    clearTicks() { for (const t of ticks) t.ink.dispose(); ticks.length = 0; },
     /** Everything in flight goes (a new fleet, a dispose). */
     clear() {
       for (const s of S) s.live = false;

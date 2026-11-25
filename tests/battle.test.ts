@@ -177,11 +177,26 @@ describe("hint ladder", () => {
     }
   });
 
-  it("a fact never met gets the squads label softly at once; a known fact gets nothing unprompted", () => {
-    const first = nextHint({ misses: 0, level: 0, asked: false }, "unseen");
-    expect(first).toMatchObject({ id: "squads", soft: true, trigger: "first-sight", afterLine: false });
-    for (const tier of ["practicing", "understood", "gold"] as const) expect(nextHint({ misses: 0, level: 0, asked: false }, tier)).toBeNull();
-    expect(nextHint({ misses: 0, level: 0, asked: false, soft: true }, "unseen")).toBeNull();
+  it("nothing before the first answer, for any fleet or fact (decision 1); never soft", () => {
+    for (const tier of ["unseen", "practicing", "understood", "gold"] as const)
+      for (const shape of [undefined, { a: 7, b: 8 }, { a: 1, b: 4 }, { a: 0, b: 10 }, { a: 5, b: 0 }])
+        expect(nextHint({ misses: 0, level: 0, asked: false }, tier, shape)).toBeNull();
+    for (let m = 1; m <= 4; m++) for (let lv = 0; lv <= 2; lv++) expect(nextHint({ misses: m, level: lv, asked: false }, "unseen")?.soft ?? false).toBe(false);
+  });
+
+  it("1 x n skips the squads rung: miss 1 counts the ships; Show Me How still on miss 3", () => {
+    const shape = { a: 1, b: 8 };
+    expect(nextHint({ misses: 1, level: 0, asked: false }, "gold", shape)).toMatchObject({ id: "each", reveal: ["each"], trigger: "miss" });
+    expect(nextHint({ misses: 2, level: 2, asked: false }, "gold", shape)).toBeNull();
+    expect(nextHint({ misses: 3, level: 2, asked: false }, "gold", shape)).toMatchObject({ id: "show-me-how" });
+  });
+
+  it("an empty fleet (0 x n, n x 0) has nothing to count: no scan rung, Show Me How on miss 3", () => {
+    for (const shape of [{ a: 0, b: 10 }, { a: 6, b: 0 }, { a: 0, b: 0 }]) {
+      expect(nextHint({ misses: 1, level: 0, asked: false }, "gold", shape)).toBeNull();
+      expect(nextHint({ misses: 2, level: 0, asked: false }, "gold", shape)).toBeNull();
+      expect(nextHint({ misses: 3, level: 0, asked: false }, "gold", shape)).toMatchObject({ id: "show-me-how" });
+    }
   });
 
   it("climbs one rung per miss and never repeats one", () => {
@@ -190,8 +205,6 @@ describe("hint ladder", () => {
     expect(nextHint({ misses: 2, level: 1, asked: false }, "gold")).toMatchObject({ id: "each", flagPowerUp: true });
     expect(nextHint({ misses: 3, level: 2, asked: false }, "gold")).toMatchObject({ id: "show-me-how", showMeHow: true });
     expect(nextHint({ misses: 5, level: 3, asked: false }, "gold")).toBeNull();
-    // a soft first sight still firms up on miss 1
-    expect(nextHint({ misses: 1, level: 0, asked: false, soft: true }, "unseen")).toMatchObject({ id: "squads", level: 1 });
   });
 
   it("asking Nova jumps straight to Show Me How", () => {
@@ -201,8 +214,7 @@ describe("hint ladder", () => {
 
   it("the reducer records what the ladder revealed", () => {
     let s = aiming(3, 8);
-    s = reduce(s, { type: "hint", step: nextHint(hintState(s), "unseen")! });
-    expect(s.hint).toMatchObject({ level: 0, soft: true, squads: true, each: false });
+    expect(nextHint(hintState(s), "unseen")).toBeNull();
     s = shot(s, 20);
     s = reduce(s, { type: "hint", step: nextHint(hintState(s), "unseen")! });
     expect(s.hint).toMatchObject({ level: 1, squads: true, each: false, powerUp: false });
