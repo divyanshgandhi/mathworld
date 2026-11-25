@@ -16,7 +16,11 @@ const DRILLS = [
 ] as const;
 
 /** If the 3D scene never reports that it settled (no WebGL, a slow device), the words still arrive. */
-const REVEAL_FALLBACK_MS = 6500;
+/**
+ * The words never wait longer than this for the fly-in: Start game, the screen's only action, must be
+ * there within about a second even on a slow device (the fly-in keeps playing behind the words).
+ */
+const REVEAL_FALLBACK_MS = 700;
 
 /**
  * The Title Screen (design/title.html): the Solar System flies in from deep space, then the wordmark, one
@@ -102,7 +106,7 @@ export function TitleScreen() {
             <p className="m-0 mt-7 max-w-[30ch] text-[clamp(18px,1.6vw,22px)] leading-normal motion-reduce:!transition-none" style={{ color: INK[2], ...reveal(shown, 150) }}>
               Answer with your shots. Clear the planets, one times table at a time.
             </p>
-            <div className="mt-11 flex min-[821px]:block" style={reveal(canStart, 350)}>
+            <div className="mt-11 flex min-[821px]:block" style={reveal(canStart, 200)}>
               <Button
                 className="mw-start pointer-events-auto inline-flex h-[76px] w-full cursor-pointer items-center justify-between gap-[22px] border-2 border-transparent pl-[42px] pr-4 text-[19px] uppercase outline-none min-[821px]:w-auto min-[821px]:justify-start"
                 style={{ borderRadius: RADIUS.pill, color: INK[1], fontStretch: "118%", fontWeight: 600, letterSpacing: "0.2em", visibility: canStart ? "visible" : "hidden" }}
