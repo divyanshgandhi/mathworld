@@ -853,7 +853,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         if (r && r.width > 0.5 && r.height > 0.5) out.push({ id, text: (o.userData.text as string) ?? null, x: r.x, y: r.y, w: r.width, h: r.height });
       };
       for (const c of fv.labels.children) push(`axis:${c.userData.axis ?? "?"}${c.userData.axisText ? ":label" : ":hairline"}`, c);
-      for (const c of fv.overlay.children) push(c.userData.text ? "overlay:text" : "overlay:bracket", c);
+      for (const c of fv.overlay.children) push(c.userData.text ? "overlay:text" : (c as THREE.Line).isLine ? "overlay:dot" : "overlay:bracket", c);
       for (const c of fv.visuals.children) push(c.userData.text ? "visual:text" : "visual", c);
       for (const c of root.children) if (c.userData.text) push("world:text", c);
       const rocket = this.rocketRect();
@@ -875,7 +875,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         const p = all[i], q = all[j];
         if (p.x < q.x + q.w - 1 && q.x < p.x + p.w - 1 && p.y < q.y + q.h - 1 && q.y < p.y + p.h - 1) {
           // a scan's bracket and the visual marks are meant to sit on the fleet
-          if ((p.id === "fleet" || q.id === "fleet") && /bracket|visual/.test(p.id + q.id)) continue;
+          if ((p.id === "fleet" || q.id === "fleet") && /bracket|visual|dot/.test(p.id + q.id)) continue;
+          // lines crossing lines (a bracket round its fizz dots) are not words colliding
+          if (!p.text && !q.text && p.id !== "fleet" && q.id !== "fleet") continue;
           hit.push([`${p.id}${p.text ? ` "${p.text}"` : ""}`, `${q.id}${q.text ? ` "${q.text}"` : ""}`]);
         }
       }
