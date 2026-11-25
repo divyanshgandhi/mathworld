@@ -73,6 +73,16 @@ describe("database", () => {
   });
 });
 
+describe("database connection", () => {
+  it("goes without TLS only for a Postgres on this machine", async () => {
+    const { isLocal } = await import("@/db/index");
+    expect(isLocal("postgres://postgres:pw@127.0.0.1:54329/postgres")).toBe(true);
+    expect(isLocal("postgres://postgres:pw@localhost:5432/postgres")).toBe(true);
+    expect(isLocal("postgresql://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres")).toBe(false);
+    expect(isLocal("not a url")).toBe(false);
+  });
+});
+
 describe("event contract", () => {
   it("accepts every documented event type", () => {
     const ok = [

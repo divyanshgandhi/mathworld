@@ -11,7 +11,9 @@ if (!url) {
   process.exit(0);
 }
 
-const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
+// A hosted database is always reached over TLS; only a Postgres on this machine may go without.
+const local = (() => { try { return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(url).hostname); } catch { return false; } })();
+const sql = postgres(url, { max: 1, prepare: false, ssl: local ? false : "require", onnotice: () => {} });
 try {
   await migrate(drizzle(sql), { migrationsFolder: "drizzle" });
   console.log("migrate: database is up to date.");
