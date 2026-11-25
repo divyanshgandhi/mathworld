@@ -131,7 +131,8 @@
 .mwc-question[data-long="2"] { font-size: calc(var(--q, 76px) * 0.6); }
 
 .mwc-dotWords { white-space: nowrap; }
-@media (max-width: 360px) {
+/* on a phone the dots say it alone: "0 won" beside five dots ran under the orb counter at 375 px */
+@media (max-width: 419px) {
   .mwc-dotWords [aria-hidden] { display: none; }
 }
 
