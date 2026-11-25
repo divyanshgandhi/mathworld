@@ -2,6 +2,16 @@
 
 @import "tailwindcss";
 
+/* Saira, the one typeface (see src/design/tokens.ts). The family name "Saira" is a contract: DOM styles and
+   canvas text in the 3D worlds both use it. Canvas text must wait for document.fonts.load('400 16px Saira'). */
+@font-face {
+  font-family: "Saira";
+  src: url("/fonts/saira-var-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 50% 125%;
+  font-display: swap;
+}
+
 :root {
   --background: #0d0e1a;
   --foreground: #f3f1ea;
