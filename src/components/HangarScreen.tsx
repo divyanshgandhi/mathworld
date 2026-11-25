@@ -223,7 +223,7 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
         return (
           <div className="flex flex-col gap-1" role="status">
             <p className="flex items-center gap-2 type-name text-[20px] text-approach"><Icon name="check" size={20} />{just ? `${selected.name} is on your rocket` : "On your rocket now"}</p>
-            <p className="type-child text-ink-2">
+            <p className="type-child text-ink-2 [@media(max-height:440px)]:hidden">
               {goalLine()}
             </p>
           </div>

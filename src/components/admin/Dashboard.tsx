@@ -65,7 +65,7 @@ export function PlayerTable({ cadets, linkFor, selected }: { cadets: Cadet[]; li
     <div className={`${glass} overflow-x-auto`}>
       <table className="w-full min-w-[860px] text-sm">
         <thead className="border-b border-line-1"><tr>
-          {["Cadet", "Joined", "Last played", "Events", "Planet", "Transfer checks", "First try: before → after a lesson", "Day 2"].map((h) => <th key={h} scope="col" className={th}>{h}</th>)}
+          {["Cadet", "Joined", "Last played", "Events", "Planet", "Orbs", "Transfer checks", "First try: before → after a lesson", "Day 2"].map((h) => <th key={h} scope="col" className={th}>{h}</th>)}
         </tr></thead>
         <tbody>
           {cadets.map(({ player, times, s, report, day2 }) => (
@@ -75,12 +75,13 @@ export function PlayerTable({ cadets, linkFor, selected }: { cadets: Cadet[]; li
               <td className={`${td} text-ink-2`}>{times.length ? when(Math.max(...times)) : "—"}</td>
               <td className={`${td} tabular-nums`}>{times.length}</td>
               <td className={td}>{s.introCompleted ? PLANET_NAMES[PLANETS_BY_TIER[s.tier]] : "intro"}</td>
+              <td className={`${td} tabular-nums`}>{s.orbs}</td>
               <td className={td}><RateCell r={report.checks} /></td>
               <td className={td}><RateCell r={report.before} /> → <RateCell r={report.after} /></td>
               <td className={td}><Day2 d={day2} /></td>
             </tr>
           ))}
-          {!cadets.length && <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-3`}>No cadets yet.</td></tr>}
+          {!cadets.length && <tr><td colSpan={9} className={`${td} py-6 text-center text-ink-3`}>No cadets yet.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -100,7 +101,7 @@ export function CadetDetail({ cadet, now }: { cadet: Cadet; now: number }) {
       </div>
       <Tabs defaultValue="mastery">
         <TabsList aria-label="Cadet views" className="mb-4 inline-flex gap-1 rounded-xl bg-black/35 p-1">
-          {[["mastery", "Fact mastery"], ["transfer", "Transfer rate"], ["timeline", "Event timeline"]].map(([v, l]) => (
+          {[["mastery", "Fact mastery"], ["transfer", "Transfer rate"], ["orbs", "Orbs"], ["timeline", "Event timeline"]].map(([v, l]) => (
             <TabsTab key={v} value={v} className="rounded-pill px-3 py-1.5 text-sm font-semibold text-ink-2 outline-none data-selected:bg-raised data-selected:text-approach data-selected:ring-1 data-selected:ring-approach">{l}</TabsTab>
           ))}
         </TabsList>
@@ -138,6 +139,10 @@ export function CadetDetail({ cadet, now }: { cadet: Cadet; now: number }) {
           <ul className="text-sm text-ink-2">{runs.map((r) => <li key={r.start}>{when(r.start)} · {mins(r.end - r.start)} · {r.events} events</li>)}</ul>
         </TabsPanel>
 
+        <TabsPanel value="orbs">
+          <OrbLedger s={s} log={log} />
+        </TabsPanel>
+
         <TabsPanel value="timeline">
           <p className="mb-2 font-code text-xs tracking-[0.2em] text-ink-3">NEWEST FIRST · {log.length} EVENTS{log.length > 300 ? " · LAST 300 SHOWN" : ""}</p>
           <ol className="max-h-[60vh] space-y-0.5 overflow-y-auto pr-2 font-code text-xs">
@@ -149,6 +154,46 @@ export function CadetDetail({ cadet, now }: { cadet: Cadet; now: number }) {
         </TabsPanel>
       </Tabs>
     </section>
+  );
+}
+
+/**
+ * The orb ledger: every orb worked out from the log (decision 4), newest first, with what the client
+ * claimed beside it. A gap between the two is expected: clients may still send their own amounts,
+ * and the fold never reads them.
+ */
+export function OrbLedger({ s, log }: { s: PlayerState; log: LoggedEvent[] }) {
+  const earned = s.ledger.filter((e) => e.amount > 0).reduce((t, e) => t + e.amount, 0);
+  const spent = -s.ledger.filter((e) => e.amount < 0).reduce((t, e) => t + e.amount, 0);
+  const claimed = log.reduce((t, e) => t + (e.type === "orb_earned" ? e.payload.amount : 0), 0);
+  const byReason = new Map<string, { n: number; total: number }>();
+  for (const e of s.ledger) {
+    const key = e.rule === "spent" ? "Spent" : e.reason, r = byReason.get(key) ?? { n: 0, total: 0 };
+    byReason.set(key, { n: r.n + 1, total: r.total + e.amount });
+  }
+  return (
+    <div className="flex flex-wrap gap-8">
+      <div className="min-w-[260px]">
+        <p className="mb-3 text-sm text-ink-2">
+          <b className="text-approach">{s.orbs}</b> orbs now · {earned} earned · {spent} spent · the client claimed {claimed} (not counted)
+          {s.patrol.done ? ` · ${s.patrol.done} daily patrol${s.patrol.done > 1 ? "s" : ""}` : ""}
+        </p>
+        <table className="text-sm">
+          <thead><tr>{["Reason", "Lines", "Orbs"].map((h) => <th key={h} scope="col" className={th}>{h}</th>)}</tr></thead>
+          <tbody>{[...byReason].map(([r, v]) => <tr key={r}><td className={td}>{r}</td><td className={`${td} tabular-nums`}>{v.n}</td><td className={`${td} tabular-nums`}>{v.total}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <ol className="max-h-[60vh] min-w-[320px] flex-1 space-y-0.5 overflow-y-auto pr-2 font-code text-xs" aria-label="Orb ledger, newest first">
+        {[...s.ledger].reverse().map((e, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="w-16 shrink-0 text-ink-3">{e.at ? clock(e.at) : "—"}</span>
+            <span className={`w-12 shrink-0 text-right tabular-nums ${e.amount < 0 ? "text-ember" : "text-gold"}`}>{e.amount > 0 ? `+${e.amount}` : e.amount}</span>
+            <span className="text-ink-2">{e.reason}{e.fact ? ` · ${e.fact.replace("x", " × ")}` : ""}</span>
+          </li>
+        ))}
+        {!s.ledger.length && <li className="text-ink-3">No orbs yet.</li>}
+      </ol>
+    </div>
   );
 }
 
