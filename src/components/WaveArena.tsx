@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushed, history, onSaveState, post, saveState } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
 import type { PlanetId } from "@/rig/pools";
@@ -13,6 +13,7 @@ import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
 import { css } from "./battle/cockpit";
 import { PillLink, Sheet } from "@/components/kit";
 import { FirstShotGuide } from "@/components/teach/FirstShotGuide";
+import { ScreenTour } from "@/components/teach";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -76,6 +77,11 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     return () => { gone = true; cleanup(); };
   }, [cadet, planet, dev, force?.a, force?.b]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the battle tour: once, at the start of wave 2 of the cadet's first planet battle (no planet cleared yet),
+  // before any answer; it holds the game while it shows, so wave 2 waits for it
+  const firstBattle = useMemo(() => !!log && fold(log).cleared.length === 0, [log]);
+  const tourMoment = firstBattle && ui?.mode === "campaign" && ui.wave?.index === 1 && !ui.outcome && !ui.lesson && !ui.done;
+
   const fly = async (to: PlanetId) => { await flushed(); router.push(`/play/${to}${dev ? "?dev" : ""}`); };
 
   return (
@@ -99,6 +105,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />} />
       {/* a player whose very first shot is here (a refresh, a drill): the guided first shot, once ever */}
       {arena && <FirstShotGuide ui={ui} bus={arena.bus} fleetRect={arena.fleetRect} rocketRect={arena.rocketRect} />}
+      {arena && <ScreenTour id="battle" hold when={tourMoment} />}
     </div>
   );
 }

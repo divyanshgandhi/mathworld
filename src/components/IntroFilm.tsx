@@ -261,7 +261,7 @@ export function IntroFilm() {
 
       {phase === "bay" && bayArena && <FirstShotGuide ui={bayUi} bus={bayArena.bus} fleetRect={bayArena.fleetRect} rocketRect={bayArena.rocketRect} />}
       {phase === "bay" && (
-        <BattleHud arena={bayArena} ui={bayUi} drone launch={false} menu={<PauseMenu places={false} />}
+        <BattleHud arena={bayArena} ui={bayUi} drone launch={false} menu={<PauseMenu places={false} leave={{ label: "Leave for now", href: "/" }} />}
           doneActions={(d) => (
             <>
               {/* the same order as every later clear: fly on is the one primary; home is the second way */}

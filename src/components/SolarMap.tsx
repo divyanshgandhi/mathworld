@@ -7,7 +7,7 @@ import type { PlayerState } from "@/director/fold";
 import { HomeLink, Icon, IconButton, masterySummary, PillLink, Pips, RocketGlyph, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
 import { FieldManual } from "./teach/FieldManual";
-import { Greeting } from "./teach/Greeting";
+import { ScreenTour } from "./teach/Tour";
 import { buttonOf, cardLine, chipOf, hyperJump, journey, openingPage, stopMarks, type JourneyStop } from "./world/journey";
 import { ARROW, DOTS_H, mapLayout, type MapLayout } from "./world/mapLayout";
 import { PlanetSprite } from "./world/PlanetSprite";
@@ -215,7 +215,7 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
           </>
         )}
       </main>
-      <Greeting screen="map" edge="top" seen={{ seen: state.seen, emit }} />
+      <ScreenTour id="map" seen={{ seen: state.seen, emit }} />
       <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/map" />
     </div>
   );
