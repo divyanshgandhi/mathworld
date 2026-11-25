@@ -23,7 +23,7 @@ function Panel({ id, mount, style, label }: { id: string; mount: Mount; style: C
     return () => { gone = true; cleanup(); };
   }, [id, mount]);
   return (
-    <figure style={{ margin: 0 }}>
+    <figure style={{ margin: 0, minWidth: 0 }}>
       <div ref={box} data-panel={id} style={{ position: "relative", overflow: "hidden", borderRadius: RADIUS.panel, border: `1px solid ${LINE[1]}`, ...style }} />
       <figcaption style={{ marginTop: 10, fontSize: TYPE.min.body, color: INK[2] }}>{label}</figcaption>
     </figure>
@@ -32,7 +32,7 @@ function Panel({ id, mount, style, label }: { id: string; mount: Mount; style: C
 
 const fleet = (a: number, b: number, safe: Safe): Mount => (stage, r) => r.mountFleet(stage, a, b, safe);
 const DESK: CSSProperties = { width: "min(100%, 960px)", aspectRatio: "1440 / 900" };
-const PHONE: CSSProperties = { width: 375, height: 740, maxWidth: "100%" };
+const PHONE: CSSProperties = { width: "min(375px, calc(100vw - 32px))", height: 740 };
 // stable mounts, so the panels never remount on a re-render
 const M = {
   lineup: ((stage, r) => r.mountLineup(stage)) as Mount,
@@ -47,7 +47,7 @@ export function ShipsReview() {
     <main style={{ minHeight: "100vh", background: COLOR.void, color: INK[1], fontFamily: `${TYPE.family}, sans-serif`, padding: "32px clamp(16px, 4vw, 56px) 64px" }}>
       <h1 style={{ margin: 0, fontWeight: TYPE.display.weight, fontStretch: `${TYPE.display.stretch}%`, letterSpacing: TYPE.display.tracking, textTransform: "uppercase", fontSize: "clamp(32px, 5vw, 56px)" }}>Ships</h1>
       <p style={{ margin: "12px 0 0", fontSize: 18, color: INK[2], maxWidth: "60ch" }}>
-        Every ship on the void at battle scale, then fleets laid out exactly as a battle lays them out. Squads alternate ember and amber; each squad&apos;s first ship is its leader, with a gold pennant.
+        Every ship on the void at battle scale, then fleets laid out exactly as a battle lays them out. Squads alternate ember and apricot; each squad&apos;s first ship is its leader, with a gold pennant.
       </p>
 
       <h2 style={h2}>Every ship</h2>
@@ -60,7 +60,7 @@ export function ShipsReview() {
       </div>
 
       <h2 style={h2}>Desktop, 1440 × 900</h2>
-      <div style={{ display: "grid", gap: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 32 }}>
         <Panel id="d68" mount={M.d68} style={DESK} label="6 × 8" />
         <Panel id="d310" mount={M.d310} style={DESK} label="3 × 10" />
       </div>

@@ -98,8 +98,8 @@ export function mountFleet(stage: Stage, a: number, b: number, safe: Safe) {
 
 /** The rows of the line-up, top to bottom, for the page's legend. */
 export const LINEUP = [
-  "Rocket (battle size, upright) · drone, ember · drone, amber · leader, ember · leader, amber · cheap fighter · cheap leader · ghost fighter",
-  "10 pod · 10 pod, 4 popped · 10 pod leader, amber · 10 pod stood up",
+  "Rocket (battle size, upright) · drone, ember · drone, apricot · leader, ember · leader, apricot · cheap fighter · cheap leader · ghost fighter",
+  "10 pod · 10 pod, 4 popped · 10 pod leader, apricot · 10 pod stood up",
   "100 carrier · 100 carrier, 37 popped · 1K flagship · 1K flagship, 4 tenths gone",
   `Plasma balls: ${Object.keys(BLASTERS).join(" · ")} (at fighter size)`,
 ];
@@ -117,12 +117,12 @@ export function mountLineup(stage: Stage) {
   const ghost = makeGhost();
   ghost.scale.setScalar(FIGHTER);
   row(6.2, [
-    rocket.group, fighter(makeInvader(M)), fighter(makeInvader(M, { tone: "amber" })), fighter(makeInvader(M, { leader: true })),
-    fighter(makeInvader(M, { tone: "amber", leader: true })), fighter(makeFighterLite(M)), fighter(makeFighterLite(M, { tone: "amber", leader: true })), ghost,
+    rocket.group, fighter(makeInvader(M)), fighter(makeInvader(M, { tone: "apricot" })), fighter(makeInvader(M, { leader: true })),
+    fighter(makeInvader(M, { tone: "apricot", leader: true })), fighter(makeFighterLite(M)), fighter(makeFighterLite(M, { tone: "apricot", leader: true })), ghost,
   ], 1.45);
   const popped = makeTenSquadPod(M, "h");
   popped.micro.forEach((m, i) => { m.visible = i >= 4; });
-  row(3.4, [makeTenSquadPod(M, "h").group, popped.group, makeTenSquadPod(M, "h", { tone: "amber", leader: true }).group, makeTenSquadPod(M, "v").group], 2.9);
+  row(3.4, [makeTenSquadPod(M, "h").group, popped.group, makeTenSquadPod(M, "h", { tone: "apricot", leader: true }).group, makeTenSquadPod(M, "v").group], 2.9);
   const carrier = makeCarrier(M, "h");
   carrier.popped(37);
   const hurt = makeDreadnought(M, "1K", "h");
