@@ -62,10 +62,12 @@ export function makeHand(M: Materials, skinColor: number, sleeveColor: number) {
   thumb.add(t1);
   add(t1, seg(0.0102, 0.018), skin, 0, 0.009, 0, nc);
 
-  // wrist, then the sleeve with its cuff, running down and out of frame
+  // wrist, then the sleeve with its cuff, running down and out of frame. The sleeve's two materials are the
+  // hand's own, so the cadet's colour can change without touching anyone else's clothes
+  const sleeve = new THREE.MeshStandardMaterial({ color: sleeveColor, roughness: 0.9 }), cuff = new THREE.MeshStandardMaterial({ color: mix(sleeveColor, COLOR.void, 0.22), roughness: 0.9 });
   add(g, new THREE.CylinderGeometry(0.023, 0.022, 0.05, 24), skin, 0, -0.052, 0, nc).scale.set(1.2, 1, 0.72);
-  add(g, new THREE.CylinderGeometry(0.038, 0.046, 0.3, 28), M.clay(sleeveColor, { roughness: 0.9 }), 0, -0.225, -0.002, nc).scale.set(1.1, 1, 0.88);
-  add(g, new THREE.CylinderGeometry(0.037, 0.037, 0.032, 28), M.clay(mix(sleeveColor, COLOR.void, 0.22), { roughness: 0.9 }), 0, -0.084, -0.002, nc).scale.set(1.12, 1, 0.9);
+  add(g, new THREE.CylinderGeometry(0.038, 0.046, 0.3, 28), sleeve, 0, -0.225, -0.002, nc).scale.set(1.1, 1, 0.88);
+  add(g, new THREE.CylinderGeometry(0.037, 0.037, 0.032, 28), cuff, 0, -0.084, -0.002, nc).scale.set(1.12, 1, 0.9);
 
   /** 0 = relaxed, slightly bent; 1 = loosely curled, as when covering a yawn. */
   const curl = (k: number) => {
@@ -73,5 +75,9 @@ export function makeHand(M: Materials, skinColor: number, sleeveColor: number) {
     t1.rotation.x = 0.2 + k * 0.3;
   };
   curl(0);
-  return { group: g, curl };
+  return {
+    group: g, curl,
+    /** The hoodie sleeve takes the colour the cadet picked. */
+    setSleeve(c: number) { sleeve.color.setHex(c); cuff.color.setHex(mix(c, COLOR.void, 0.22)); },
+  };
 }

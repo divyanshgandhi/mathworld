@@ -3,7 +3,7 @@ import { COLOR, TYPE, hex } from "@/design/tokens";
 import { add, canvasTexture, type Materials } from "@/engine/materials";
 import { clamp, type Rng } from "@/engine/util";
 import { LOOKS, type Look } from "@/worlds/looks";
-import { mix } from "./cast";
+import { contactShadow, mix, PLAIN, WARM } from "./cast";
 
 /** Desk positions: 3 rows of 3, the board at z = -5. The player sits in the middle (index 4). */
 export const SEATS: [number, number][] = [-1.6, 0.6, 2.8].flatMap((z) => [-2.6, 0, 2.6].map((x) => [x, z] as [number, number]));
@@ -14,19 +14,27 @@ export const SEAT_HEIGHT = 0.32, DESK_HEIGHT = 0.58, DESK_DEPTH = 0.55, CHAIR_BA
 const ROOM = { x: 6, z: 5, h: 3.5, t: 0.2 };
 const DOOR = { z0: -4.15, z1: -2.95, top: 2.3, hingeZ: -4.13, leaf: 1.15 };
 const WINDOWS = { z: [-2.4, 0.2, 2.8], w: 1.9, sill: 1.0, head: 3.0 };
+/** Where the writing sits on the board: right of centre, clear of where the teacher stands. `px` is on the 1024 px canvas; the rest are metres in the room. */
+export const BOARD_TEXT = { px: 566, x: (566 / 1024 - 0.5) * 5.7, y: 1.95 + (0.5 - 172 / 320) * 1.68, half: (560 / 1024) * 5.7 / 2, z: -4.93 };
 /** The middle of the doorway at head height: where the class looks when someone knocks. */
 export const DOOR_POINT = new THREE.Vector3(ROOM.x, 1.3, (DOOR.z0 + DOOR.z1) / 2);
 /** Morning sun through the windows: low, raking across the desks toward the board. */
-const SUN_DIR = new THREE.Vector3(1, -0.345, -0.38).normalize();
+const SUN_DIR = new THREE.Vector3(1, -0.26, -0.2).normalize(); // across the room, not onto the board: the writing stays in even light
+
+/** A token colour at an opacity, for canvas drawing. */
+const ink = (c: string, a: number) => `rgba(${parseInt(c.slice(1, 3), 16)},${parseInt(c.slice(3, 5), 16)},${parseInt(c.slice(5, 7), 16)},${a})`;
+const css = (c: number) => `#${new THREE.Color(c).getHexString()}`;
 
 /**
- * The materials of the set. Wood, plaster and paper have no role in the UI tokens, so their
- * colours are declared once here; everything with a role (board, chairs, posters, the door) is
- * mixed from the tokens.
+ * The materials of the set. Wood, plaster and paper have no role in the UI tokens, so each is mixed
+ * once here from the tokens: `WARM` (ember and gold) is the root of every wood, and plaster and paper
+ * are the pale ink warmed by the gold of the morning.
  */
 const SET = {
-  plaster: 0xcfc4b0, ceiling: 0xc9c5bc, floor: 0x8b6a4c, floorLine: "rgba(40,26,14,.4)", wood: 0x9c7752, desk: 0xc4a47e,
-  paper: 0xe9e4d8, steel: 0x5d6270, hall: "#c9a57c", hallLow: "#8d6f52", skyHigh: "#9cc0e8", skyLow: "#ffe0ae",
+  plaster: mix(mix(COLOR.approach, COLOR.gold, 0.24), COLOR.horizon, 0.08), ceiling: mix(COLOR.approach, COLOR.gold, 0.14), floor: mix(WARM, COLOR.shadow, 0.42),
+  wood: mix(WARM, COLOR.horizon, 0.48), desk: mix(mix(WARM, COLOR.approach, 0.55), COLOR.horizon, 0.12), paper: mix(COLOR.approach, COLOR.gold, 0.1),
+  steel: mix(COLOR.horizon, COLOR.sky, 0.25), hall: mix(mix(COLOR.gold, COLOR.approach, 0.4), COLOR.horizon, 0.18), hallLow: mix(WARM, COLOR.horizon, 0.55),
+  skyHigh: mix(COLOR.sky, COLOR.approach, 0.25), skyLow: mix(COLOR.gold, COLOR.approach, 0.55),
 };
 
 /**
@@ -51,13 +59,13 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   for (let i = 0; i < 8; i++) {
     plank.ctx.fillStyle = `#${new THREE.Color(SET.floor).offsetHSL(0, 0, ((i * 37) % 5) * 0.012 - 0.024).getHexString()}`;
     plank.ctx.fillRect(0, i * 32, 256, 32);
-    plank.ctx.fillStyle = SET.floorLine;
+    plank.ctx.fillStyle = ink(COLOR.void, 0.32);
     plank.ctx.fillRect(0, i * 32, 256, 2);
     plank.ctx.fillRect(((i * 97) % 200) + 20, i * 32, 2, 32);
   }
   plank.texture.wrapS = plank.texture.wrapT = THREE.RepeatWrapping;
   plank.texture.repeat.set(3, 3);
-  add(room, new THREE.PlaneGeometry(RX * 2, RZ * 2), M.clay(0xffffff, { map: plank.texture, roughness: 0.85 }), 0, 0, 0, noCast).rotation.x = -Math.PI / 2;
+  add(room, new THREE.PlaneGeometry(RX * 2, RZ * 2), M.clay(PLAIN, { map: plank.texture, roughness: 0.85 }), 0, 0, 0, noCast).rotation.x = -Math.PI / 2;
 
   // walls: the side walls are single meshes with real openings, and every wall runs a little into
   // its neighbours, so there is no seam for light to leak through
@@ -80,7 +88,14 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   add(room, wallWithOpenings([[-zEnd, lo], [DOOR.z0, lo], [DOOR.z0, DOOR.top], [DOOR.z1, DOOR.top], [DOOR.z1, lo], [zEnd, lo], [zEnd, hi], [-zEnd, hi]], []), plaster, RX + WT, 0, 0);
   box(room, [-RX - WT, RX + WT], [lo, hi], [-RZ - WT, -RZ], plaster);
   box(room, [-RX - WT, RX + WT], [lo, hi], [RZ, RZ + WT], plaster);
-  box(room, [-RX - 0.4, RX + 0.4], [RH, RH + 0.2], [-RZ - 0.4, RZ + 0.4], M.clay(SET.ceiling, { roughness: 0.95 }));
+  // the ceiling: pale plaster carrying the light the sunlit floor throws back up (a matte lift, far under any
+  // bloom), a cornice, and two beams that run to the board, so the room's lines lead to the lesson
+  const lifted = (c: number, k: number) => M.clay(c, { roughness: 0.95, emissive: mix(c, COLOR.gold, 0.18), emissiveIntensity: k });
+  box(room, [-RX - 0.4, RX + 0.4], [RH, RH + 0.2], [-RZ - 0.4, RZ + 0.4], lifted(SET.ceiling, 0.5));
+  for (const x of [-2.3, 2.3]) box(room, [x - 0.11, x + 0.11], [RH - 0.17, RH + 0.01], [-RZ, RZ], lifted(mix(SET.ceiling, SET.wood, 0.3), 0.3), noCast);
+  box(room, [-RX, RX], [RH - 0.09, RH + 0.01], [-RZ, -RZ + 0.07], lifted(SET.ceiling, 0.35), noCast);
+  box(room, [-RX, RX], [RH - 0.09, RH + 0.01], [RZ - 0.07, RZ], lifted(SET.ceiling, 0.35), noCast);
+  for (const sx of [-1, 1]) box(room, sx < 0 ? [-RX, -RX + 0.07] : [RX - 0.07, RX], [RH - 0.09, RH + 0.01], [-RZ, RZ], lifted(SET.ceiling, 0.35), noCast);
   // skirting on the front and back walls
   for (const s of [-1, 1]) box(room, [-RX, RX], [0, 0.12], s < 0 ? [-RZ, -RZ + 0.03] : [RZ - 0.03, RZ], wood);
 
@@ -88,7 +103,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   const sky = canvasTexture(8, 256);
   {
     const g = sky.ctx.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, SET.skyHigh); g.addColorStop(0.75, SET.skyLow); g.addColorStop(1, SET.skyLow);
+    g.addColorStop(0, css(SET.skyHigh)); g.addColorStop(0.75, css(SET.skyLow)); g.addColorStop(1, css(SET.skyLow));
     sky.ctx.fillStyle = g; sky.ctx.fillRect(0, 0, 8, 256);
     sky.texture.needsUpdate = true;
   }
@@ -138,15 +153,15 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   const hallTex = canvasTexture(256, 256);
   {
     const x = hallTex.ctx, g = x.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, SET.hall); g.addColorStop(0.58, SET.hall); g.addColorStop(0.6, SET.hallLow); g.addColorStop(1, SET.hallLow);
+    g.addColorStop(0, css(SET.hall)); g.addColorStop(0.58, css(SET.hall)); g.addColorStop(0.6, css(SET.hallLow)); g.addColorStop(1, css(SET.hallLow));
     x.fillStyle = g; x.fillRect(0, 0, 256, 256);
     const v = x.createRadialGradient(128, 70, 30, 128, 128, 200);
-    v.addColorStop(0, "rgba(255,240,215,.28)"); v.addColorStop(1, "rgba(20,12,6,.38)");
+    v.addColorStop(0, ink(COLOR.gold, 0.2)); v.addColorStop(1, ink(COLOR.void, 0.38));
     x.fillStyle = v; x.fillRect(0, 0, 256, 256);
     hallTex.texture.needsUpdate = true;
   }
   const hallWall = new THREE.MeshBasicMaterial({ map: hallTex.texture }), hallFlat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SET.hallLow).multiplyScalar(0.7) });
-  const hallFloor = M.clay(new THREE.Color(SET.hallLow).getHex(), { roughness: 0.9 });
+  const hallFloor = M.clay(SET.hallLow, { roughness: 0.9 });
   const HX = RX + WT + 2.6, hallZ: [number, number] = [-RZ - 1.6, -1.2], hallH = 2.9;
   add(room, new THREE.PlaneGeometry(hallZ[1] - hallZ[0], hallH), hallWall, HX, hallH / 2, (hallZ[0] + hallZ[1]) / 2, off).rotation.y = -Math.PI / 2;
   for (const z of hallZ) add(room, new THREE.PlaneGeometry(HX - RX - WT, hallH), hallFlat, (HX + RX + WT) / 2, hallH / 2, z, off).rotation.y = z < -3 ? 0 : Math.PI;
@@ -161,7 +176,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     x.fillStyle = COLOR.shadow;
     x.fillRect(0, 0, 1024, 320);
     for (let i = 0; i < 26; i++) {
-      x.fillStyle = `rgba(230,241,255,${0.012 + ((i * 53) % 7) * 0.004})`;
+      x.fillStyle = ink(COLOR.approach, 0.012 + ((i * 53) % 7) * 0.004);
       x.beginPath();
       x.ellipse((i * 211) % 1024, (i * 97) % 320, 60 + ((i * 31) % 110), 14 + ((i * 17) % 26), (i * 0.7) % 3, 0, 7);
       x.fill();
@@ -170,48 +185,108 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     x.textAlign = "center"; x.textBaseline = "middle";
     let px = 128;
     do { x.font = `300 ${px}px "${TYPE.family}", sans-serif`; px -= 4; } while (x.measureText(written).width > 560 && px > 40);
-    x.fillText(written, 512, 172);
+    x.fillText(written, BOARD_TEXT.px, 172);
     x.font = `500 30px "${TYPE.family}", sans-serif`;
     x.textAlign = "left";
-    x.fillStyle = "rgba(230,241,255,.6)";
+    x.fillStyle = ink(COLOR.approach, 0.6);
     x.fillText("Tuesday", 40, 46);
     board.texture.needsUpdate = true;
   };
   const write = (s: string) => { written = s; paint(); };
   if (typeof document !== "undefined") void document.fonts.load(`400 16px ${TYPE.family}`).then(() => { paint(); paintPosters(); });
   box(room, [-2.95, 2.95], [1.02, 2.88], [-RZ, -RZ + 0.06], wood);
-  add(room, new THREE.PlaneGeometry(5.7, 1.68), M.clay(0xffffff, { map: board.texture, roughness: 0.95 }), 0, 1.95, -RZ + 0.066, noCast);
+  add(room, new THREE.PlaneGeometry(5.7, 1.68), M.clay(PLAIN, { map: board.texture, roughness: 0.95 }), 0, 1.95, -RZ + 0.066, noCast);
   box(room, [-2.7, 2.7], [0.96, 1.0], [-RZ, -RZ + 0.14], wood);
   box(room, [-0.9, -0.74], [1.0, 1.035], [-RZ + 0.05, -RZ + 0.11], M.clay(hex(COLOR.approach), { roughness: 0.9 }));
 
-  // posters: the solar system foreshadows the adventure; the four signs name today's lesson
-  const poster = canvasTexture(256, 320), ops = canvasTexture(256, 256);
+  // the walls teach: the solar system (where this story is going), the four signs (today's lesson is one of
+  // them), a number line over the board, and on the door wall rows of dots and a hundred square
+  const poster = canvasTexture(512, 640), ops = canvasTexture(256, 256), line = canvasTexture(2048, 128), rows = canvasTexture(384, 448), hundred = canvasTexture(512, 512);
+  const face = (px: number, w = 400) => `${w} ${px}px "${TYPE.family}", sans-serif`;
   const paintPosters = () => {
     let x = poster.ctx;
-    x.fillStyle = COLOR.void; x.fillRect(0, 0, 256, 320);
-    x.strokeStyle = "rgba(230,241,255,.3)"; x.lineWidth = 1.2; x.setLineDash([3, 5]);
-    for (const r of [52, 84, 118, 156, 196]) { x.beginPath(); x.arc(20, 190, r, -1.2, 1.2); x.stroke(); }
+    x.fillStyle = COLOR.void; x.fillRect(0, 0, 512, 640);
+    // the Sun low on the left and the planets strung out along their dashed orbits, as on the title screen
+    const cx = -40, cy = 400, orbit = [96, 150, 204, 262, 350, 432, 500, 560];
+    x.strokeStyle = ink(COLOR.approach, 0.3); x.lineWidth = 1.6; x.setLineDash([4, 9]);
+    for (const r of orbit) { x.beginPath(); x.arc(cx, cy, r, -1.3, 1.1); x.stroke(); }
     x.setLineDash([]);
-    x.fillStyle = COLOR.gold; x.beginPath(); x.arc(20, 190, 30, 0, 7); x.fill();
-    for (const [c, r, a, s] of [[COLOR.approach, 52, -0.5, 5], [COLOR.sky, 84, 0.3, 8], [COLOR.disk, 118, -0.2, 9], [COLOR.ember, 156, 0.55, 7], [COLOR.gold, 196, -0.1, 15]] as const) {
-      x.fillStyle = c; x.beginPath(); x.arc(20 + Math.cos(a) * r, 190 + Math.sin(a) * r, s, 0, 7); x.fill();
-    }
+    x.fillStyle = COLOR.gold; x.beginPath(); x.arc(cx, cy, 78, 0, 7); x.fill();
+    const worlds: [string, number, number][] = [[COLOR.approach, -0.5, 6], [COLOR.gold, 0.32, 9], [COLOR.sky, -0.16, 11], [COLOR.ember, 0.5, 8], [COLOR.gold, -0.3, 24], [COLOR.approach, 0.2, 19], [COLOR.sky, -0.52, 14], [COLOR.disk, 0.02, 13]];
+    worlds.forEach(([c, a, r], i) => {
+      const px = cx + Math.cos(a) * orbit[i], py = cy + Math.sin(a) * orbit[i];
+      x.fillStyle = c; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+      if (i === 5) { x.strokeStyle = ink(COLOR.approach, 0.7); x.lineWidth = 2; x.beginPath(); x.ellipse(px, py, r * 1.9, r * 0.5, -0.3, 0, 7); x.stroke(); }
+      if (i === 2) { x.strokeStyle = COLOR.gold; x.lineWidth = 2; x.beginPath(); x.arc(px, py, r + 7, 0, 7); x.stroke(); } // home, ringed in gold
+    });
     x.fillStyle = COLOR.approach; x.textAlign = "center"; x.textBaseline = "middle";
-    x.font = `300 25px "${TYPE.family}", sans-serif`;
-    x.fillText("OUR SOLAR SYSTEM", 128, 44);
+    x.font = face(40, 300);
+    if ("letterSpacing" in x) (x as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "5px";
+    x.fillText("OUR SOLAR SYSTEM", 258, 76);
     poster.texture.needsUpdate = true;
+
     x = ops.ctx;
     x.fillStyle = COLOR.panel; x.fillRect(0, 0, 256, 256);
-    for (const [s, c, px, py] of [["+", COLOR.sky, 68, 70], ["−", COLOR.approach, 188, 70], ["×", COLOR.gold, 68, 186], ["÷", COLOR.ember, 188, 186]] as const) {
-      x.fillStyle = c; x.font = `300 120px "${TYPE.family}", sans-serif`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(s, px, py);
+    for (const [s, c, px, py] of [["+", COLOR.sky, 68, 70], ["\u2212", COLOR.approach, 188, 70], ["\u00d7", COLOR.gold, 68, 186], ["\u00f7", COLOR.ember, 188, 186]] as const) {
+      x.fillStyle = c; x.font = face(120, 300); x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(s, px, py);
     }
     ops.texture.needsUpdate = true;
+
+    // the number line: 0 to 20 on a strip of paper, the tens in gold
+    x = line.ctx;
+    x.fillStyle = css(SET.paper); x.fillRect(0, 0, 2048, 128);
+    x.strokeStyle = COLOR.shadow; x.lineWidth = 4; x.beginPath(); x.moveTo(40, 92); x.lineTo(2008, 92); x.stroke();
+    x.textAlign = "center"; x.textBaseline = "middle";
+    for (let i = 0; i <= 20; i++) {
+      const px = 64 + i * 96;
+      x.strokeStyle = COLOR.shadow; x.lineWidth = 4; x.beginPath(); x.moveTo(px, 78); x.lineTo(px, 106); x.stroke();
+      x.fillStyle = i % 10 === 0 ? css(mix(COLOR.ember, COLOR.shadow, 0.25)) : COLOR.shadow;
+      x.font = face(56, i % 10 === 0 ? 600 : 400);
+      x.fillText(String(i), px, 42);
+    }
+    line.texture.needsUpdate = true;
+
+    // rows of dots: three rows of four, the picture today's lesson will give a name to
+    x = rows.ctx;
+    x.fillStyle = css(SET.paper); x.fillRect(0, 0, 384, 448);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) { x.fillStyle = [COLOR.disk, css(mix(COLOR.ember, COLOR.shadow, 0.15)), css(mix(COLOR.gold, COLOR.shadow, 0.25))][r]; x.beginPath(); x.arc(72 + c * 80, 96 + r * 86, 27, 0, 7); x.fill(); }
+    x.fillStyle = COLOR.shadow; x.textAlign = "center"; x.textBaseline = "middle"; x.font = face(46, 500);
+    x.fillText("3 rows of 4", 192, 384);
+    rows.texture.needsUpdate = true;
+
+    // the hundred square, every tenth number in gold
+    x = hundred.ctx;
+    x.fillStyle = css(SET.paper); x.fillRect(0, 0, 512, 512);
+    x.textAlign = "center"; x.textBaseline = "middle";
+    for (let n = 1; n <= 100; n++) {
+      const c = (n - 1) % 10, r = Math.floor((n - 1) / 10), px = 36 + c * 48.8, py = 38 + r * 48.8;
+      if (n % 10 === 0) { x.fillStyle = COLOR.gold; x.fillRect(px - 22, py - 22, 44, 44); }
+      x.fillStyle = COLOR.shadow; x.font = face(n === 100 ? 20 : 24, 500); x.fillText(String(n), px, py + 1);
+    }
+    x.strokeStyle = ink(COLOR.shadow, 0.35); x.lineWidth = 1.5;
+    for (let i = 0; i <= 10; i++) { x.beginPath(); x.moveTo(11.6 + i * 48.8, 13.6); x.lineTo(11.6 + i * 48.8, 501.6); x.moveTo(11.6, 13.6 + i * 48.8); x.lineTo(499.6, 13.6 + i * 48.8); x.stroke(); }
+    hundred.texture.needsUpdate = true;
   };
   paintPosters();
+  const printed = (t: { texture: THREE.Texture }) => M.clay(PLAIN, { map: t.texture, roughness: 0.92 });
   box(room, [3.72, 4.82], [1.58, 2.72], [-RZ, -RZ + 0.02], trim);
-  add(room, new THREE.PlaneGeometry(1.04, 1.08), M.clay(0xffffff, { map: ops.texture, roughness: 0.9 }), 4.27, 2.15, -RZ + 0.026, noCast);
-  box(room, [-5.02, -3.98], [1.5, 2.8], [-RZ, -RZ + 0.02], trim);
-  add(room, new THREE.PlaneGeometry(0.98, 1.24), M.clay(0xffffff, { map: poster.texture, roughness: 0.9 }), -4.5, 2.15, -RZ + 0.026, noCast);
+  add(room, new THREE.PlaneGeometry(1.04, 1.08), printed(ops), 4.27, 2.15, -RZ + 0.026, noCast);
+  box(room, [-5.3, -3.62], [1.14, 3.02], [-RZ, -RZ + 0.02], trim);
+  add(room, new THREE.PlaneGeometry(1.44, 1.8), printed(poster), -4.46, 2.08, -RZ + 0.026, noCast);
+  // the number line runs along the top of the front wall, either side of the clock
+  const SPLIT = 1072 / 2048; // 0 to 10 on the left of the clock, 11 to 20 on its right
+  for (const [u0, u1, x0] of [[0, SPLIT, -3.2], [SPLIT, 1, 0.35]] as const) {
+    const w = (u1 - u0) * 5.45, strip = add(room, new THREE.PlaneGeometry(w, 0.17), printed(line), x0 + w / 2, 3.2, -RZ + 0.012, noCast);
+    const uv = strip.geometry.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, u0 + uv.getX(i) * (u1 - u0));
+  }
+  // the door wall, between the door and the back of the room
+  const onDoorWall = (t: { texture: THREE.Texture }, z: number, y: number, w: number, h: number) => {
+    box(room, [RX - 0.02, RX], [y - h / 2 - 0.05, y + h / 2 + 0.05], [z - w / 2 - 0.05, z + w / 2 + 0.05], trim, noCast);
+    add(room, new THREE.PlaneGeometry(w, h), printed(t), RX - 0.026, y, z, noCast).rotation.y = -Math.PI / 2;
+  };
+  onDoorWall(rows, -1.55, 2.1, 1.02, 1.19);
+  onDoorWall(hundred, 0.55, 2.1, 1.3, 1.3);
 
   // the back wall: a pin-board of the class's drawings over a low shelf of books
   box(room, [-2.3, 2.3], [1.25, 2.55], [RZ - 0.03, RZ], wood);
@@ -248,7 +323,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   paintDial();
   if (typeof document !== "undefined") void document.fonts.load(`400 16px ${TYPE.family}`).then(paintDial);
   add(clock, new THREE.CylinderGeometry(0.23, 0.23, 0.04, 48), M.clay(hex(COLOR.shadow), { roughness: 0.7 }), 0, 0, 0.02).rotation.x = Math.PI / 2;
-  add(clock, new THREE.CircleGeometry(0.2, 48), M.clay(0xffffff, { map: dial.texture, roughness: 0.9 }), 0, 0, 0.046, noCast);
+  add(clock, new THREE.CircleGeometry(0.2, 48), M.clay(PLAIN, { map: dial.texture, roughness: 0.9 }), 0, 0, 0.046, noCast);
   for (const [len, w, angle, z] of [[0.11, 0.02, ((8 + 42 / 60) / 12) * Math.PI * 2, 0.052], [0.16, 0.013, (42 / 60) * Math.PI * 2, 0.058]] as const) {
     const pivot = new THREE.Group();
     pivot.position.z = z;
@@ -256,9 +331,6 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     clock.add(pivot);
     add(pivot, new THREE.BoxGeometry(w, len, 0.005), M.clay(hex(COLOR.shadow)), 0, len / 2 - 0.012, 0, noCast);
   }
-
-  // ceiling lamps: plain fittings, switched off on a bright morning
-  for (const z of [-1.4, 2.2]) box(room, [-1.2, 1.2], [RH - 0.07, RH], [z - 0.13, z + 0.13], trim, noCast);
 
   // the teacher's desk, with a globe that says where this is going
   const tdesk = new THREE.Group();
@@ -281,6 +353,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   const paper = M.clay(SET.paper, { roughness: 0.95 }), pencil = M.clay(hex(COLOR.gold), { roughness: 0.7 });
   const packs = [COLOR.ember, COLOR.sky, COLOR.gold, COLOR.disk, COLOR.approach, COLOR.ember, COLOR.sky, COLOR.disk, COLOR.gold].map((c) => M.clay(mix(c, COLOR.horizon, 0.3), { roughness: 0.9 }));
   const chairs: THREE.Group[] = [];
+  const lay = (parent: THREE.Object3D, m: THREE.Mesh, x: number, y: number, z: number) => { m.position.set(x, y, z); parent.add(m); };
   for (const [i, [x, z]] of SEATS.entries()) {
     const d = new THREE.Group();
     d.position.set(x, 0, z);
@@ -303,7 +376,35 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
       box(c, [a * 0.135 - 0.015, a * 0.135 + 0.015], [0, SEAT_HEIGHT - 0.03], [-0.15, -0.12], steel);
       box(c, [a * 0.135 - 0.015, a * 0.135 + 0.015], [0, SEAT_HEIGHT + 0.36], [0.18, 0.21], steel);
     }
+    lay(c, contactShadow(0.62, 0.66, 0.34), 0, 0.005, 0.02);
+    lay(d, contactShadow(1.5, 1.0, 0.3), 0, 0.004, 0);
     chairs.push(c);
+  }
+  lay(tdesk, contactShadow(2.5, 1.5, 0.4), 0, 0.004, 0);
+  lay(room, contactShadow(3.2, 1.0, 0.4), -4.05, 0.004, RZ - 0.3);
+
+  // the sun's shafts, as geometry: from each window a slab of faint gold air runs down the sun's own
+  // direction to the floor. They are matte haze, brightest at the glass and gone by the floor; nothing blooms
+  const shaftMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const shaftTint = new THREE.Color(look.key.color).multiplyScalar(0.034);
+  for (const z of WINDOWS.z) {
+    const P: number[] = [], C: number[] = [];
+    const corner = (dz: number, y: number) => {
+      const from = new THREE.Vector3(-RX, y, z + dz), reach = Math.min(y / -SUN_DIR.y, (RX * 2) / SUN_DIR.x), to = from.clone().addScaledVector(SUN_DIR, reach);
+      return [from, to] as const;
+    };
+    const [a0, a1] = corner(-half + 0.06, WINDOWS.sill + 0.06), [b0, b1] = corner(half - 0.06, WINDOWS.sill + 0.06), [c0, c1] = corner(half - 0.06, WINDOWS.head - 0.06), [d0, d1] = corner(-half + 0.06, WINDOWS.head - 0.06);
+    const quad = (p: THREE.Vector3, q: THREE.Vector3, r: THREE.Vector3, t: THREE.Vector3, k: [number, number, number, number]) => {
+      for (const [v, kk] of [[p, k[0]], [q, k[1]], [r, k[2]], [p, k[0]], [r, k[2]], [t, k[3]]] as const) { P.push(v.x, v.y, v.z); C.push(shaftTint.r * kk, shaftTint.g * kk, shaftTint.b * kk); }
+    };
+    // four long faces: bright at the window end (1), nothing at the far end (0)
+    quad(a0, a1, b1, b0, [1, 0, 0, 1]); quad(d0, d1, c1, c0, [1, 0, 0, 1]); quad(a0, a1, d1, d0, [1, 0, 0, 1]); quad(b0, b1, c1, c0, [1, 0, 0, 1]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(C, 3));
+    const shaft = new THREE.Mesh(geo, shaftMat);
+    shaft.renderOrder = 2;
+    room.add(shaft);
   }
 
   // lights, all from the look and all steady: the sun through the windows is the key, the stage's
@@ -343,8 +444,12 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   return {
     room, door, write, chairs,
     lights: { sun, soft, rim, spill, doorFill },
+    /** The lights that cast shadows here, for whoever schedules shadow passes. */
+    shadows: [sun, spill],
     /** Shut the door at once (a chapter jump). */
     reset() { swing = swingV = 0; door.rotation.y = 0; hall = 0; },
+    /** Put the door where it would have settled (0 shut, 1 open) with no swing: for a jump into the middle of the film. */
+    set(open: number) { swing = open; swingV = 0; door.rotation.y = OPEN * swing; hall = open; },
     /**
      * Per-frame ambience. `on` lights the set; `door` is where the door is going (0 shut, 1 open);
      * `hall` (0..1) is how much the hallway matters in the story right now. The spill follows the

@@ -37,11 +37,12 @@ export const LOOKS: Record<LookId, Look> = {
     background: hex(COLOR.void), exposure: 1.1, bloom: { strength: 0.55, radius: 0.5, threshold: 1.0 }, sat: 1, vignette: 0.32,
     key: { color: tone(COLOR.gold, COLOR.approach, 0.6), intensity: 2.7 }, fill: { sky: tone(COLOR.disk, COLOR.void, 0.5), ground: hex(COLOR.void), intensity: 0.55 }, rim: { color: hex(COLOR.sky), intensity: 0.9 },
   },
-  // the film's classroom and town: low gold morning sun as the key, cool sky fill with a warm bounce off the
-  // floor, and no bloom at all (nothing indoors is a light source the camera sees)
+  // the film's classroom and town: a low gold morning sun as the key, a pale sky fill with a warm bounce off the
+  // floor, a cool rim, and no bloom at all (nothing indoors is a light source the camera sees). Lights in this
+  // three.js are physical, so a daylit room needs these strengths. Every colour is mixed from the tokens.
   interior: {
-    background: hex(COLOR.void), exposure: 1.1, bloom: { strength: 0, radius: 0.3, threshold: 1.2 }, sat: 1, vignette: 0.3,
-    key: { color: 0xffe2b0, intensity: 7 }, fill: { sky: 0xa9bfe6, ground: 0x7a6650, intensity: 1.3 }, rim: { color: hex(COLOR.sky), intensity: 0.9 },
+    background: hex(COLOR.void), exposure: 1.08, bloom: { strength: 0, radius: 0.3, threshold: 1.2 }, sat: 1, vignette: 0.34,
+    key: { color: tone(COLOR.gold, COLOR.approach, 0.42), intensity: 7 }, fill: { sky: tone(COLOR.sky, COLOR.approach, 0.5), ground: tone(COLOR.gold, COLOR.horizon, 0.52), intensity: 1.25 }, rim: { color: hex(COLOR.sky), intensity: 1.1 },
   },
   // a single hero object on show: the hangar's rocket preview. A brighter key and a stronger rim than
   // open space, so a small object reads as sculpted; no bloom on anything (threshold above every surface).
