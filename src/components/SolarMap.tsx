@@ -215,7 +215,7 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
           </>
         )}
       </main>
-      <Greeting screen="map" seen={{ seen: state.seen, emit }} />
+      <Greeting screen="map" edge="top" seen={{ seen: state.seen, emit }} />
       <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/map" />
     </div>
   );
