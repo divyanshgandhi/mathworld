@@ -3,8 +3,6 @@ import { Button as UiButton } from "@ui-sdk/react/button";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { PlayerState } from "@/director/fold";
-import type { Stop } from "@/director/hub";
-import { PLANET_NAMES } from "@/worlds/space/lines";
 import { HomeLink, Icon, masterySummary, PillLink, Pips, RocketGlyph, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
 import { hereIndex, hyperJump, journey, stopMarks, type JourneyStop } from "./world/journey";
@@ -13,8 +11,6 @@ import { preloadSprites } from "./world/spriteStore";
 import { Starfield } from "./world/Starfield";
 import { ACTION_WORDS, STATE_WORDS, STOP_WORDS, type StopId } from "./world/words";
 
-/** Kept for older imports: each stop's name. New code reads `STOP_WORDS` (src/components/world/words.ts). */
-export const STOP_NAMES: Record<Stop["id"], string> = { mercury: "Mercury", venus: "Venus", ...PLANET_NAMES };
 
 /** Each planet's sprite size on the wide map, roughly true to the bodies (Saturn's includes its rings). */
 const SIZE: Record<StopId, number> = {
