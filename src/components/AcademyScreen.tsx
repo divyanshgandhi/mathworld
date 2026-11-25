@@ -1,46 +1,188 @@
 "use client";
-import { Button } from "@ui-sdk/react/button";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { FILMS, filmOf, type Film } from "@/rig/academy";
-import { PLANETS_BY_TIER, tierOf } from "@/rig/pools";
-import { WHY } from "@/rig/showme";
+import { Button as UiButton } from "@ui-sdk/react/button";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { EventInput } from "@/db/events";
+import type { LoggedEvent } from "@/director/fold";
+import type { Stage } from "@/engine/stage";
+import { FILMS_BY_JOURNEY, FIRST_MET, filmOf, type Film } from "@/rig/academy";
+import { PLANETS_BY_TIER, tierOf, tierOfPlanet, type PlanetId } from "@/rig/pools";
+import type { TrickId } from "@/rig/tricks";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { BattleHud } from "./battle/BattleHud";
-import { ghost, glass, lime } from "./battle/ui";
-import { Icon } from "./kit/Icon";
-import { useScene } from "./hub/Scene";
+import { Button, HomeLink, Icon, IconButton, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
+import { PlanetSprite } from "./world/PlanetSprite";
+import { preloadSprites } from "./world/spriteStore";
+import { Starfield } from "./world/Starfield";
+import { TrickPicture } from "./world/TrickPicture";
+import { ACADEMY_WORDS, STOP_WORDS, TRICK_REASON } from "./world/words";
+
+/* ---------- which film is playing lives in the URL (?watch=flip-it), so Back returns to the list ---------- */
+
+const URL_EVENT = "mw:academy-url";
+const subscribeUrl = (fn: () => void) => {
+  addEventListener("popstate", fn); addEventListener(URL_EVENT, fn);
+  return () => { removeEventListener("popstate", fn); removeEventListener(URL_EVENT, fn); };
+};
+const param = (k: string) => () => new URLSearchParams(location.search).get(k);
+const watchParam = param("watch"), trickParam = param("trick");
+const noParam = () => null;
+function setUrl(search: string, push: boolean) {
+  const url = `${location.pathname}${search}`;
+  if (push) history.pushState(null, "", url); else history.replaceState(null, "", url);
+  dispatchEvent(new Event(URL_EVENT));
+}
+
+interface Playing { trick: TrickId; a: number; b: number; watch: boolean; n: number }
 
 /**
- * The Academy (/academy): every Trick Card's film on demand, played by the same Beat Player as
- * battle over a live fleet, every line of docs/tricks.md spoken. Then the cadet answers the We-Do,
- * and can try a sister fleet. Watching a card for the first time unlocks it onto the battle belt.
+ * The Academy (/academy): where Nova shows any trick on a real fleet. In 2D, the ten tricks as one list in
+ * the order the journey meets them, each with its kid name, one plain reason, an example fact and a small
+ * true picture of the trick in dots. Watched tricks wear a gold ring. Choosing one plays its trick film in
+ * the 3D battle (the arena's academy mode), then it is the cadet's turn; "All tricks" is always on screen.
  */
-export function AcademyScreen() {
-  const router = useRouter();
+export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
   const { state, log, emit } = useCadet();
-  const { box, stage } = useScene(() => ({ dispose() {} }));
-  const [film, setFilm] = useState<{ f: Film; a: number; b: number; watch: boolean } | null>(null);
+  const watching = useSyncExternalStore(subscribeUrl, watchParam, noParam);
+  const highlight = useSyncExternalStore(subscribeUrl, trickParam, noParam);
+  const [override, setOverride] = useState<Playing | null>(null);
+  const pushed = useRef(false);
+
+  const base = watching ? filmOf(watching) : null;
+  const film: Playing | null = !base ? null : override?.trick === base.trick ? override : { trick: base.trick, a: base.a, b: base.b, watch: true, n: 0 };
+
+  useEffect(() => { void import("@/engine/audio").then(({ audio }) => audio.mood("hangar")); }, []);
+  useEffect(() => { void preloadSprites(PLANETS_BY_TIER.map((id) => ({ id, size: 36 }))); }, []);
+
+  const watch = useCallback((f: Film) => { pushed.current = true; setOverride(null); setUrl(`?watch=${f.trick}`, true); }, []);
+  const back = useCallback(() => {
+    setOverride(null);
+    if (pushed.current) { pushed.current = false; history.back(); } else setUrl("", false);
+  }, []);
+
+  if (!state) return <div className="fixed inset-0 bg-void" />;
+  if (film && base) {
+    return (
+      <TrickFilm film={film} f={base} log={log} emit={emit} onBack={back}
+        onAgain={() => setOverride({ trick: base.trick, a: base.a, b: base.b, watch: true, n: film.n + 1 })}
+        onSister={() => setOverride({ trick: base.trick, a: base.sister[0], b: base.sister[1], watch: false, n: film.n + 1 })} />
+    );
+  }
+
+  const seen = (t: TrickId) => (state.seenTricks[t] ?? 0) > 0;
+  const reached = (p: PlanetId) => tierOfPlanet(p) <= state.tier;
+  const next = FILMS_BY_JOURNEY.find((f) => !seen(f.trick) && reached(FIRST_MET[f.trick]))?.trick ?? null;
+  return (
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-void text-approach">
+      <Starfield seed={23} />
+      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Academy" orbs={state.orbs} onHelp={onHelp} />
+      <main className="relative z-10 mx-auto w-full max-w-[920px] px-4 pb-16 pt-4 sm:px-8 md:pt-10">
+        <h2 className="m-0 type-display text-[clamp(44px,7vw,80px)] leading-[0.95]">{ACADEMY_WORDS.heading}</h2>
+        <p className="m-0 mt-4 max-w-[36ch] type-child text-ink-2">{ACADEMY_WORDS.intro}</p>
+        <TrickList seen={seen} reached={reached} next={next} highlight={highlight} onWatch={watch} />
+      </main>
+    </div>
+  );
+}
+
+/* ---------- the list: planet by planet along a dashed path, one row per trick ---------- */
+
+function TrickList({ seen, reached, next, highlight, onWatch }: {
+  seen: (t: TrickId) => boolean; reached: (p: PlanetId) => boolean; next: TrickId | null; highlight: string | null; onWatch: (f: Film) => void;
+}) {
+  const groups = useMemo(() => {
+    const out: { planet: PlanetId; films: Film[] }[] = [];
+    for (const f of FILMS_BY_JOURNEY) {
+      const p = FIRST_MET[f.trick], g = out.at(-1);
+      if (g?.planet === p) g.films.push(f); else out.push({ planet: p, films: [f] });
+    }
+    return out;
+  }, []);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (highlight) list.current?.querySelector<HTMLElement>(`[data-trick="${highlight}"]`)?.scrollIntoView({ block: "center" });
+  }, [highlight]);
+
+  return (
+    <div ref={list} className="relative mt-10">
+      {/* the journey's dashed path runs down the left, through each planet */}
+      <span aria-hidden className="absolute bottom-10 left-[17px] top-4 border-l border-dashed border-line-2" />
+      {groups.map(({ planet, films }) => (
+        <section key={planet} aria-labelledby={`at-${planet}`} className="relative mb-6">
+          <h3 id={`at-${planet}`} className="m-0 flex items-center gap-4 py-2">
+            <PlanetSprite id={planet} size={36} alt="" />
+            <span className="type-name text-[17px] text-ink-2">{STOP_WORDS[planet].name}</span>
+          </h3>
+          <ul className="m-0 list-none p-0 pl-[36px] sm:pl-[52px]">
+            {films.map((f) => (
+              <li key={f.trick} className="border-b border-line-1 last:border-b-0">
+                <TrickRow f={f} seen={seen(f.trick)} future={!reached(planet)} next={next === f.trick} lit={highlight === f.trick} onWatch={onWatch} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function TrickRow({ f, seen, future, next, lit, onWatch }: { f: Film; seen: boolean; future: boolean; next: boolean; lit: boolean; onWatch: (f: Film) => void }) {
+  const status = seen ? ACADEMY_WORDS.watched : next ? ACADEMY_WORDS.next : ACADEMY_WORDS.watch;
+  return (
+    <UiButton data-trick={f.trick} onClick={() => onWatch(f)}
+      aria-label={`${f.card}. ${TRICK_REASON[f.trick]} Example: ${f.a} × ${f.b}. ${seen ? ACADEMY_WORDS.watched : ACADEMY_WORDS.watch}.`}
+      className={`group my-1 flex w-full flex-col gap-3 rounded-chip px-3 py-4 text-left transition-colors hover:bg-raised sm:grid sm:grid-cols-[176px_1fr_auto] sm:items-center sm:gap-x-6 ${lit ? "bg-raised" : ""}`}>
+      <span className="flex items-center gap-4 sm:flex-col sm:gap-1.5">
+        <TrickPicture trick={f.trick} a={f.a} b={f.b} width={176} height={84} className="hidden sm:block" />
+        <TrickPicture trick={f.trick} a={f.a} b={f.b} width={150} height={64} className="sm:hidden" />
+        <span className="type-number text-[17px] text-ink-2" aria-hidden>{f.a} × {f.b}</span>
+      </span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="type-name text-[21px] leading-tight text-approach">{f.card}</span>
+        <span className="type-child text-[18px] leading-snug text-ink-2">{TRICK_REASON[f.trick]}</span>
+        {future && <span className="mt-0.5 type-body-sm text-ink-3">{ACADEMY_WORDS.meet(FIRST_MET[f.trick])}</span>}
+        {/* phones: the status as words under the reason */}
+        <span className={`mt-1 flex items-center gap-1.5 type-body-sm sm:hidden ${seen ? "text-gold" : "text-ink-2"}`}>
+          <Icon name={seen ? "check" : "play"} size={16} />{status}
+        </span>
+      </span>
+      <span className="hidden w-[88px] flex-col items-center gap-1.5 whitespace-nowrap sm:flex" aria-hidden>
+        <span className={`grid size-11 place-items-center rounded-full border ${seen ? "border-[1.5px] border-gold text-gold" : next ? "border-line-3 text-approach" : "border-line-2 text-ink-2"} transition-colors group-hover:border-gold`}>
+          <Icon name="play" size={18} />
+        </span>
+        <span className={`type-body-sm ${seen ? "text-gold" : next ? "text-approach" : "text-ink-3"}`}>{status}</span>
+      </span>
+    </UiButton>
+  );
+}
+
+/* ---------- the film: the battle stage in academy mode, then "Your turn" ---------- */
+
+function TrickFilm({ film, f, log, emit, onBack, onAgain, onSister }: {
+  film: Playing; f: Film; log: LoggedEvent[] | null; emit: (e: EventInput) => void;
+  onBack: () => void; onAgain: () => void; onSister: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState<Stage | null>(null);
   const [arena, setArena] = useState<Arena | null>(null);
   const [ui, setUi] = useState<ArenaUi | null>(null);
-  const want = useSyncExternalStore(() => () => {}, () => new URLSearchParams(location.search).get("trick"), () => null);
   const logRef = useRef(log);
   useEffect(() => { logRef.current = log; }, [log]);
 
-  // idle: the Solar System drifts behind the card shelf; a film mounts the battle stage instead
+  useEffect(() => {
+    let gone = false, made: Stage | null = null;
+    void import("@/engine/stage").then(({ createStage }) => {
+      if (gone || !box.current) return;
+      made = createStage(box.current, { fill: true });
+      setStage(made);
+    });
+    return () => { gone = true; made?.dispose(); setStage(null); };
+  }, []);
+
   useEffect(() => {
     if (!stage) return;
     let gone = false, cleanup = () => {};
-    (async () => {
-      if (!film) {
-        const { mountTitle } = await import("@/worlds/space/title");
-        if (gone) return;
-        const t = mountTitle(stage);
-        cleanup = () => t.dispose();
-        return;
-      }
-      const { mountArena } = await import("@/worlds/space/arena");
+    void import("@/worlds/space/arena").then(({ mountArena }) => {
       if (gone) return;
       const planet = PLANETS_BY_TIER[tierOf(film.a, film.b) ?? 1];
       const a = mountArena(stage, { planet, history: logRef.current ?? [], onUi: setUi, onEvent: emit, force: { a: film.a, b: film.b }, academy: { film: film.watch } });
@@ -48,58 +190,34 @@ export function AcademyScreen() {
       setArena(a);
       a.start();
       cleanup = () => { a.dispose(); setArena(null); setUi(null); };
-    })();
+    });
     return () => { gone = true; cleanup(); };
-  }, [stage, film, emit]);
+  }, [stage, film.trick, film.a, film.b, film.watch, film.n, emit]);
 
-  const watch = useCallback((f: Film) => setFilm({ f, a: f.a, b: f.b, watch: true }), []);
-  const seen = (t: string) => (state?.seenTricks[t as keyof typeof state.seenTricks] ?? 0) > 0;
-  const wanted = want ? filmOf(want) : null;
+  // Escape is the way out of a film, as everywhere else
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open], [role=dialog]")) onBack(); };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [onBack]);
 
+  const backButton = (
+    <>
+      <IconButton icon="back" label={ACADEMY_WORDS.back} onClick={onBack} className="bg-void md:hidden" />
+      <Button variant="secondary" icon="back" onClick={onBack} className="hidden bg-void md:inline-flex">{ACADEMY_WORDS.back}</Button>
+    </>
+  );
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
-      <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
-        <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
-        {film ? <Button aria-label="All tricks" onClick={() => setFilm(null)} className={`${ghost} bg-void`}><Icon name="trick" size={18} />All tricks</Button>
-          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-ink-2">Academy</span>}
-      </div>
-
-      {!film && state && (
-        <div className="absolute inset-0 z-20 overflow-y-auto px-3 pb-6 pt-20">
-          <div className={`${glass} mx-auto w-[min(96vw,760px)] p-4 md:p-6`}>
-            <h2 className="m-0 type-display text-[clamp(30px,5vw,44px)]">Academy</h2>
-            <p className="mt-2 max-w-[56ch] type-body text-ink-2">Nova shows each trick on a real fleet, then you fire the answer. A trick you have watched goes on your battle belt as a Power-Up.</p>
-            <ul className="mt-4 flex flex-col divide-y divide-line-1" aria-label="Tricks">
-              {FILMS.map((f) => (
-                <li key={f.trick}>
-                  <Button aria-label={`Watch ${f.card}${seen(f.trick) ? " (on your belt)" : ""}`} onClick={() => watch(f)}
-                    className={`flex w-full items-center gap-4 rounded-chip px-2 py-3.5 text-left transition hover:bg-raised ${wanted?.trick === f.trick ? "bg-raised" : ""}`}>
-                    {/* a watched trick wears a gold ring: it is on the battle belt */}
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-full border ${seen(f.trick) ? "border-gold text-gold" : "border-line-2 text-ink-2"}`}><Icon name="trick" size={20} /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block type-name text-[18px]">{f.card}</span>
-                      <span className="mt-0.5 block type-body text-[17px] text-ink-2">{WHY[f.trick]} <span className="type-number whitespace-nowrap text-ink-3">({f.a} × {f.b})</span></span>
-                    </span>
-                    <Icon name="play" size={20} className="text-ink-2" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {film && (
-        <BattleHud arena={arena} ui={ui} launch={false}
-          doneActions={() => (
-            <>
-              <Button className={`${lime} px-5 py-3 text-base`} onClick={() => setFilm({ ...film, a: film.f.sister[0], b: film.f.sister[1], watch: false })}>Try {film.f.sister[0]} × {film.f.sister[1]}</Button>
-              <Button className={`${ghost} px-4 py-3 text-base`} onClick={() => watch(film.f)}>Watch again</Button>
-              <Button className={`${ghost} px-4 py-3 text-base`} onClick={() => setFilm(null)}>All tricks</Button>
-            </>
-          )} />
-      )}
+      <BattleHud arena={arena} ui={ui} launch={false} menu={backButton}
+        doneActions={() => (
+          <>
+            <Button variant="primary" onClick={onSister}>{ACADEMY_WORDS.tryFact(f.sister[0], f.sister[1])}</Button>
+            <Button variant="secondary" icon="play" onClick={onAgain}>{ACADEMY_WORDS.again}</Button>
+            <Button variant="secondary" icon="back" onClick={onBack}>{ACADEMY_WORDS.back}</Button>
+          </>
+        )} />
     </div>
   );
 }
