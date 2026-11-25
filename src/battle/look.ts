@@ -8,7 +8,8 @@ import { COLOR, hex } from "@/design/tokens";
  */
 export const LOOK = {
   // the one void behind every screen (tokens.ts), so the route fade and the battle share a ground
-  scene: { background: hex(COLOR.void), far: 3000, exposure: 1.0, bloom: { strength: 0.12, radius: 0.2, threshold: 1.4 } },
+  // background, exposure and bloom come from the `space` look (src/worlds/looks.ts); only the far plane is the battle's
+  scene: { far: 3000 },
   light: {
     key: { color: 0xfff1dc, intensity: 1.6 },
     rim: { color: 0x7dfcff, intensity: 0.9 },
@@ -25,14 +26,15 @@ export const LOOK = {
   bracket: { color: hex(COLOR.sky) },
   rail: 0x3b4470,
   ghost: { color: 0x9fe8ff, fill: 0.12, outlineFill: 0.08 },
-  laser: { color: 0xffd36b, intensity: 1.1 },
+  // every glow stays under the space look's bloom threshold (1.0): only the Sun and the Launch moment glow
+  laser: { color: 0xffd36b, intensity: 0.7 },
   shield: { color: 0x7dfcff, peak: 0.28 },
   dim: { color: 0x01030a, opacity: 0.62 },
   /** Balls that fly past (an overshoot). */
-  over: { color: 0xff9a3c, intensity: 1.3 },
-  /** The ball glow sits just over the bloom threshold: a little glow, never a halo. */
-  ball: { intensity: 1.45 },
-  spark: [1.2, 2.0, 1.0, 0.9] as [number, number, number, number],
+  over: { color: 0xff9a3c, intensity: 0.55 },
+  /** Bright, but under the bloom threshold: a ball is a lit object, never a halo. */
+  ball: { intensity: 0.55 },
+  spark: [0.62, 0.55, 0.32, 0.75] as [number, number, number, number],
   zeroRing: { intensity: 0.6 },
   /** A soft label (a hint the player did not ask for). */
   soft: { opacity: 0.6 },

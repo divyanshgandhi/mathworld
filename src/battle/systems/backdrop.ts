@@ -1,3 +1,4 @@
+import { applyLook } from "@/worlds/looks";
 import * as THREE from "three";
 import type { Stage } from "@/engine/stage";
 import type { PlanetId } from "@/rig/pools";
@@ -31,12 +32,8 @@ export function createBackdrop(stage: Stage, planet: PlanetId, origin: THREE.Vec
       const S = LOOK.scene;
       camera.far = S.far;
       camera.updateProjectionMatrix();
-      scene.background = new THREE.Color(S.background);
+      applyLook(stage, "space");
       scene.fog = null;
-      Object.assign(stage.bloom, S.bloom);
-      stage.renderer.toneMappingExposure = S.exposure;
-      stage.grade.sat.value = 1;
-      stage.grade.tint.value.set(1, 1, 1);
     },
     update(dt: number) { sky?.update(dt); },
     dispose() { scene.remove(...lights); sky?.dispose(); },

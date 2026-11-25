@@ -1,3 +1,4 @@
+import { applyLook } from "@/worlds/looks";
 import * as THREE from "three";
 import { canvasTexture } from "@/engine/materials";
 import type { Stage } from "@/engine/stage";
@@ -27,13 +28,11 @@ function ringSprite(colour: string, alpha = 1) {
 export function mountSolarMap(stage: Stage, init: Stop[]) {
   const { scene, camera, mats: M } = stage, rnd = seeded(19), root = new THREE.Group();
   scene.add(root);
-  scene.background = new THREE.Color(0x02030a);
+  applyLook(stage, "space"); // the Sun is in frame: the space look's bloom catches its core and nothing else
   scene.fog = null;
   camera.fov = 40;
   camera.far = 3000;
   camera.updateProjectionMatrix();
-  Object.assign(stage.bloom, { strength: 0.6, radius: 0.5, threshold: 1.0 });
-  stage.renderer.toneMappingExposure = 1.05;
 
   const sun = makeBody(M, "sun", 7);
   sun.group.position.set(-SPACING * 1.25, 0, -4);
@@ -69,7 +68,7 @@ export function mountSolarMap(stage: Stage, init: Stop[]) {
       const locked = s.status === "locked", warm = s.status === "cleared" || s.status === "ace";
       v.body.mats.forEach((m, k) => {
         m.color.copy(locked ? new THREE.Color(0x0b0e1a) : v.base[k]);
-        m.emissiveIntensity = locked ? 0 : warm ? 0.5 : 0.3;
+        m.emissiveIntensity = 0; // matte bodies: a cleared planet is marked by its ring, never by a glow
         if (warm) m.emissive.setHex(0xffe2b0); else m.emissive.setHex(0xffffff);
       });
       v.rim.visible = locked;
