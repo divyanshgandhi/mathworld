@@ -34,7 +34,7 @@ const CARD_MAX = 420, CARD_MIN = 320;
 const step = (n: number) => Math.max(8, Math.floor(n / 8) * 8);
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-export function mapLayout(w: number, h: number, cardH: number): MapLayout {
+export function mapLayout(w: number, h: number, cardH: number, cardW = 0): MapLayout {
   const side = w >= 600 && w > h * 1.1;
   if (side) {
     const short = h < 520, gap = short ? 32 : 56;
@@ -42,10 +42,12 @@ export function mapLayout(w: number, h: number, cardH: number): MapLayout {
     const roomH = short ? h - DOTS_H - 24 : h - DOTS_H - 40;
     const roomW = w - 2 * (ARROW + 24) - gap - cardMaxW;
     const hero = step(clamp(Math.min(roomH * (short ? 0.92 : 0.74), roomW * 0.9, w * 0.3), 96, 400));
-    const groupW = hero + gap + cardMaxW;
+    // centred on the widest card as drawn (a card is as wide as its words), not on the room it may take
+    const drawnW = cardW > 0 ? Math.min(cardW, cardMaxW) : cardMaxW;
+    const groupW = hero + gap + drawnW;
     const heroCx = Math.round((w - groupW) / 2 + hero / 2);
     const heroCy = Math.round(short ? 12 + roomH / 2 : (h - DOTS_H) / 2);
-    const heroL = heroCx - hero / 2, cardLeft = heroCx + hero / 2 + gap, cardR = cardLeft + cardMaxW;
+    const heroL = heroCx - hero / 2, cardLeft = heroCx + hero / 2 + gap, cardR = cardLeft + drawnW;
     const peek = step(clamp(hero * 0.2, 40, 72));
     const arrowL = 16 + ARROW, arrowR = w - 16 - ARROW;
     // a neighbour sits midway in the gutter when it fits there, else half off the page's edge

@@ -50,6 +50,8 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   const prevBtn = useRef<HTMLButtonElement>(null), nextBtn = useRef<HTMLButtonElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [cardH, setCardH] = useState(300);
+  const [cardWs, setCardWs] = useState<number[]>([]);
+  const cardW = cardWs.length ? Math.max(...cardWs) : 0;
   const atRef = useRef(page);
   // the page in view, for handlers and effects (kept in step before anything below reads it)
   useLayoutEffect(() => { atRef.current = page; }, [page]);
@@ -67,7 +69,10 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
     const ro = new ResizeObserver(read);
     ro.observe(el);
     read();
-    return () => ro.disconnect();
+    // a resize or a rotation is also read straight from the window, so the page never keeps an old layout
+    addEventListener("resize", read);
+    addEventListener("orientationchange", read);
+    return () => { ro.disconnect(); removeEventListener("resize", read); removeEventListener("orientationchange", read); };
   }, [ready]);
   // open on the page at once (no ride past the others), and stay on it through a resize
   useLayoutEffect(() => {
@@ -79,14 +84,20 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   // the tallest card decides how much room the planet has above it on a phone, so the button is always in view
   useLayoutEffect(() => {
     if (!ready) return;
-    const read = () => { const h = Math.max(0, ...cards.current.map((c) => c?.offsetHeight ?? 0)); if (h) setCardH((o) => (Math.abs(o - h) < 2 ? o : h)); };
+    const read = () => {
+      const h = Math.max(0, ...cards.current.map((c) => c?.offsetHeight ?? 0));
+      if (h) setCardH((o) => (Math.abs(o - h) < 2 ? o : h));
+      // each card's own width: the planet and its card sit centred as one group on every page
+      const ws = cards.current.map((c) => c?.offsetWidth ?? 0);
+      setCardWs((o) => (o.length === ws.length && o.every((v, k) => Math.abs(v - ws[k]) < 2) ? o : ws));
+    };
     const ro = new ResizeObserver(read);
     cards.current.forEach((c) => c && ro.observe(c));
     read();
     return () => ro.disconnect();
   }, [ready, box.w]);
 
-  const L = useMemo(() => (box.w ? mapLayout(box.w, box.h, cardH) : null), [box.w, box.h, cardH]);
+  const L = useMemo(() => (box.w ? mapLayout(box.w, box.h, cardH, cardW) : null), [box.w, box.h, cardH, cardW]);
 
   // the planets this screen shows, the one in view first, then its neighbours, then the rest
   useEffect(() => {
@@ -197,6 +208,7 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
         >
           {stops.map((s, i) => (
             <Page key={s.id} s={s} i={i} n={stops.length} state={state} L={L} current={i === page} near={Math.abs(i - page) <= NEAR}
+              shift={L?.mode === "side" && cardWs[i] ? Math.round((Math.min(cardW, L.cardMaxW) - Math.min(cardWs[i], L.cardMaxW)) / 2) : 0}
               prev={stops[i - 1] ?? null} next={stops[i + 1] ?? null}
               cardRef={(el) => { cards.current[i] = el; }} />
           ))}
@@ -225,11 +237,13 @@ const sunSize = (L: MapLayout) => Math.max(96, Math.floor((L.hero * 1.1) / 8) * 
 
 /* ---------- one page: the planet, its neighbours on the path, its card ---------- */
 
-function Page({ s, i, n, state, L, current, near, prev, next, cardRef }: {
-  s: JourneyStop; i: number; n: number; state: PlayerState; L: MapLayout | null; current: boolean; near: boolean;
+function Page({ s, i, n, state, L: L0, current, near, prev, next, cardRef, shift }: {
+  s: JourneyStop; i: number; n: number; state: PlayerState; L: MapLayout | null; current: boolean; near: boolean; shift: number;
   prev: JourneyStop | null; next: JourneyStop | null; cardRef: (el: HTMLElement | null) => void;
 }) {
   const w = STOP_WORDS[s.id];
+  // the page's planet and card move together by `shift`, so a card narrower than the widest stays centred with its planet
+  const L = L0 && shift ? { ...L0, heroCx: L0.heroCx + shift, cardLeft: L0.cardLeft + shift } : L0;
   return (
     <section
       className="relative h-full w-full shrink-0 snap-center snap-always"
@@ -297,7 +311,7 @@ function Card({ s, state, L, current, cardRef }: { s: JourneyStop; state: Player
   return (
     <section ref={cardRef} data-guide={current ? "map-card" : undefined} aria-label={w.name}
       className={`absolute flex w-max flex-col items-start rounded-panel border border-line-1 bg-panel ${tight ? "gap-2 p-4" : "gap-3 p-5"}`}
-      style={{ ...pos, minWidth: Math.min(320, L.cardMaxW) }}>
+      style={pos}>
       <span className="inline-flex h-8 items-center gap-1.5 rounded-pill border border-line-2 px-3 type-name text-[17px] leading-none text-ink-1">
         {chip.icon && <Icon name={chip.icon} size={18} className={chip.icon === "lock" ? "text-ink-2" : "text-gold"} />}
         {chip.text}{s.here && s.cleared ? `, ${STATE_WORDS.cleared.toLowerCase()}` : ""}
