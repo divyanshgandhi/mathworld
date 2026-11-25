@@ -15,7 +15,7 @@ export const dialogClass = "mw-sheet mw-dialog";
  * round Close button all close it; focus returns to where it came from.
  *
  * Use it only for something that needs an interruption: a question with a real consequence
- * ("Start as a new cadet?"), or one task opened on top of a screen (flashcards, the Field Manual).
+ * ("Who is playing?"), or one task opened on top of a screen (flashcards, the Field Manual).
  * - `presentation="auto"` slides it up from the bottom as a sheet on small touch screens.
  * - `actions` sits under the content; give it one primary at most. Use `<DialogClose className={buttonClass(...)}>`
  *   (re-exported here as `SheetClose`) for a button that only closes.

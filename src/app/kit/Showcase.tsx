@@ -281,9 +281,9 @@ export function KitShowcase() {
               <p className="m-0 type-body-sm text-ink-3">SheetDialog: a plain scrim (the void at 72%, no blur), a sheet with a title, one sentence, the content and the actions. Escape, the scrim and Close all close it. Use it only for a real interruption.</p>
             </div>
           </div>
-          <SheetDialog open={dialog} onOpenChange={setDialog} size="sm" title="Start as a new cadet?"
-            description={<>This device will forget <b className="font-medium text-ink-1">Kit</b>. Kit&apos;s orbs and Gold facts cannot be brought back.</>}
-            actions={<><SheetClose className={buttonClass("primary", "md")}>Keep playing</SheetClose><SheetClose className={buttonClass("secondary", "md")}>New cadet</SheetClose></>} />
+          <SheetDialog open={dialog} onOpenChange={setDialog} size="sm" title="Who is playing?"
+            description={<>Every cadet on this device keeps their orbs and Gold facts.</>}
+            actions={<><SheetClose className={buttonClass("primary", "md")}>Keep playing as Kit</SheetClose><SheetClose className={buttonClass("secondary", "md")}>New cadet</SheetClose></>} />
           <SheetDialog open={sheet} onOpenChange={setSheet} presentation="auto" title="How to play"
             actions={<SheetClose className={buttonClass("primary", "md")}>Got it</SheetClose>}>
             <p className="m-0 type-child text-ink-2">Launch flies you to your next mission. Count the ships, then fire exactly that many plasma balls.</p>
