@@ -1,0 +1,188 @@
+/*
+  The hub screens' layout: the Resting Bay (RestingBayScreen.tsx, design/bay-accretion.html) and
+  Flashcards. Token variables only; the kit's components bring their own styles.
+*/
+@layer components {
+  /* ---------- Resting Bay ---------- */
+  .mw-bay { overscroll-behavior: contain; }
+  .mw-bay-main {
+    position: relative;
+    z-index: 1;
+    margin: 0 auto;
+    max-width: 1440px;
+    padding: 0 max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+  .mw-bay-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mw-bay-planet {
+    position: relative;
+    flex: none;
+    align-self: center;
+    width: min(60vw, 32dvh, 280px);
+    aspect-ratio: 1;
+    margin-bottom: -2%;
+  }
+  /* the factory sprite fills its frame edge to edge: inset it so the orbit runs clear around the body */
+  .mw-bay-sprite { position: absolute !important; inset: 14%; width: 72% !important; height: 72% !important; }
+  .mw-bay-orbit { fill: none; stroke: var(--color-line-3); stroke-width: 1.25px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .mw-bay-name { font-size: clamp(44px, 13vw, 64px); line-height: 0.95; overflow-wrap: anywhere; }
+  .mw-bay-status {
+    margin: 14px 0 0;
+    max-width: 30ch;
+    color: var(--color-ink-2);
+    font-size: var(--text-child);
+    line-height: 1.45;
+  }
+  .mw-bay-status b { font-weight: 600; color: var(--color-ink-1); }
+  .mw-bay-launch { margin-top: 24px; width: 100%; justify-content: space-between; }
+  .mw-bay-launch-long { display: none; }
+  .mw-bay-nova { margin-top: 28px; }
+  [data-slot="daily-patrol"] { margin-top: 20px; }
+
+  .mw-bay-deck {
+    display: grid;
+    grid-template-areas: "tables" "facts" "places";
+    gap: 28px;
+    margin-top: 44px;
+  }
+  .mw-bay-tables { grid-area: tables; min-width: 0; }
+  .mw-bay-facts { grid-area: facts; padding: 20px; }
+  .mw-bay-places { grid-area: places; }
+  .mw-bay-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mw-bay-table {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 12px 0 14px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .mw-bay-foot { display: flex; padding: 28px 0 8px; margin-left: -12px; }
+
+  @media (min-width: 600px) {
+    .mw-bay-main { padding-left: max(40px, env(safe-area-inset-left)); padding-right: max(40px, env(safe-area-inset-right)); }
+    .mw-bay-launch { width: auto; justify-content: center; }
+    .mw-bay-launch-long { display: inline; }
+  }
+
+  @media (min-width: 900px) {
+    .mw-bay-main { padding-left: max(clamp(24px, 5.2vw, 88px), env(safe-area-inset-left)); padding-right: max(clamp(24px, 5.2vw, 88px), env(safe-area-inset-right)); }
+    .mw-bay-hero {
+      display: grid;
+      grid-template-columns: minmax(380px, 46%) 1fr;
+      align-items: center;
+      min-height: max(440px, calc(100dvh - 76px - 260px));
+    }
+    .mw-bay-planet { grid-column: 2; grid-row: 1; width: min(40vw, 62dvh, 560px); justify-self: center; margin: 0; }
+    .mw-bay-mission { grid-column: 1; grid-row: 1; }
+    .mw-bay-name { font-size: clamp(56px, 6.1vw, 96px); text-wrap: balance; }
+    .mw-bay-status { margin-top: 22px; font-size: 20px; }
+    .mw-bay-launch { margin-top: 32px; }
+    .mw-bay-nova { margin-top: 36px; }
+    .mw-bay-deck { margin-top: 8px; }
+    .mw-bay-strip { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+    .mw-bay-facts { padding: 22px 26px; }
+  }
+
+  @media (min-width: 1280px) {
+    .mw-bay-deck {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "tables places" "facts facts";
+      column-gap: 40px;
+      align-items: end;
+    }
+  }
+
+  /* landscape phones: the planet sits beside the mission, small */
+  @media (max-height: 500px) and (min-width: 600px) {
+    .mw-bay-hero { display: grid; grid-template-columns: 1fr auto; align-items: center; min-height: 0; padding-top: 8px; }
+    .mw-bay-planet { grid-column: 2; grid-row: 1; width: min(34vw, 62dvh, 240px); }
+    .mw-bay-mission { grid-column: 1; grid-row: 1; }
+    .mw-bay-name { font-size: 48px; }
+    .mw-bay-status { margin-top: 10px; font-size: 18px; }
+    .mw-bay-launch { margin-top: 16px; }
+    .mw-bay-nova { margin-top: 18px; }
+  }
+
+  /* ---------- Flashcards ---------- */
+  .mw-cards {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    background: var(--color-void);
+    color: var(--color-ink-1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    outline: none;
+    transition: opacity var(--transition-duration-route) var(--ease-out);
+  }
+  .mw-cards[data-starting-style],
+  .mw-cards[data-ending-style] { opacity: 0; }
+  .mw-cards-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 8px max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left));
+  }
+  .mw-cards-fact {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 180px;
+  }
+  .mw-cards-pad { width: 100%; max-width: 400px; margin: 0 auto; }
+  .mw-cards-slot {
+    display: inline-block;
+    min-width: 1.3em;
+    border-bottom: 2px solid var(--color-line-3);
+    text-align: center;
+  }
+  .mw-cards-slot[data-empty] { color: var(--color-ink-3); }
+  .mw-dots {
+    display: grid;
+    gap: calc(var(--dot) * 0.7) calc(var(--dot) * 0.35);
+    justify-content: center;
+  }
+  .mw-dots > i {
+    display: block;
+    width: var(--dot);
+    height: var(--dot);
+    border-radius: 50%;
+    background: var(--color-ink-1);
+  }
+  @media (min-width: 900px) and (min-height: 560px) {
+    .mw-cards-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      align-items: center;
+      gap: 56px;
+      padding: 0 clamp(24px, 5.2vw, 88px) 48px;
+    }
+    .mw-cards-pad { margin: 0; }
+  }
+  /* landscape phones: the fact and the keypad side by side */
+  @media (max-height: 500px) and (min-width: 600px) {
+    .mw-cards-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 24px; }
+    .mw-cards-fact { min-height: 0; }
+  }
+}

@@ -13,10 +13,12 @@ const PATHS = {
       <path d="M8.3 15l-2.3 4M15.7 15l2.3 4M12 17.5v3" />
     </>
   ),
+  // decision 8: an orb is a gold ring (with a count beside it), never a filled bullseye like Gold mastery.
+  // The short arc inside is a highlight, so the ring reads as a sphere.
   orb: (
     <>
       <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none" />
+      <path d="M8.2 10.4a4.3 4.3 0 0 1 3-3" />
     </>
   ),
   plasma: (

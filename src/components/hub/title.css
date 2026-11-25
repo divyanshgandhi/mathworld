@@ -1,0 +1,132 @@
+/*
+  The Title's words block (TitleScreen.tsx, design/title.html). Token variables only.
+  Two layouts, chosen by the same media query as the 3D framing (SIDE in TitleScreen.tsx):
+  "side" puts the words left and the system right; "stack" puts the system above the words.
+*/
+@layer components {
+  .mw-title-main {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    pointer-events: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .mw-title[data-layout="side"] .mw-title-main {
+    align-items: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)) max(clamp(24px, 6vw, 104px), env(safe-area-inset-left));
+  }
+  .mw-title[data-layout="stack"] .mw-title-main {
+    align-items: flex-end;
+    padding: 24px max(24px, env(safe-area-inset-right)) max(7vh, calc(env(safe-area-inset-bottom) + 24px)) max(24px, env(safe-area-inset-left));
+  }
+  @media (min-width: 640px) {
+    .mw-title[data-layout="stack"] .mw-title-main { padding-left: max(48px, env(safe-area-inset-left)); padding-bottom: 9vh; }
+  }
+
+  .mw-title-words {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 600px;
+    margin-block: auto 0;
+  }
+  .mw-title[data-layout="side"] .mw-title-words { width: auto; max-width: min(640px, 50vw); margin-block: auto; }
+
+  /* the wordmark: the ring logo and MATH WORLD, thin and wide */
+  .mw-title-mark {
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 1.8vw, 26px);
+    margin: 0;
+    font-weight: 200;
+    font-stretch: 125%;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1;
+    font-size: clamp(26px, 8.2vw, 56px);
+    letter-spacing: 0.08em;
+  }
+  .mw-title-ring { width: clamp(40px, 1.35em, 76px); height: auto; }
+  .mw-title[data-layout="side"] .mw-title-mark { font-size: clamp(34px, 4.4vw, 72px); letter-spacing: 0.13em; }
+
+  .mw-title-body {
+    margin-top: clamp(20px, 3.2vh, 30px);
+    animation: mw-title-arrive var(--transition-duration-route) var(--ease-out);
+  }
+  .mw-title-line {
+    margin: 0;
+    max-width: 30ch;
+    color: var(--color-ink-2);
+    font-size: clamp(18px, 1.6vw, 22px);
+    line-height: 1.5;
+  }
+  .mw-title-name { font-weight: 500; color: var(--color-ink-1); overflow-wrap: anywhere; }
+  .mw-title-ask {
+    margin: 0;
+    font-weight: 300;
+    font-stretch: 112%;
+    font-size: clamp(24px, 2.3vw, 32px);
+    line-height: 1.2;
+  }
+  /* the actions keep their height while they wait, so nothing below them jumps */
+  .mw-title-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 18px;
+    min-height: 72px;
+    margin-top: clamp(28px, 4.4vh, 44px);
+  }
+  /* a long name wraps (balanced) instead of running off the screen */
+  .mw-title-quiet { white-space: normal; text-wrap: balance; text-align: center; height: auto; padding-block: 10px; overflow-wrap: anywhere; }
+  .mw-title-form { margin-top: 4px; }
+
+  /* phones: the primary runs the width of the screen, the rocket at its far end */
+  @media (max-width: 599px) {
+    .mw-title[data-layout="stack"] .mw-title-act { flex-direction: column; align-items: stretch; }
+    .mw-title[data-layout="stack"] .mw-title-primary { width: 100%; justify-content: space-between; }
+  }
+
+  /* short screens: the sign-up gets the whole block (the wordmark steps aside while it is open) */
+  @media (max-height: 720px) {
+    .mw-title[data-phase="signup"] .mw-title-mark { display: none; }
+    .mw-title[data-phase="signup"] .mw-title-body { margin-top: 0; }
+  }
+  /* short landscape screens: tighter still */
+  @media (max-height: 560px) {
+    .mw-title-body { margin-top: 14px; }
+    .mw-title-act { margin-top: 18px; min-height: 0; }
+    .mw-title[data-layout="side"] .mw-title-mark { font-size: clamp(28px, 4vw, 44px); }
+    .mw-title[data-phase="switch"] .mw-title-mark { display: none; }
+    .mw-title[data-phase="switch"] .mw-title-body { margin-top: 0; }
+  }
+
+  /* the one authored moment: the system flies in, then the words arrive (wordmark first) */
+  .mw-title-main > .mw-title-words > * {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity calc(var(--transition-duration-moment) * 0.8) var(--ease-out), transform var(--transition-duration-moment) var(--ease-out);
+  }
+  .mw-title-main[data-shown] > .mw-title-words > * { opacity: 1; transform: none; }
+  .mw-title-main[data-shown] > .mw-title-words > .mw-title-body { transition-delay: 150ms; }
+
+  .mw-dev {
+    border: 1px solid var(--color-line-1);
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: var(--color-ink-2);
+  }
+  .mw-dev:hover,
+  .mw-dev:focus-visible { border-color: var(--color-gold); color: var(--color-ink-1); }
+}
+
+@keyframes mw-title-arrive {
+  from { opacity: 0; translate: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mw-title-main > .mw-title-words > * { transition: none; }
+  .mw-title-body { animation: none; }
+}

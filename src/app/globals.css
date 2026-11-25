@@ -106,6 +106,33 @@
     font-stretch: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100dvh;
+    /* a game, not a document: no double-tap zoom delay, no grey tap flash, no rubber-band past the void */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  /* the parts the browser draws carry the design too */
+  input,
+  textarea {
+    caret-color: var(--color-gold);
+  }
+  * {
+    scrollbar-color: var(--color-line-2) transparent;
+    scrollbar-width: thin;
+  }
+  a {
+    text-underline-offset: 0.2em;
+  }
+  button,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   ::selection {

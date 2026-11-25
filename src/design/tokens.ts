@@ -114,6 +114,15 @@ export const CADET = {
   "cadet-6": "#f07a95",
 } as const;
 export type CadetColor = keyof typeof CADET;
+/** The spoken name of each cadet colour: what a screen reader says and what the sign-up shows beside the swatches. */
+export const CADET_NAME: Record<CadetColor, string> = {
+  "cadet-1": "Sky blue",
+  "cadet-2": "Gold",
+  "cadet-3": "Ember",
+  "cadet-4": "White",
+  "cadet-5": "Violet",
+  "cadet-6": "Rose",
+};
 
 /**
  * Every design value as a CSS custom property, in the exact form globals.css declares it.

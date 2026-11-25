@@ -40,7 +40,7 @@ export function TopBar({ title, left, orbs, onHelp, helpLabel = "How to play", r
   return (
     <header className={`mw-topbar ${className}`}>
       {left}
-      {title && <h1 className="m-0 min-w-0 truncate type-label text-ink-2">{title}</h1>}
+      {title && <h1 className="mw-topbar-title">{title}</h1>}
       <span className="flex-1" />
       {right}
       {orbs != null && <OrbCount n={orbs} />}
