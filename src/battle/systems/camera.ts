@@ -58,7 +58,8 @@ export function frameBox(m: { w: number; h: number; bottom: number; top?: number
 }
 
 /** The rocket's band at the bottom of the free area, in CSS px (it holds the rocket and the number on its nose). */
-export const rocketBand = (freeH: number) => Math.round(Math.max(freeH < 320 ? 80 : 108, Math.min(196, freeH * 0.28)));
+/** On a short free area (a small phone) the band shrinks so the fleet keeps its size (review round, point 7). */
+export const rocketBand = (freeH: number) => Math.round(freeH < 280 ? Math.max(56, freeH * 0.28) : Math.max(freeH < 320 ? 80 : 108, Math.min(196, freeH * 0.28)));
 
 export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCanvasElement, origin: THREE.Vector3) {
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();

@@ -371,8 +371,13 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   let lastPpu = 0;
   function lanePad(p: { left: number; top: number }) {
     if (!(lastPpu > 0)) return p;
+    // capped by the fleet's own size: room asked for in px grows as the camera pulls back, so uncapped it
+    // would pull the camera back further every frame on a small phone
     const h = COUNT_PX / lastPpu;
-    return { left: Math.max(p.left, LANE.gap + h * textAspect("00") + 0.1), top: Math.max(p.top, LANE.topGap + h + 0.1) };
+    return {
+      left: Math.max(p.left, Math.min(LANE.gap + h * textAspect("00") + 0.1, fv.fw * 0.3)),
+      top: Math.max(p.top, Math.min(LANE.topGap + h + 0.1, fv.fh * 0.15)),
+    };
   }
 
   function ready() {
@@ -874,7 +879,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
           hit.push([`${p.id}${p.text ? ` "${p.text}"` : ""}`, `${q.id}${q.text ? ` "${q.text}"` : ""}`]);
         }
       }
-      return { time: stage.time, fleet: fleet && { x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }, rocket: rocket && { x: rocket.x, y: rocket.y, w: rocket.width, h: rocket.height }, shipPx, marks: out, overlaps: hit, scan: scan.debug(), hint: ui.hint, words: fv.words };
+      return { time: stage.time, fleet: fleet && { x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }, rocket: rocket && { x: rocket.x, y: rocket.y, w: rocket.width, h: rocket.height }, shipPx, marks: out, overlaps: hit, scan: scan.debug(), hint: ui.hint, words: fv.words, safe: cam.safe, band: cam.band, lift: rocketLift, pad: lanePad(fv.wordsPad()), fw: fv.fw, fh: fv.fh };
     },
     /** The rocket and the number on its nose, as a box on screen in CSS px (the guide keeps its captions off them). */
     rocketRect(): DOMRect | null {
