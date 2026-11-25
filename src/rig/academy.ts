@@ -1,4 +1,5 @@
 import { TRICKS } from "@/db/events";
+import { tierOfPlanet, type PlanetId } from "./pools";
 import { CARD, type TrickId } from "./tricks";
 
 /**
@@ -23,3 +24,18 @@ const EXAMPLES: Record<TrickId, [number, number, [number, number]]> = {
 
 export const FILMS: Film[] = TRICKS.map((t) => { const [a, b, sister] = EXAMPLES[t]; return { trick: t, card: CARD[t], a, b, sister }; });
 export const filmOf = (t: string) => FILMS.find((f) => f.trick === t) ?? null;
+
+/**
+ * Where the journey first shows each trick: the first planet with a fact whose Show Me How (`lesson`)
+ * uses it. tests/academy.test.ts derives this from the router over every planet's facts, so it cannot drift.
+ */
+export const FIRST_MET: Record<TrickId, PlanetId> = {
+  "empty-mirror": "earth",
+  "fast-adding": "moon", "flip-it": "moon", "double-it": "moon", "easy-5-10": "moon", "borrow-take-back": "moon", // 2 × 9
+  "jump-one-more": "mars", "split-and-add": "mars",
+  "big-small-split": "jupiter",
+  "half-double": "saturn",
+};
+
+/** The films in the order the journey meets their tricks (planet by planet, then the doc's order). */
+export const FILMS_BY_JOURNEY: Film[] = [...FILMS].sort((x, y) => tierOfPlanet(FIRST_MET[x.trick]) - tierOfPlanet(FIRST_MET[y.trick]));
