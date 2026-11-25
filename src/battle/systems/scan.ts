@@ -1,4 +1,5 @@
 import { MOTION } from "@/design/tokens";
+import * as THREE from "three";
 import type { Stage } from "@/engine/stage";
 import { eachScan, scanTiming, squadScan, type ScanStep } from "../formation";
 import { LOOK, reducedMotion } from "../look";
@@ -27,7 +28,34 @@ export interface ScanHooks {
   caption: (text: string | null) => void;
 }
 
+/** How much the ships not being counted dim (a fraction of LOOK.dim's strength): a little, never hidden. */
+const DIM = 0.55;
+const unit = new THREE.PlaneGeometry(1, 1);
+
 export function createScan(stage: Stage, fv: FleetView, hooks: ScanHooks) {
+  // the dim: four void panes round the box being counted, over the rest of the fleet (so that box reads brighter)
+  const dimMat = new THREE.MeshBasicMaterial({ color: LOOK.dim.color, transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  const panes = Array.from({ length: 4 }, () => { const m = new THREE.Mesh(unit, dimMat); m.renderOrder = 5; m.visible = false; return m; });
+  const dimOff = () => { for (const m of panes) { m.visible = false; m.removeFromParent(); } };
+  /** Dim the fleet's box outside `b` (formation units), padded by `pad`. */
+  function dimAround(b: { x: number; y: number; hx: number; hy: number }, pad: number, k: number) {
+    const l = fv.layout;
+    if (!l) return;
+    const X0 = -l.W / 2 - pad, X1 = l.W / 2 + pad, Y0 = -l.H / 2 - pad, Y1 = l.H / 2 + pad;
+    const x0 = b.x - b.hx - pad, x1 = b.x + b.hx + pad, y0 = b.y - b.hy - pad, y1 = b.y + b.hy + pad;
+    const set = (m: THREE.Mesh, a0: number, a1: number, c0: number, c1: number) => {
+      const w = a1 - a0, h = c1 - c0;
+      m.visible = w > 0.01 && h > 0.01;
+      m.position.set((a0 + a1) / 2, (c0 + c1) / 2, 0.6);
+      m.scale.set(Math.max(w, 0.001), Math.max(h, 0.001), 1);
+      if (!m.parent) fv.overlay.add(m);
+    };
+    set(panes[0], X0, X1, y1, Y1); // above
+    set(panes[1], X0, X1, Y0, y0); // below
+    set(panes[2], X0, x0, y0, y1); // left
+    set(panes[3], x1, X1, y0, y1); // right
+    dimMat.opacity = LOOK.dim.opacity * DIM * k;
+  }
   let run: {
     kind: ScanKind; steps: ScanStep[]; t0: number; step: number; settle: number; shown: number;
     done: (() => void) | null; count: InkText | null; bracket: ReturnType<typeof createBracket>; counted: boolean;
@@ -40,6 +68,7 @@ export function createScan(stage: Stage, fv: FleetView, hooks: ScanHooks) {
     const r = run;
     run = null;
     r.count?.dispose();
+    dimOff();
     r.done?.();
     if (skipped) { r.bracket.dispose(); return; }
     tail.push({ t0: stage.time, bracket: r.bracket });
@@ -94,7 +123,7 @@ export function createScan(stage: Stage, fv: FleetView, hooks: ScanHooks) {
       const r = run, el = now - r.t0, n = r.steps.length;
       if (el >= n * r.step) {
         // the last count goes, the bracket lets go: a short beat with nothing new, then the label
-        if (!r.counted) { r.counted = true; r.count?.dispose(); r.count = null; r.bracket.mat.opacity = 0.35; }
+        if (!r.counted) { r.counted = true; r.count?.dispose(); r.count = null; r.bracket.mat.opacity = 0.35; dimOff(); }
         if (el >= n * r.step + r.settle) end(false);
         return;
       }
@@ -116,8 +145,9 @@ export function createScan(stage: Stage, fv: FleetView, hooks: ScanHooks) {
         const k = Math.min(1, (now - (r.count.mesh.userData.born as number)) / (MOTION.quick / 1000));
         place(r, st, u * (0.8 + 0.2 * (1 - Math.pow(1 - k, 3))));
       }
-      // the bracket keeps its hairline width as the camera eases
+      // the bracket keeps its hairline width as the camera eases; the rest of the fleet dims a little
       r.bracket.set(st.box, LOOK.scan.line * u, 0.1);
+      dimAround(st.box, 0.08, Math.min(1, (now - r.t0) / (MOTION.quick / 1000)));
     },
   };
   return scan;
