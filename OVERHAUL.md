@@ -81,20 +81,56 @@ These read as generic machine-made UI. Do not ship them:
 - **Come back for mastery.** The return loop is a daily patrol of facts due for review and a wall of dots turning Gold.
 
 ## Plan
-- **Wave 1 (foundations, in parallel):**
-  - `kit`: tokens to CSS and Tailwind, Saira, the component kit, the top bar, the route fade, `DESIGN.md`.
-  - `engine`: the battle split into a tested state machine, an event bus, systems and registries. No visual change.
-  - `film`: the intro film fixed and re-lit, captions and cards in the new language, the cast redesigned.
-  - `worlds`: looks, one planet factory, one Earth, the title scene, planet sprites for 2D.
-  - `ships`: rocket, invader drones with squad leaders, pods and big ships, the hangar scene.
-- **Wave 2:** Title and sign-up, Resting Bay in 2D, the battle as a cockpit with the hint ladder and real hit effects, Star map, Academy, Hangar shop, pause menu, economy logic.
-- **Wave 3:** the teaching layer (guided first shot, Field Manual, first-visit lines, briefing cards), economy UI and the daily patrol, one copy pass.
-- **Wave 4:** a full test sweep on desktop and phone, fixes, and documentation.
+- **Wave 1 (done):** kit, engine, film, worlds and ships, merged, tested and fixed. Handoff notes: `docs/overhaul/README.md`.
+- **Wave 2 (now):** seven tracks in parallel; see "Wave 2" below.
+- **Wave 3:** wire the teaching layer into every screen (guided first shot, greetings, Field Manual links), the daily patrol on the bay, the film-to-battle hand-off, one copy pass and one voice bake.
+- **Wave 4:** the final sweep on desktop and phone. Testers try everything that could break a child's game and score every screen for attention overload; fixers fix; a second pass confirms.
+
+## Wave 2
+
+### Decisions already made (do not reopen)
+1. **No multiple choice.** The four-answer Targeting Radar row is gone for good. Hints are the ladder: squad scan, each scan, Show Me How.
+2. **Structure is discovered by default.** Battles run with `structure: "discover"`. The "N squads · N ships each" line and the axis labels appear only when the ladder reveals them.
+3. **The typed number lives on the rocket and on the Fire button** ("Fire 42"). There is no input box.
+4. **Orbs are derived, not trusted.** The fold works out orbs from learning events. A client-sent amount is never believed.
+5. **Flashcards pay no orbs.** The daily patrol pays once a day instead.
+6. **The rig decides which Power-Ups fit** (`powerUpFits`). The battle draws every fleet so those tricks can act on it; no battle-only exceptions.
+7. **Missions are named by their planet** on every label: Earth, the Moon, Mars. "Cadet Bay" stays only in the film's story lines. The hub is the Resting Bay.
+8. **Orbs and Gold look different:** an orb is a gold ring with a count; Gold mastery is a filled gold bullseye.
+9. **Earth may keep a thin atmosphere rim.** It never blooms. The Sun and the Launch moment are still the only glow.
+10. **New spoken lines are captions first.** Only the film track bakes audio this wave. Everyone else lists new lines under "Lines to bake" in their handoff note.
+
+### Tracks and what each owns
+A file has one owner. Edit only what you own. Anything else goes in your handoff note as a request.
+
+| Track | Builds | Owns |
+| --- | --- | --- |
+| `console` | The battle's 2D layer: the cockpit console, mission strip, Power-Up belt, briefing, reward, unlock and clear cards, pause menu | `src/components/battle/**` (not `ui.tsx`), `src/components/WaveArena.tsx`, `src/components/WarmupDrill.tsx` |
+| `combat` | The battle's 3D layer: discover mode, scans, the number on the nose, volley, kill beat, misses, warp-in, backdrop, camera | `src/battle/**` (not `rewards.ts`), `src/worlds/space/{arena,warmup,skies,cadetBay,ships}.ts`, `src/engine/**` (not `overlay.ts`), `src/director/next.ts`, the `space` look |
+| `front` | Title with sign-up, Resting Bay, flashcards, the kit, route transitions, error and loading states | `src/components/{TitleScreen,RestingBayScreen,SoundToggle}.tsx`, `src/components/hub/**`, `src/components/kit/**`, `src/design/**`, `src/app/{globals.css,layout.tsx,page.tsx,not-found.tsx,bay,kit}/**`, `src/worlds/space/title.ts`, `DESIGN.md`, `docs/glossary.md` |
+| `places` | Star map in 2D, Academy in 2D, planet sprites | `src/components/{SolarMap,AcademyScreen}.tsx`, `src/components/world/**`, `src/app/{map,academy,dev/planets}/**`, `src/worlds/sprites.ts`, `src/worlds/space/{solarMap,planets,planetMaps,planetMaps.worker,bodies,earth}.ts`, `src/rig/academy.ts` |
+| `economy` | Orb rules in the fold, the catalogue, the daily patrol logic, the Hangar shop | `src/director/{fold,hub,hangar,telemetry}.ts`, `src/battle/rewards.ts`, `src/db/**`, `src/app/{api,admin,hangar}/**`, `src/components/{HangarScreen.tsx,admin/**}`, `src/worlds/space/hangarBay.ts`, the `hero` look |
+| `manual` | The Field Manual, first-visit greetings, the guided first shot, ship sprites | new `src/teach/**`, `src/components/teach/**`, `src/app/{manual,dev/teach}/**`, `src/worlds/shipSprites.ts`, `docs/teaching.md` |
+| `film` | The intro film's beauty pass, Skip and replay, glossary words, the bake | `src/worlds/space/{intro,cast,classroom,town,hangar,hand,lines}.ts`, `src/components/IntroFilm.tsx`, `src/app/{intro,dev/cast}/**`, `src/engine/overlay.ts`, `public/vo/**`, `scripts/bake-voices.py`, the `interior` look |
+
+Frozen for everyone: `src/rig/**` (except `academy.ts`), `src/components/battle/ui.tsx`, `package.json`, the lockfile, `OVERHAUL.md`, `PRODUCT.md`, `CLAUDE.md`, `STATE.md`. Build a replacement in a file you own instead of editing `ui.tsx`. Tests belong to whoever owns the code they test.
+
+### Contracts between tracks
+- **Console to arena** (all of these exist today): `arena.fire(n)`, `arena.setCharge(n | null)` on every keypad change, `arena.setSafe({ top, right, bottom, left })` with the console's footprint in px, `arena.captionAt(px, side)`, `arena.showMeHow()`, `arena.powerUp(id)`, `arena.bus.on(type, fn)`, and `ArenaUi` (`wave`, `canFire`, `outcome`, `hint`, `belt`, `sectors`, `lesson`, `unlock`, `offer`, `done`, `orbs`).
+- **`ArenaUi.radar` is always `null`** from now on. Console does not read it. Combat keeps the field in the type and keeps `arena.radar` as a harmless alias of `fire`.
+- **`ArenaUi.hint`** drives every structure word in the console: nothing about squads or ships each is shown unless `hint.squads` or `hint.each` is `"on"` or `"soft"`. `hint.powerUp` names the Power-Up to pulse.
+- **Guide anchors:** the console marks its parts with `data-guide="question" | "keypad" | "fire" | "help" | "powerups" | "orbs"`. The guided first shot points at these.
+- **Seen keys:** a first-visit greeting or guided step is recorded with `emit({ type: "seen", payload: { key } })` and read from `state.seen[key]`. Keys: `greet:<screen>`, `guide:<step>`, `manual:<page>`.
+- **Help:** `TopBar`'s `onHelp` opens the Field Manual. Until the tracks merge, a screen may leave `onHelp` unset.
+- **Planet art:** every 2D planet is `<PlanetSprite id size />`. Every 3D planet is `makeBody`.
+- **The film's last frame** is the rocket at bottom centre on the void with Earth's horizon below. The Earth battle opens on the same frame, so the cut is clean.
 
 ## Working rules for every track
 - Work only inside your own worktree and commit only to your own branch. Never switch branches, never push, never edit another worktree or the `main` checkout.
 - Edit only the files your track owns. If you need a change in a file you do not own, write it down in your handoff note; do not make it.
 - Do not add dependencies unless there is no other way; say so in your handoff note if you do.
 - Keep the public API of files other tracks import from you, or document the change.
-- Write a handoff note at `docs/overhaul/<track>.md`: what changed, the APIs others should use, how you verified it, what is not done.
+- Write a handoff note at `docs/overhaul/<track>.md` (`w2-<track>.md` in wave 2): what changed, the APIs others should use, how you verified it, what is not done, and any "Lines to bake".
 - Verify by playing it in a browser on your own origin, on desktop and at phone size. Check the console for errors.
+- Stay silent: set `localStorage["mw:mute"] = "1"` on your own origin before anything plays. Never press M or click the speaker.
+- The browser pane is shared and usually hidden. Pass your own `tabId` on every browser call. While hidden, CSS transitions do not advance and the 3D clock is slow: call `document.getAnimations().forEach(a => a.finish())` before a screenshot, and step the stage (`window.__mw.stage`) to judge motion.

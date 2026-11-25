@@ -41,6 +41,8 @@ export const EventInput = z.discriminatedUnion("type", [
   /** Mercury (addition) and Venus (subtraction) warm-ups, up to 20. */
   z.object({ type: z.literal("warmup_answered"), payload: z.object({ op: z.enum(["add", "sub"]), a: z.number().int().min(0).max(20), b: z.number().int().min(0).max(20), guess: z.number().int().min(0).max(1e6), correct: z.boolean().optional(), latencyMs: count }) }),
   z.object({ type: z.literal("flashcard_answered"), payload: z.object({ a: factor, b: factor, correct: z.boolean().optional(), latencyMs: count, guess: z.number().int().min(0).max(1e10) }) }),
+  /** The cadet has met something once: a screen's greeting, a help page, a guided step. Keys look like "greet:bay" or "guide:first-shot". */
+  z.object({ type: z.literal("seen"), payload: z.object({ key: z.string().regex(/^[a-z0-9:-]{1,48}$/) }) }),
 ]);
 export type EventInput = z.infer<typeof EventInput>;
 export type EventType = EventInput["type"];

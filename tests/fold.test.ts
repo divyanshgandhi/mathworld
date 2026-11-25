@@ -137,6 +137,13 @@ describe("fold", () => {
     expect(s.orbs).toBe(10);
     expect(s.equipped.hull).toBe("solar-gold");
   });
+
+  it("counts what the cadet has seen, by key, and nothing else moves", () => {
+    const s = fold([{ type: "seen", payload: { key: "greet:bay" } }, { type: "seen", payload: { key: "greet:bay" } }, { type: "seen", payload: { key: "guide:first-shot" } }]);
+    expect(s.seen).toEqual({ "greet:bay": 2, "guide:first-shot": 1 });
+    expect(s.orbs).toBe(0);
+    expect(s.waves).toBe(0);
+  });
 });
 
 describe("scaffolding", () => {

@@ -176,6 +176,7 @@ export function describe(e: LoggedEvent): string {
     case "flashcard_answered": { const p = e.payload; return `flashcard ${p.a} × ${p.b} → ${p.guess} ${p.guess === p.a * p.b ? "✓" : "✗"} · ${(p.latencyMs / 1000).toFixed(1)} s`; }
     case "warmup_answered": { const p = e.payload, r = p.op === "add" ? p.a + p.b : p.a - p.b; return `warm-up ${p.a} ${p.op === "add" ? "+" : "−"} ${p.b} → ${p.guess} ${p.guess === r ? "✓" : "✗"}`; }
     case "intro_completed": return "finished the intro";
+    case "seen": return `saw ${e.payload.key}`;
   }
 }
 

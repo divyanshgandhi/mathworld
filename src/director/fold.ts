@@ -46,6 +46,8 @@ export interface PlayerState {
   transferQueue: { trick: TrickId; key: string; tier: number; due: number }[];
   transfer: { checks: number; passes: number };
   antiMashNudges: number;
+  /** How many times each "seen" key was recorded (first-visit greetings, guided steps, help pages). */
+  seen: Record<string, number>;
   open: OpenWave | null;
   offers: { hyperJumpTo: number | null; cushion: boolean; clear: boolean };
 }
@@ -55,7 +57,7 @@ const freshMission = (n: number) => ({ n, waves: 0, inTier: 0, solved: 0, passed
 export const initialState = (): PlayerState => ({
   introCompleted: false, tier: 0, unlocked: 0, cleared: [], aceCleared: [], facts: {}, seenTricks: {}, orbs: 0, equipped: {}, owned: [], warmups: { answered: 0, correct: 0 },
   waves: 0, history: [], mission: freshMission(0), goldStreak: 0, probePassed: false, struggleStreak: 0, lastStruggle: null,
-  transferQueue: [], transfer: { checks: 0, passes: 0 }, antiMashNudges: 0, open: null,
+  transferQueue: [], transfer: { checks: 0, passes: 0 }, antiMashNudges: 0, seen: {}, open: null,
   offers: { hyperJumpTo: null, cushion: false, clear: false },
 });
 
@@ -188,6 +190,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
         s.facts[key] = { m: Math.max(f.m, ewma(f.m, FLASHCARD_OBS, FLASHCARD_ALPHA)), seen: f.seen + 1, fastWins: f.fastWins + 1 };
         break;
       }
+      case "seen": s.seen[e.payload.key] = (s.seen[e.payload.key] ?? 0) + 1; break;
       case "warmup_answered": { const p = e.payload; s.warmups.answered++; if (p.guess === (p.op === "add" ? p.a + p.b : p.a - p.b)) s.warmups.correct++; break; }
       default: break; // explanation_started: telemetry only
     }
