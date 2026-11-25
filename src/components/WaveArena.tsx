@@ -1,17 +1,17 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { flushed, history, post } from "@/engine/outbox";
+import { flushed, history, onSaveState, post, saveState } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
 import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
-import { fold } from "@/director/fold";
+import { fold, type LoggedEvent } from "@/director/fold";
 import { canLaunch } from "@/director/hub";
 import { BattleHud } from "./battle/BattleHud";
 import { PauseMenu } from "./battle/PauseMenu";
 import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
 import { css } from "./battle/cockpit";
-import { Sheet } from "@/components/kit";
+import { PillLink, Sheet } from "@/components/kit";
 import { FirstShotGuide } from "@/components/teach/FirstShotGuide";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
@@ -35,28 +35,37 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
   const [arena, setArena] = useState<Arena | null>(null);
   const [ui, setUi] = useState<ArenaUi | null>(null);
   const [cadet, setCadet] = useState<Cadet | null | undefined>(undefined);
+  const [log, setLog] = useState<LoggedEvent[] | null>(null);
+  const [locked, setLocked] = useState(false);
+  const saving = useSyncExternalStore(onSaveState, saveState, () => "saved");
   const query = useSyncExternalStore(() => () => {}, readQuery, () => JSON.stringify({ dev: false, force: null }));
   const { dev, force } = JSON.parse(query) as { dev: boolean; force: { a: number; b: number } | null };
 
   const router = useRouter();
   useEffect(() => {
-    fetch("/api/player").then((r) => r.json()).then((j) => {
+    const isDev = new URLSearchParams(location.search).has("dev");
+    fetch("/api/player").then((r) => r.json()).then(async (j) => {
       // no cadet on this device: the Title signs them up (dev drills sign up right here)
-      if (!j.player && !new URLSearchParams(location.search).has("dev")) return router.replace("/");
+      if (!j.player && !isDev) return router.replace("/");
+      // the film comes first, as on every hub screen
+      if (j.player && !j.introCompleted && !isDev) return router.replace("/intro");
+      const events = j.player ? await history() : [];
+      // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere):
+      // decided before anything mounts, with a visible way back in case the redirect stalls
+      if (j.player && !isDev && !canLaunch(fold(events), planet)) { setLocked(true); return location.replace("/map"); }
+      setLog(events);
       setCadet(j.player);
     }).catch(() => setCadet(null));
-  }, [router]);
+  }, [router, planet]);
 
   useEffect(() => {
     if (!cadet) return;
     let gone = false, cleanup = () => {};
     (async () => {
-      const [{ createStage }, { mountArena }, log] = await Promise.all([import("@/engine/stage"), import("@/worlds/space/arena"), history()]);
+      const [{ createStage }, { mountArena }, events] = await Promise.all([import("@/engine/stage"), import("@/worlds/space/arena"), log ?? history()]);
       if (gone || !box.current) return;
-      // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere)
-      if (!dev && !canLaunch(fold(log), planet)) return router.replace("/map");
       const stage = createStage(box.current, { fill: true });
-      const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
+      const a = mountArena(stage, { planet, history: events, onUi: setUi, onEvent: post, dev, force });
       const { audio } = await import("@/engine/audio");
       window.__mw = { stage, arena: a, audio };
       setArena(a);
@@ -73,6 +82,15 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     // the game root: focused on mount so the keyboard works without a click; no text selection, no zoom
     <div className={css.root} data-cockpit tabIndex={-1} inputMode="none" autoFocus>
       <div ref={box} className="absolute inset-0" />
+      {locked && (
+        <Sheet className="absolute inset-0 z-30 m-auto h-fit w-[min(92%,420px)] p-6 text-center">
+          <p className="mb-4">This planet is locked.</p>
+          <PillLink href="/map" icon="map">Back to the Star map</PillLink>
+        </Sheet>
+      )}
+      {saving === "waiting" && (
+        <p role="status" className="pointer-events-none absolute top-14 left-1/2 z-40 -translate-x-1/2 rounded-pill border border-line-1 px-3 py-1 text-xs text-ink-2">Not saved yet. Trying again.</p>
+      )}
       {cadet === null && (
         <Sheet className="absolute inset-0 z-30 m-auto h-fit max-h-[92dvh] w-[min(92%,520px)] overflow-y-auto p-6 md:p-8">
           <CadetSignUp onDone={setCadet} />
