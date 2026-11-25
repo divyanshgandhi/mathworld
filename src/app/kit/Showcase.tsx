@@ -320,7 +320,7 @@ export function KitShowcase() {
           <p className="mt-4 type-body-sm text-ink-3">The sign-up is live: Begin creates a cadet on this device.</p>
         </Section>
 
-        <Section id="legacy" title="Older screens" note="battle/ui.tsx keeps its exported class strings so older screens keep working until they move to the kit: btn is a pill base, ghost is secondary, lime and primary are the primary pill, quiet is quiet, glass is a sheet, backdrop is the scrim, dialogBox is a centred sheet, padKey is a keypad key. New code uses the kit components above instead." >
+        <Section id="legacy" title="Older screens" note="battle/ui.tsx keeps five class strings for the admin screens and the battle cards until they move to the kit: ghost is secondary, lime is the primary pill, glass is a sheet, backdrop is the scrim, dialogBox is a centred sheet. New code uses the kit components above instead." >
           <p className="m-0 type-body text-ink-2">Their replacements: <b className="font-medium">Button</b> and <b className="font-medium">buttonClass()</b>, <b className="font-medium">Sheet</b>, <b className="font-medium">SheetDialog</b> with <b className="font-medium">scrimClass</b> and <b className="font-medium">dialogClass</b>, <b className="font-medium">Keypad</b> and <b className="font-medium">CadetSignUp</b> (in components/hub).</p>
         </Section>
 
