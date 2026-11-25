@@ -4,10 +4,11 @@ import { CameraRig, type V3 } from "@/engine/camera";
 import { Director, type Step } from "@/engine/director";
 import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
+import { applyLook, LOOKS, type LookId } from "@/worlds/looks";
 import { approach, clamp, ease, keyframes, seeded } from "@/engine/util";
 import { prepare, warmVoice } from "@/engine/voice";
 import { animateCharacter, CAPTAIN, CLASSMATES, eyePosition, face, headPosition, makeCharacter, PLAYER, PRINCIPAL, seat, SKIN, TEACHER, type Character } from "./cast";
-import { buildClassroom, DOOR_POINT, PLAYER_SEAT, SEATS } from "./classroom";
+import { buildClassroom, CHAIR_BACK, DESK_DEPTH, DESK_HEIGHT, DOOR_POINT, PLAYER_SEAT, SEAT_HEIGHT, SEATS } from "./classroom";
 import { buildEarth, EARTH_RADIUS } from "./earth";
 import { makeHand } from "./hand";
 import { buildHangar } from "./hangar";
@@ -27,12 +28,13 @@ export interface FilmUi { prompt: { eq: string; options: number[]; stage: "raise
 export const SPACE_AT = new THREE.Vector3(0, 0, -6000);
 const TOWN_AT = new THREE.Vector3(1500, 0, 0), HANGAR_AT = new THREE.Vector3(-1500, 0, 0);
 const CLASS_CENTRE = new THREE.Vector3(0, 1, 1.2);
-const HALL = [new THREE.Vector3(7.0, 0, -3.2), new THREE.Vector3(6.2, 0, -3.4)];
-const ARRIVE = { principal: new THREE.Vector3(4.5, 0, -2.4), captain: new THREE.Vector3(3.5, 0, -3.8) };
-const MOODS = {
-  tuesday: { sat: 0.62, tint: [1.03, 1.0, 0.95], exposure: 0.95, hall: 0.2, spill: 0, fill: 0, buzz: true },
-  knock: { sat: 0.86, tint: [1.04, 1.0, 0.95], exposure: 1.0, hall: 0.85, spill: 16, fill: 5, buzz: false },
-} as const;
+// the walk in: from down the hall, through the middle of the doorway, to their marks clear of the open door
+const HALL = [new THREE.Vector3(7.6, 0, -3.75), new THREE.Vector3(6.1, 0, DOOR_POINT.z)];
+const ARRIVE = { principal: new THREE.Vector3(4.75, 0, -2.2), captain: new THREE.Vector3(3.95, 0, -3.1) };
+/** Each set picks one of the three looks; no shot sets its own background, bloom, exposure or grade. */
+const LOOK_OF: Record<Env, LookId> = { space: "space", town: "interior", class: "interior", hangar: "hero" };
+/** The one story grade: the ordinary Tuesday is a touch muted, and colour arrives with the knock. `hall` is how much the hallway lights the room. */
+const MOODS = { tuesday: { sat: 0.86, hall: 0 }, knock: { sat: 1, hall: 1 } } as const;
 
 export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) => void; onEnd?: () => void } = {}) {
   const { scene, camera, mats: M } = stage;
@@ -40,12 +42,13 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   void audio.preload();
   const overlay = createOverlay(stage.container, stage.renderer.domElement);
   const cam = new CameraRig();
-  const hemi = new THREE.HemisphereLight(0xdfe6f0, 0x6b5a4a, 0.8);
+  // the cool fill of whichever look is on
+  const hemi = new THREE.HemisphereLight(LOOKS.space.fill.sky, LOOKS.space.fill.ground, LOOKS.space.fill.intensity);
   scene.add(hemi);
 
   const earth = buildEarth(scene, M, rnd, SPACE_AT);
   const town = buildTown(scene, M, rnd, TOWN_AT);
-  const room = buildClassroom(scene, M, rnd);
+  const room = buildClassroom(scene, M, rnd, LOOKS.interior);
   const hangar = buildHangar(scene, M, rnd, HANGAR_AT);
 
   // first-person hand for the yawn, with a soft light so it never reads as a dark blob
@@ -70,7 +73,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   let j = 0;
   SEATS.forEach(([x, z], i) => {
     const c = makeCharacter(i === PLAYER_SEAT ? PLAYER : CLASSMATES[j++], M, rnd);
-    seat(c, x, 0.47, z + 0.5);
+    seat(c, x, SEAT_HEIGHT, z + CHAIR_BACK, { chair: room.chairs[i], desk: DESK_HEIGHT, edge: CHAIR_BACK - DESK_DEPTH / 2 });
     c.group.rotation.y = Math.PI;
     scene.add(c.group);
     if (i === PLAYER_SEAT) player = c; else kids.push(c);
@@ -112,22 +115,21 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   function setEnv(e: Env) {
     env = e;
     const space = e === "space", tw = e === "town", cls = e === "class", hg = e === "hangar";
-    scene.background = tw ? null : new THREE.Color(space ? 0x030612 : cls ? 0x1f1b24 : 0x050918);
+    const look = applyLook(stage, LOOK_OF[e]);
     scene.fog = tw ? new THREE.FogExp2(0xf5cfa0, 0.0026) : hg ? new THREE.FogExp2(0x081126, 0.008) : null;
     camera.far = space ? 3000 : tw ? 700 : 120;
     camera.near = space ? 0.5 : 0.02;
     camera.updateProjectionMatrix();
-    hemi.color.set(space ? 0x3a5a8c : tw ? 0xfff0d4 : hg ? 0x7dd3fc : 0xfff1dc);
-    hemi.groundColor.set(space ? 0x070a18 : tw ? 0x3f6e3b : hg ? 0x1e293b : 0x6e543f);
-    hemi.intensity = space ? 0.5 : tw ? 0.85 : hg ? 0.6 : 0.62;
-    earth.sun.intensity = space ? 3 : 0;
-    town.sun.intensity = tw ? 3.0 : 0;
+    hemi.color.setHex(look.fill.sky);
+    hemi.groundColor.setHex(look.fill.ground);
+    hemi.intensity = look.fill.intensity;
+    earth.sun.color.setHex(look.key.color);
+    earth.sun.intensity = space ? look.key.intensity : 0;
+    town.sun.color.setHex(look.key.color);
+    town.sun.intensity = tw ? look.key.intensity : 0;
     hangar.lights(hg);
-    Object.assign(stage.bloom, space ? { strength: 0.65, threshold: 1.0 } : hg ? { strength: 0.5, threshold: 1.1 } : { strength: 0.3, threshold: 1.25 });
-    const m = cls ? MOODS[mood] : { sat: 1, tint: [1, 1, 1], exposure: tw ? 0.98 : 1.02 };
-    stage.grade.sat.value = m.sat;
-    stage.grade.tint.value.set(m.tint[0], m.tint[1], m.tint[2]);
-    stage.renderer.toneMappingExposure = m.exposure;
+    stage.grade.tint.value.set(1, 1, 1);
+    stage.grade.sat.value = look.sat * (cls ? MOODS[mood].sat : 1);
   }
 
   const S = SPACE_AT, T = TOWN_AT, H = HANGAR_AT;
@@ -320,10 +322,10 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
       beats: [{ id: "teacher_mult", who: "Teacher", c: T_ }] }),
     { name: "knock", env: "class", chapter: "knock", d: 2.6,
       enter() { talk(null); overlay.caption("", "KNOCK!  KNOCK!  KNOCK!"); audio.sfx("knock"); shake = 0.08; lookAt(DOOR_POINT); cut([1.1, 1.9, -1.5], [6.0, 1.6, -3.4]); },
-      update(t) { if (t > 1.2 && doorTarget === 0) { doorTarget = 1.45; mood = "knock"; audio.sfx("door"); audio.mood("heroic"); overlay.caption("", ""); } } },
+      update(t) { if (t > 1.2 && doorTarget === 0) { doorTarget = 1; mood = "knock"; audio.sfx("door"); audio.mood("heroic"); overlay.caption("", ""); } } },
     talkShot({ name: "officers", env: "class", chapter: "knock", lead: 1.5, tail: 0.5,
       enter() {
-        doorTarget = 1.45; mood = "knock";
+        doorTarget = 1; mood = "knock";
         for (const [c, to, delay] of [[principal, ARRIVE.principal, 0], [captain, ARRIVE.captain, 0.3]] as const) {
           c.group.visible = true;
           c.group.position.copy(HALL[0]);
@@ -403,7 +405,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   function reset() {
     for (const p of people()) { p.rig.raise = false; p.rig.talking = false; p.rig.walk = null; if (p.rig.seat) { p.rig.stand = 0; p.rig.s = 0; } }
     for (const c of [principal, captain]) { c.group.visible = false; c.group.position.copy(HALL[0]); }
-    mood = "tuesday"; doorTarget = 0; room.door.rotation.y = 0;
+    mood = "tuesday"; doorTarget = 0; room.reset();
     overlay.card("", ""); overlay.caption("", ""); overlay.timer(null);
     hand.group.visible = false; lids = 1; blur = 0; fade = 0; firstPerson = false;
     hangar.reset();
@@ -428,16 +430,13 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
     if (env === "space") earth.update(dt);
     if (env === "town") town.update(time);
     if (env === "class") {
-      const m = MOODS[mood], tint = stage.grade.tint.value;
-      stage.grade.sat.value = approach(stage.grade.sat.value, m.sat, 1.5, dt);
-      tint.set(approach(tint.x, m.tint[0], 1.5, dt), approach(tint.y, m.tint[1], 1.5, dt), approach(tint.z, m.tint[2], 1.5, dt));
-      stage.renderer.toneMappingExposure = approach(stage.renderer.toneMappingExposure, m.exposure, 1.5, dt);
-      room.door.rotation.y = approach(room.door.rotation.y, doorTarget, 2.5, dt);
-      room.update(time, dt, { hall: m.hall, spill: m.spill, fill: m.fill, buzz: m.buzz, on: true });
+      const m = MOODS[mood];
+      stage.grade.sat.value = approach(stage.grade.sat.value, LOOKS.interior.sat * m.sat, 1.5, dt);
+      room.update(time, dt, { on: true, hall: m.hall, door: doorTarget });
       for (const p of people()) animateCharacter(p, time, dt, rnd, p === speaker ? voice : 0);
       player.rig.head.visible = !(firstPerson && cam.p.distanceTo(eye()) < 0.6);
     } else {
-      room.update(time, dt, { hall: 0, spill: 0, fill: 0, buzz: false, on: false });
+      room.update(time, dt, { on: false, hall: 0, door: doorTarget });
     }
     if (env === "hangar") { hangar.update(time, dt, voice, speaker === "nova"); animateCharacter(captainH, time, dt, rnd, speaker === captainH ? voice : 0); }
     shake *= 0.88;

@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { add, PALETTE, type Materials } from "@/engine/materials";
-import { clamp, type Rng } from "@/engine/util";
+import { clamp, keyframes, type Rng } from "@/engine/util";
+
+/** Mix two colours (token strings or hex numbers): how the film derives its palette from the tokens. */
+export const mix = (a: string | number, b: string | number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
 
 /**
  * The Storybook cast: hand-built characters with jointed limbs (hips, knees, shoulders, elbows),
@@ -13,8 +16,13 @@ type Extra = "glasses" | "tie" | "mustache";
 export interface Spec { role?: Role; skin: number; hair: number; hs: Hair; top: number; bot: number; shoe?: number; eyes?: number; ex?: Extra[] }
 
 interface Build { L: number; Ht: number; R: number; H: number; A: number }
-const KID: Build = { L: 0.4, Ht: 0.42, R: 0.16, H: 0.21, A: 0.36 };
-const ADULT: Build = { L: 0.78, Ht: 0.7, R: 0.2, H: 0.19, A: 0.6 };
+/**
+ * One proportion system, in metres: L hip height (thigh and shin are half each), Ht torso, R torso
+ * radius, H head radius, A arm length. A child is about 3.7 heads tall (1.32 m) and an adult about
+ * 5 (1.82 m), so a child who stands is clearly taller than the same child sitting on a 0.32 m chair.
+ */
+const KID: Build = { L: 0.56, Ht: 0.36, R: 0.13, H: 0.178, A: 0.4 };
+const ADULT: Build = { L: 0.92, Ht: 0.54, R: 0.18, H: 0.172, A: 0.62 };
 
 export const SKIN = [0xf1c7a5, 0xd9a27e, 0xa86b4a, 0x7a4a32, 0xf5d6c0, 0xc68f6a];
 export const CLASSMATES: Spec[] = [
@@ -35,10 +43,13 @@ export const CAPTAIN: Spec = { role: "captain", skin: 0, hair: 0x2b1b12, hs: "sh
 export interface Rig {
   body: THREE.Group; hips: THREE.Group[]; knees: THREE.Group[]; shoulders: THREE.Group[]; elbows: THREE.Group[];
   head: THREE.Group; mouth: THREE.Mesh; eyes: THREE.Group[]; torso: THREE.Group; prop: THREE.Object3D | null;
-  H: number; L: number; blink: number; ph: number;
+  H: number; L: number; Ht: number; A: number; R: number; blink: number; ph: number;
   /** raise amount and target */ r: number; raise: boolean;
   talking: boolean; look: THREE.Vector3 | null;
-  seat: { y: number; z: number } | null; s: number; stand: number;
+  /** Where this character sits: the seated hip height, the spot, and the chair and desk it belongs to. */
+  seat: { x: number; hip: number; z: number; chair: THREE.Object3D | null; chairZ: number; desk: number; edge: number } | null;
+  /** Progress of the sit-to-stand move (0 seated, 1 standing) and its target. */
+  s: number; stand: number;
   walk: { pts: THREE.Vector3[]; t0: number; d: number; face?: THREE.Vector3 } | null;
 }
 export interface Character { group: THREE.Group; rig: Rig; spec: Spec }
@@ -143,8 +154,8 @@ export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
   // neck and head
   add(torso, new THREE.CylinderGeometry(H * 0.29, H * 0.33, H * 0.42, 24), skin, 0, Ht * 1.05, 0);
   const head = new THREE.Group();
-  head.position.y = L + Ht + H * 0.22;
-  body.add(head);
+  head.position.y = Ht + H * 0.22; // on the torso, so a lean carries the head with it
+  torso.add(head);
   const hy = H * 0.95;
   add(head, new THREE.SphereGeometry(H, 48, 32), skin, 0, hy, 0).scale.set(1, 1.04, 0.97);
   add(head, new THREE.SphereGeometry(H * 0.7, 32, 20), skin, 0, hy - H * 0.36, H * 0.2).scale.set(1, 0.72, 0.88); // jaw and chin
@@ -232,22 +243,75 @@ export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
     add(head, new THREE.OctahedronGeometry(H * 0.13, 0), M.glow(0xfbbf24, 1.6), 0, hy + H * 0.84, H * 1.06, nc);
   }
 
-  const rig: Rig = { body, hips, knees, shoulders, elbows, head, mouth, eyes, torso, prop, H, L, blink: rnd() * 3, ph: rnd() * 6, r: 0, raise: false, talking: false, look: null, seat: null, s: 0, stand: 0, walk: null };
+  const rig: Rig = { body, hips, knees, shoulders, elbows, head, mouth, eyes, torso, prop, H, L, Ht, A, R, blink: rnd() * 3, ph: rnd() * 6, r: 0, raise: false, talking: false, look: null, seat: null, s: 0, stand: 0, walk: null };
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true; });
   if (role === "captain") g.scale.setScalar(1.06);
   return { group: g, rig, spec };
 }
 
-/** Sits a character down: hips on the seat, thighs forward, shins down, forearms on the desk. */
-export function seat(c: Character, x: number, seatHeight: number, z: number) {
-  c.rig.seat = { y: seatHeight - c.rig.L, z };
-  c.group.position.set(x, c.rig.seat.y, z);
+/**
+ * Sits a character down on a seat whose top is `seatHeight`, at (x, z). Pass the chair (so it can be
+ * pushed back when the character stands), the height of the desk in front and how far ahead its near
+ * edge is (the hands rest on that edge).
+ */
+export function seat(c: Character, x: number, seatHeight: number, z: number, o: { chair?: THREE.Object3D; desk?: number; edge?: number } = {}) {
+  const u = c.rig, hip = seatHeight + u.R * 0.37 + 0.004; // the thigh rests on the seat, not in it
+  u.seat = { x, hip, z, chair: o.chair ?? null, chairZ: o.chair?.position.z ?? 0, desk: o.desk ?? seatHeight + 0.26, edge: o.edge ?? 0.225 };
+  u.s = u.stand = 0;
+  c.group.position.set(x, hip - u.L, z);
 }
 
 export const headPosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 0.95, 0));
 /** The eye point, for first-person shots. */
 export const eyePosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 1.02, c.rig.H * 0.92));
 export const face = (g: THREE.Object3D, t: THREE.Vector3) => (g.rotation.y = Math.atan2(t.x - g.position.x, t.z - g.position.z));
+
+/** How long the sit-to-stand move takes, in seconds. */
+export const STAND_TIME = 1.25;
+
+/**
+ * The sit-to-stand move as an animator would block it, in the character's own side view (z forward
+ * toward the desk, y up; the hand is measured from the hip), as a function of its progress s:
+ * anticipation (the hands leave the desk edge, the body leans in, the chair starts back), the push
+ * up through planted feet with a small overshoot, and the settle. Legs and arms are placed by IK
+ * from these curves, so feet come down, plant and stay planted, and nothing passes through the
+ * chair or the desk.
+ */
+export function standPose(s: number, d: { L: number; Ht: number; A: number }, st: { hip: number; desk: number; edge: number }) {
+  const a = d.L / 2, shY = d.Ht * 0.88, arm = d.A * 0.98;
+  const K = (keys: [number, number][]) => keyframes(keys)(s);
+  const lean = K([[0, 0], [0.08, 0], [0.32, 0.34], [0.46, 0.3], [0.82, -0.03], [1, 0]]);
+  const hip = K([[0, st.hip], [0.2, st.hip], [0.74, d.L + 0.008], [1, d.L]]);
+  const fwd = K([[0, 0], [0.3, 0.02], [0.62, 0.07], [1, 0.05]]);
+  // the hand: off the desk edge and back first, then down to hang under the shoulder
+  const kk = K([[0, 0], [0.02, 0], [0.36, 1], [1, 1]]);
+  const restZ = st.edge + 0.03 - fwd, restY = st.desk + 0.068 - hip;
+  const hangZ = Math.sin(lean) * shY + 0.02, hangY = Math.cos(lean) * shY - arm * 0.985;
+  return {
+    /** Torso pitch, radians forward. */
+    lean,
+    /** Hip height above the floor, and how far the hips have moved toward the desk. */
+    hip, fwd,
+    /** How far the chair has been pushed back. */
+    chair: K([[0, 0], [0.14, 0], [0.56, 0.3], [1, 0.3]]),
+    /** The sole of the foot: forward of the seated hip, and above the floor. */
+    footZ: K([[0, a], [0.22, a], [0.56, 0.05], [1, 0.05]]),
+    footY: K([[0, st.hip - a], [0.22, st.hip - a], [0.52, 0], [1, 0]]),
+    /** The wrist, forward of and above the hip. */
+    handZ: restZ + (hangZ - restZ) * smooth(kk),
+    handY: restY + (hangY - restY) * smooth((kk - 0.1) / 0.9) + 0.04 * Math.sin(Math.PI * clamp(kk / 0.5)),
+    /** 1 while the hands are on the desk, 0 once the arms hang. */
+    sit: 1 - kk,
+  };
+}
+const smooth = (k: number) => { k = clamp(k); return k * k * (3 - 2 * k); };
+
+/** Two-bone IK in the side view: the angle of the first bone from straight down (forward positive) and the bend of the joint. */
+export function ik(a: number, b: number, dz: number, dy: number, bendForward: boolean) {
+  const d = clamp(Math.hypot(dz, dy), Math.abs(a - b) + 1e-4, a + b - 1e-4);
+  const toEnd = Math.atan2(dz, -dy), off = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1));
+  return { first: toEnd + (bendForward ? off : -off), bend: Math.PI - Math.acos(clamp((a * a + b * b - d * d) / (2 * a * b), -1, 1)) };
+}
 
 /** Per-frame life: breathing, blinking, a voice-driven mouth, looking, raising a hand, sitting, standing, walking. */
 export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, voice = 0) {
@@ -260,6 +324,26 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   const open = u.talking ? (voice > 0.02 ? 0.18 + voice * 1.05 : 0.25 + Math.abs(Math.sin(T * 11 + u.ph)) * 0.6) : 0.18;
   u.mouth.scale.y += (open - u.mouth.scale.y) * k(18);
 
+  // sitting ↔ standing: a timed move, not a blend, so it has anticipation and a settle
+  const st = u.seat, up = u.A * 0.48, fore = u.A * 0.5, shY = u.Ht * 0.88;
+  let lean = 0, sit = 0, hz = 0.02, hy = shY - (up + fore) * 0.985;
+  if (st) {
+    u.s = clamp(u.s + Math.sign(u.stand - u.s) * Math.min(Math.abs(u.stand - u.s), dt / STAND_TIME));
+    const p = standPose(u.s, u, st), fx = Math.sin(g.rotation.y), fz = Math.cos(g.rotation.y);
+    lean = p.lean; sit = p.sit; hz = p.handZ; hy = p.handY;
+    g.position.set(st.x + fx * p.fwd, p.hip - u.L, st.z + fz * p.fwd);
+    if (st.chair) st.chair.position.z = st.chairZ - fz * p.chair;
+    if (!u.walk) {
+      const leg = ik(u.L / 2, u.L / 2, p.footZ - p.fwd, p.footY - p.hip, true);
+      u.hips.forEach((h) => (h.rotation.x = -leg.first));
+      u.knees.forEach((n) => (n.rotation.x = leg.bend));
+    }
+  } else if (!u.walk) {
+    u.hips.forEach((h) => (h.rotation.x = 0));
+    u.knees.forEach((n) => (n.rotation.x = 0));
+  }
+  u.torso.rotation.x = lean;
+
   let yaw = 0, pitch = 0;
   if (u.look) {
     const w = headPosition(c), d = Math.atan2(u.look.x - w.x, u.look.z - w.z) - g.rotation.y;
@@ -267,30 +351,22 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
     pitch = clamp(Math.atan2(w.y - u.look.y, Math.hypot(u.look.x - w.x, u.look.z - w.z)), -0.4, 0.4);
   }
   u.head.rotation.y += (yaw - u.head.rotation.y) * k(5);
-  u.head.rotation.x += (pitch * 0.6 + (u.talking ? Math.sin(T * 5.5) * 0.04 : 0) - u.head.rotation.x) * k(5);
+  u.head.rotation.x += (pitch * 0.6 - lean * 0.85 + (u.talking ? Math.sin(T * 5.5) * 0.04 : 0) - u.head.rotation.x) * k(8);
   u.head.rotation.z = Math.sin(T * 1.3 + u.ph) * 0.035;
 
-  // sitting ↔ standing
-  if (u.seat) {
-    u.s += (u.stand - u.s) * k(4);
-    g.position.y = u.seat.y * (1 - u.s);
-    g.position.z = u.seat.z + 0.22 * u.s;
-  }
-  const sit = u.seat ? 1 - u.s : 0;
-  if (!u.walk) {
-    u.hips.forEach((h) => (h.rotation.x = -Math.PI / 2 * sit));
-    u.knees.forEach((n) => (n.rotation.x = Math.PI / 2 * sit));
-  }
-  // arms: rest, forearms on the desk when seated, the right arm up when raising a hand
+  // arms: hands resting on the desk when seated, hanging when standing, the right arm up when raising a hand
   u.r += ((u.raise ? 1 : 0) - u.r) * k(7);
   // standing speakers talk with their hands: forearms lift and sway with the voice
   const gest = u.talking && sit < 0.5 && !u.walk ? 1 : 0;
+  // into the torso's own frame (it leans), then solve the arm
+  const ty = hy * Math.cos(lean) + hz * Math.sin(lean), tz = -hy * Math.sin(lean) + hz * Math.cos(lean);
+  const arm = ik(up, fore, tz, ty - shY, false);
   u.shoulders.forEach((sh, i) => {
-    const side = i === 0 ? -1 : 1, up = side === 1 ? u.r : 0;
+    const side = i === 0 ? -1 : 1, lift = side === 1 ? u.r : 0;
     const g1 = gest * (0.35 + 0.18 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + voice * 0.4);
-    sh.rotation.x = -0.55 * sit * (1 - up) - g1 * 0.35 * (1 - up);
-    sh.rotation.z = side * (0.14 + (Math.PI * 0.86 - 0.14) * up) + (up ? Math.sin(T * 9) * 0.05 : 0);
-    u.elbows[i].rotation.x = (-1.05 * sit - 0.28 * (1 - sit) - g1) * (1 - up) - 0.25 * up;
+    sh.rotation.x = (-arm.first - g1 * 0.35) * (1 - lift);
+    sh.rotation.z = side * (0.14 + (Math.PI * 0.86 - 0.14) * lift) + (lift ? Math.sin(T * 9) * 0.05 : 0);
+    u.elbows[i].rotation.x = (-arm.bend - g1) * (1 - lift) - 0.25 * lift;
   });
 
   if (u.walk) {
