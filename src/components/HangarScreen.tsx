@@ -2,10 +2,9 @@
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ORB_RULES } from "@/battle/rewards";
-import type { EventInput } from "@/db/events";
 import { fold, type LoggedEvent } from "@/director/fold";
 import { CATALOG, itemOf, itemState, nextGoal, PLANET_IN_A_SENTENCE, purchase, SLOTS, STARTER, type Item, type Slot } from "@/director/hangar";
-import { flushed } from "@/engine/outbox";
+import { onSaveState, post, saveState } from "@/engine/outbox";
 import type { HangarBay, ShipStyle } from "@/worlds/space/hangarBay";
 import { Button, buttonClass, HomeLink, Icon, PillLink, TopBar } from "./kit";
 import { useScene } from "./hub/Scene";
@@ -30,7 +29,7 @@ const ARM_MS = 450;
 type Phase =
   | { kind: "idle" }
   | { kind: "confirm"; item: Item; cost: number; armedAt: number }
-  | { kind: "saving"; item: Item }
+  | { kind: "saving"; item: Item; late?: boolean }
   | { kind: "failed"; item: Item }
   | { kind: "done"; item: Item; bought: boolean };
 
@@ -133,19 +132,19 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
     if (item.slot === "blaster" && shown("blaster") === item.id) scene?.demo(); // a second tap fires it again
   };
 
-  /** Save one purchase: everything queued goes first (the fold reads order), then this, and wait for the answer. */
+  /**
+   * Save one purchase through the outbox: after everything queued (the fold reads order), retried
+   * with the same id until it is stored, so it is never lost and never charged twice. The screen
+   * shows it bought only once the server has it; a try that fails shows "Not saved yet" while the
+   * outbox keeps going. Only a purchase the server refused (no re-send pending) offers Try again.
+   */
   const save = async (item: Item, cost: number) => {
     if (!state || busy.current) return;
     const e = purchase(state, item.slot, item.id);
     if (!e) return;
     busy.current = true;
     setPhase({ kind: "saving", item });
-    let ok = false;
-    try {
-      await flushed();
-      const r = await fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(e satisfies EventInput) });
-      ok = r.ok;
-    } catch { ok = false; }
+    const ok = await post(e);
     busy.current = false;
     if (!ok) { setPhase({ kind: "failed", item }); return; }
     setMine((m) => [...m, { ...e, at: Date.now() }]);
@@ -154,6 +153,14 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
     void import("@/engine/audio").then(({ audio }) => audio.sfx(cost ? "fanfare" : "blip_ok"));
     if (cost > 0) window.setTimeout(() => scene?.celebrate(), 450); // after the orbs have ticked down
   };
+
+  // a purchase whose try failed says so, calmly, while the outbox keeps retrying it
+  useEffect(() => {
+    if (phase.kind !== "saving") return;
+    const look = () => { if (saveState() === "waiting") setPhase((p) => (p.kind === "saving" && !p.late ? { ...p, late: true } : p)); };
+    look();
+    return onSaveState(look);
+  }, [phase.kind]);
 
   /** Ask before buying. `t` is the press's event time (the same clock as performance.now()). */
   const ask = (item: Item, cost: number, t: number) => { if (!busy.current) setPhase({ kind: "confirm", item, cost, armedAt: t + ARM_MS }); };
@@ -195,11 +202,18 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
         </div>
       );
     }
-    if (phase.kind === "saving") return <Button variant="primary" size="lg" disabled className="w-full justify-between" glyph={false}>Saving…</Button>;
+    if (phase.kind === "saving") {
+      return (
+        <div className="flex flex-col gap-3">
+          {phase.late && <p role="status" className="type-child text-ink-2">Not saved yet. Your orbs are safe. It saves when the connection is back.</p>}
+          <Button variant="primary" size="lg" disabled className="w-full justify-between" glyph={false}>Saving…</Button>
+        </div>
+      );
+    }
     if (phase.kind === "failed" && phase.item.id === selected.id) {
       return (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="type-child text-approach">That did not save. Your orbs are safe. Check the connection and try again.</p>
+          <p role="alert" className="type-child text-approach">That did not save. Your orbs are safe. Try again.</p>
           <Button variant="primary" size="lg" onKeyDown={noRepeat} onClick={(e) => (itemState(state, selected).kind === "price" ? ask(selected, selected.cost, e.timeStamp) : void save(selected, 0))} className="w-full justify-between">Try again</Button>
         </div>
       );
