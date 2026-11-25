@@ -169,7 +169,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     x.fillStyle = COLOR.approach;
     x.textAlign = "center"; x.textBaseline = "middle";
     let px = 128;
-    do { x.font = `300 ${px}px "${TYPE.family}", sans-serif`; px -= 4; } while (x.measureText(written).width > 900 && px > 40);
+    do { x.font = `300 ${px}px "${TYPE.family}", sans-serif`; px -= 4; } while (x.measureText(written).width > 560 && px > 40);
     x.fillText(written, 512, 172);
     x.font = `500 30px "${TYPE.family}", sans-serif`;
     x.textAlign = "left";
@@ -212,6 +212,26 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   add(room, new THREE.PlaneGeometry(1.04, 1.08), M.clay(0xffffff, { map: ops.texture, roughness: 0.9 }), 4.27, 2.15, -RZ + 0.026, noCast);
   box(room, [-5.02, -3.98], [1.5, 2.8], [-RZ, -RZ + 0.02], trim);
   add(room, new THREE.PlaneGeometry(0.98, 1.24), M.clay(0xffffff, { map: poster.texture, roughness: 0.9 }), -4.5, 2.15, -RZ + 0.026, noCast);
+
+  // the back wall: a pin-board of the class's drawings over a low shelf of books
+  box(room, [-2.3, 2.3], [1.25, 2.55], [RZ - 0.03, RZ], wood);
+  box(room, [-2.2, 2.2], [1.33, 2.47], [RZ - 0.04, RZ - 0.01], M.clay(mix(SET.desk, SET.wood, 0.5), { roughness: 0.95 }), noCast);
+  const sheets = [COLOR.approach, COLOR.sky, COLOR.gold, COLOR.approach, COLOR.ember, COLOR.disk, COLOR.approach, COLOR.gold].map((c) => M.clay(mix(c, SET.paper, 0.45), { roughness: 0.95 }));
+  sheets.forEach((m, i) => {
+    const sheet = add(room, new THREE.BoxGeometry(0.42, 0.52 + (i % 3) * 0.04, 0.006), m, -1.85 + i * 0.53, 1.9 + ((i * 7) % 3) * 0.04 - 0.04, RZ - 0.045, noCast);
+    sheet.rotation.z = ((i * 5) % 4 - 1.5) * 0.035;
+  });
+  box(room, [-5.2, -2.9], [0, 0.82], [RZ - 0.34, RZ], wood);
+  box(room, [-5.14, -2.96], [0.06, 0.4], [RZ - 0.36, RZ - 0.3], M.clay(mix(SET.wood, COLOR.void, 0.45), { roughness: 0.9 }), noCast);
+  box(room, [-5.14, -2.96], [0.46, 0.78], [RZ - 0.36, RZ - 0.3], M.clay(mix(SET.wood, COLOR.void, 0.45), { roughness: 0.9 }), noCast);
+  [COLOR.ember, COLOR.sky, COLOR.gold, COLOR.disk, COLOR.approach, COLOR.sky, COLOR.ember, COLOR.gold, COLOR.disk, COLOR.approach, COLOR.gold, COLOR.sky].forEach((c, i) => {
+    for (const y of [0.07, 0.47]) box(room, [-5.08 + i * 0.172, -5.08 + i * 0.172 + 0.13], [y, y + 0.22 + ((i + (y > 0.2 ? 3 : 0)) % 4) * 0.02], [RZ - 0.39, RZ - 0.34], M.clay(mix(c, COLOR.horizon, 0.35), { roughness: 0.9 }), noCast);
+  });
+  // a painted dado along the side and back walls ties the room to the palette and breaks up the plaster
+  const dado = M.clay(mix(COLOR.disk, SET.plaster, 0.62), { roughness: 0.95 });
+  box(room, [RX - 0.012, RX], [0.12, 1.0], [DOOR.z1 + 0.14, RZ], dado, noCast);
+  box(room, [-RX, RX], [0.12, 1.0], [RZ - 0.012, RZ], dado, noCast);
+  box(room, [-RX, -RX + 0.012], [0.12, WINDOWS.sill - 0.05], [-RZ, RZ], dado, noCast);
 
   // the wall clock: 8:42, the same morning as the clock tower outside
   const clock = new THREE.Group();
