@@ -114,7 +114,8 @@ export function IntroFilm() {
     setTimeout(() => setVeil("off"), (still ? 0 : FILM_FADE.in) + 100);
   }, []);
   // the film is over the moment the battle opens: a reload from here on carries on in the battle, not at the film's start
-  useEffect(() => { ending.current = again ? () => router.replace(from) : () => { post({ type: "seen", payload: { key: FILM_DONE } }); void startBay(); }; }, [again, from, router, startBay]);
+  // (a replay goes back with a plain page load: a router transition started from the stage's clock can stall while the tab is not in front)
+  useEffect(() => { ending.current = again ? () => location.replace(from) : () => { post({ type: "seen", payload: { key: FILM_DONE } }); void startBay(); }; }, [again, from, startBay]);
 
   /**
    * Does this piece of a line fit the caption plate in two lines on this screen? The film asks before it
@@ -148,15 +149,16 @@ export function IntroFilm() {
     (async () => {
       const j = await fetch("/api/player").then((r) => r.json()).catch(() => ({ player: null }));
       // the Title owns sign-up; a cadet who has finished the intro only comes back here to watch the film again
-      if (!j.player && !devMode) return router.replace("/");
+      // these gates leave with a plain page load: router.replace from inside an async mount effect can stall on a blank screen
+      if (!j.player && !devMode) return location.replace("/");
       const watching = wantReplay && (!!j.introCompleted || devMode);
-      if (j.introCompleted && !devMode && !watching) return router.replace("/bay");
+      if (j.introCompleted && !devMode && !watching) return location.replace("/bay");
       if (j.player && !watching) setInBay((await history()).some((e) => (e.type === "seen" && e.payload.key === FILM_DONE) || (e.type === "attempt_submitted" && e.payload.planetId === "earth")));
       setAgain(watching);
       setPlayer(j.player);
     })();
     return () => { gone = true; cleanup(); };
-  }, [fits, router]);
+  }, [fits]);
 
   // the hoodie and the first-person sleeve take the colour picked at sign-up
   useEffect(() => {
