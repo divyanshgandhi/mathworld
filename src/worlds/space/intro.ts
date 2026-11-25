@@ -509,6 +509,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
           if (since >= hold) {
             to("raise");
             talk(null);
+            clear(); // the invitation takes the caption's place: nothing under the button moves a moment later
             if (early) call();
             else { prompt("raise"); show(SETUP.invite); }
           }
@@ -517,6 +518,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
           if (since >= WAIT.hand) classmate();
         } else if (phase === "called" && since >= hold) {
           to("choose");
+          clear();
           prompt("choose");
           show(() => SETUP.board(true)); // what the cadet is looking at: the sum, with the answers under it
         } else if (phase === "choose" && since >= WAIT.answer) classmate(); // a long think: a classmate helps out
@@ -790,7 +792,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       update(t) {
         if (t >= novaLen && speaker !== null) talk(null);
         // Launch shows as her question's last word lands
-        if (t >= novaHold && !ui.cta) { ctaAt = t; setUi({ cta: "Launch" }); show(() => SETUP.nova(true)); }
+        if (t >= novaHold && !ui.cta) { ctaAt = t; clear(); setUi({ cta: "Launch" }); show(() => SETUP.nova(true)); }
         // a cadet who never presses it is carried along: Nova launches for them
         if (ctaAt && t > ctaAt + WAIT.launch) director.go(director.find("launch"));
       } },

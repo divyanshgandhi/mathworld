@@ -9,8 +9,8 @@ import { FILM_LINES, type FilmLineId } from "./lines";
 export const FILM_PACE = {
   /** One fade grammar: out to the void and back in. Together they are a join of two chapters. */
   fade: { out: 0.5, in: 0.5 },
-  /** A heard caption leaves this long after its voice. */
-  linger: 0.2,
+  /** A heard caption leaves this long after its voice, so a reply's caption takes its place with no blink between them. */
+  linger: PACE.linger,
   /** Listeners turn to the next speaker this long before the first word. */
   turnLead: 0.2,
   orbit: { d: 4.0, cardOff: 3.3 },
@@ -20,15 +20,16 @@ export const FILM_PACE = {
   yawn: { d: 3.2 },
   turn: { d: 1.25, look: 1.1 },
   /** A classroom question: how long the class waits, when a classmate's hand goes up, and the breaths around the answer. */
-  question: { wait: PACE.wait, rival: 3, answer: PACE.wait, mime: 1.0, reply: 0.25, kidReply: 0.3, tail: 0.4 },
+  question: { wait: PACE.wait, rival: 3, answer: PACE.wait, mime: 1.0, reply: 0.2, kidReply: 0.25, tail: 0.4 },
   mult: { lead: 0.1, tail: 0.4 },
   knock: { sound: 1.0, door: 1.2, d: 1.9 },
   officers: { lead: 0.9, walk: 2.1, behind: 0.35, gap: 0.4, tail: 0.1 },
-  captain: { lead: 0.2, proud: 0.3, names: 0.25, tail: 0.1 },
-  names: { lead: 0.25, tail: 0.25 },
+  // a reply comes inside the last caption's linger, so one caption gives way to the next with no empty plate between them
+  captain: { lead: 0.15, proud: 0.2, names: 0.25, tail: 0.1 },
+  names: { lead: 0.15, tail: 0.25 },
   /** The cadet is picked: they stand at `stand` of the line, the name card rises `card` after it, the picture leaves `out` after it. */
   picked: { lead: 0.25, stand: 0.8, card: 0.7, out: 2.9 },
-  hangar: { lead: 1.6, cardOff: 1.3, brief2: 0.45, nova: 0.5, tail: 0.3 },
+  hangar: { lead: 1.6, cardOff: 1.3, brief2: 0.45, nova: 0.5, tail: 0.2 },
   nova: { wait: PACE.wait },
   launch: { beat: 0.7, breath: 2.0, fire: 2.5, lift: 3.3, cloud: 4.85, end: 5.75 },
   arrival: { clear: 0.6, settle: 3.0, card: [1.0, 4.0], end: 4.5 },
@@ -81,10 +82,11 @@ export function filmSchedule({ heard, spoken, fits, input }: ScheduleOptions) {
   const text = (id: string) => FILM_LINES[id as FilmLineId] ?? "";
   const hold = (name: string, seconds: number, what: string) => { holds.push({ name, start: t, seconds, what }); t += seconds; };
   /** Speak a line at `at`; `kind` is what the gap before it is. */
-  function line(id: string, who: string, at: number, kind: GapKind, o: { words?: string; clip?: number; voiced?: boolean; what?: string } = {}): FilmLine {
+  function line(id: string, who: string, at: number, kind: GapKind, o: { words?: string; clip?: number; voiced?: boolean; what?: string; cut?: boolean } = {}): FilmLine {
     const words = o.words ?? text(id), clip = o.clip ?? spoken(id), h = heard && o.voiced !== false;
     const pieces = splitCaption(words, (p) => (fits ? fits(who, p) : p.length <= 84)), { starts, hold: held } = scheduleCaptions(pieces, clip, h);
-    const off = at + held + (h ? F.linger : 0);
+    // `cut`: a control takes the caption's place the moment the line is over (the invitation, the answers, Launch)
+    const off = at + held + (h && !o.cut ? F.linger : 0);
     const l: FilmLine = { id, who, text: words, clip, start: at, voiceEnd: at + clip, end: at + held, captions: pieces.map((p, i) => ({ text: p, on: at + starts[i], off: i + 1 < pieces.length ? at + starts[i + 1] : off, need: readingTime(p, h) })) };
     if (prev) gaps.push({ after: prev.id, before: id, kind, seconds: at - prev.end, what: o.what });
     lines.push(l);
@@ -100,11 +102,11 @@ export function filmSchedule({ heard, spoken, fits, input }: ScheduleOptions) {
   hold("turn", F.turn.d, "the look to the teacher");
 
   const question = (ask: string, kid: string, ok: string, answer: string, first: GapKind) => {
-    const Q = F.question, q = line(ask, "Teacher", t, first);
+    const Q = F.question, q = line(ask, "Teacher", t, first, { cut: true });
     let last: FilmLine;
     if (input) {
       // the hand goes up the moment the invitation shows; the answer is picked the moment the two answers show
-      const yes = line("teacher_yes", "Teacher", q.end, "input", { what: "the invitation, taken at once" });
+      const yes = line("teacher_yes", "Teacher", q.end, "input", { what: "the invitation, taken at once", cut: true });
       const you = line("you", "You", yes.end, "input", { words: answer, clip: Q.mime, what: "the two answers, picked at once" });
       last = line(ok, "Teacher", you.end + Q.reply, "reply");
     } else {
@@ -136,7 +138,7 @@ export function filmSchedule({ heard, spoken, fits, input }: ScheduleOptions) {
   const brief2 = line("captain_brief2", "Captain", brief1.end + F.hangar.brief2, "same");
   const meet = line("captain_nova", "Captain", brief2.end + F.hangar.nova, "same");
   t = meet.end + F.hangar.tail;
-  const nova = line("nova_hi", "Nova", t, "reply");
+  const nova = line("nova_hi", "Nova", t, "reply", { cut: true });
   t = nova.end;
   if (!input) hold("launch-wait", F.nova.wait, "Launch is on screen; nobody presses it, so Nova launches");
   hold("launch", F.launch.end, "the countdown, the fire, the climb");
