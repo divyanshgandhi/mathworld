@@ -31,8 +31,12 @@ const REACH = Math.max(...ORBITS.map(([id, R, r]) => R + r * (id === "saturn" ? 
 const FLY = 5.5, DRIFT = 0.02, WIDE = 820;
 
 export interface TitleScene {
-  /** Fit the system around the words: their box in CSS pixels of the stage, or null for a default layout. */
-  frameAround(box: { left: number; top: number; right: number; bottom: number } | null): void;
+  /**
+   * Fit the system around the words: their box in CSS pixels of the stage (or null for a default), and
+   * where the words sit: "side" (the system right of them) or "stack" (the system above them). Without a
+   * layout the width decides (over 820 px is "side"). A new box eases the frame over; a resize snaps it.
+   */
+  frameAround(box: { left: number; top: number; right: number; bottom: number } | null, layout?: "side" | "stack"): void;
   /** Runs `fn` once the fly-in has settled (at once if it has). Returns an unsubscribe. */
   onSettled(fn: () => void): () => void;
   readonly settled: boolean;
@@ -101,58 +105,77 @@ export function mountTitle(stage: Stage): TitleScene {
   root.add(beltPts, starfield(2800, 1500, rnd));
 
   /* ---------- framing ---------- */
-  let box: { left: number; top: number; right: number; bottom: number } | null = null, fitW = 0, fitH = 0;
+  // The system is fitted into the free part of the screen: right of the words ("side"), or above them
+  // ("stack"). The fit is solved in screen space (a view offset is a pure 2D shift and the zoom scales
+  // about the Sun's point), so every orbit stays inside the frame and clear of the words, at every
+  // moment of the drift. A change of the words' box eases the frame over; a resize snaps it.
+  type Box = { left: number; top: number; right: number; bottom: number };
+  let box: Box | null = null, layout: "side" | "stack" | null = null, fitW = 0, fitH = 0;
   let elev = 0.37, dist = 110;
   const az0 = 0.55;
   const pose = (az: number, d = dist, e = elev, out = new THREE.Vector3()) => out.set(Math.cos(az) * Math.cos(e) * d, Math.sin(e) * d, Math.sin(az) * Math.cos(e) * d);
   const v = new THREE.Vector3();
+  const cur = { px: 0, py: 0, zoom: 1 }, tgt = { px: 0, py: 0, zoom: 1 };
+  let primed = false;
 
-  function fit() {
+  const apply = () => {
+    const w = fitW, h = fitH;
+    camera.setViewOffset(w, h, w / 2 - cur.px, h / 2 - cur.py, w, h);
+    camera.zoom = cur.zoom;
+    camera.updateProjectionMatrix();
+  };
+
+  function fit(snap: boolean) {
     const w = stage.container.clientWidth, h = stage.container.clientHeight;
     if (!w || !h) return;
     fitW = w; fitH = h;
-    const wide = w > WIDE;
-    elev = wide ? 0.42 : 0.52;
-    dist = wide ? 120 : 130;
-    camera.fov = wide ? 30 : 38;
-    const margin = Math.min(56, Math.max(20, w * 0.03));
-    const right = box?.right ?? w * 0.52, top = box?.top ?? h * 0.55;
-    // where the Sun sits on screen: right of the words, or above them
-    const px = wide ? right + (w - right) * 0.7 : w / 2, py = wide ? h * 0.5 : Math.max(h * 0.2, top * 0.47);
+    const side = (layout ?? (w > WIDE ? "side" : "stack")) === "side";
+    elev = side ? 0.42 : 0.5;
+    dist = side ? 120 : 130;
+    camera.fov = side ? 30 : 36;
     camera.aspect = w / h;
     camera.zoom = 1;
-    camera.setViewOffset(w, h, w / 2 - px, h / 2 - py, w, h);
+    camera.setViewOffset(w, h, 0, 0, w, h);
     camera.position.copy(pose(az0));
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
-    // measure the outermost orbit (and Mars's, for phones) on screen at zoom 1, relative to the Sun
-    let minDx = 0, maxDy = 0, marsDx = 0;
-    const measure = (R: number, cb: (dx: number, dy: number) => void) => {
-      for (let i = 0; i < 96; i++) {
-        const a = (i / 96) * Math.PI * 2;
-        for (const y of [-1, 1]) {
-          v.set(Math.cos(a) * R, y * 1.2, Math.sin(a) * R).project(camera);
-          cb((v.x + 1) / 2 * w - px, (1 - v.y) / 2 * h - py);
-        }
+    // the outermost reach of the system on screen at zoom 1, relative to the Sun's point
+    v.set(0, 0, 0).project(camera);
+    const sx = (v.x + 1) / 2 * w, sy = (1 - v.y) / 2 * h;
+    let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    for (let i = 0; i < 128; i++) {
+      const a = (i / 128) * Math.PI * 2;
+      for (const y of [-1.2, 1.2]) {
+        v.set(Math.cos(a) * REACH, y, Math.sin(a) * REACH).project(camera);
+        const dx = (v.x + 1) / 2 * w - sx, dy = (1 - v.y) / 2 * h - sy;
+        x0 = Math.min(x0, dx); x1 = Math.max(x1, dx); y0 = Math.min(y0, dy); y1 = Math.max(y1, dy);
       }
-    };
-    measure(REACH, (dx, dy) => { minDx = Math.min(minDx, dx); maxDy = Math.max(maxDy, dy); });
-    measure(21.5 + 1.4, (dx) => { marsDx = Math.max(marsDx, Math.abs(dx)); });
-    let zoom: number;
-    if (wide) {
-      zoom = (px - right - margin) / -minDx;
-      zoom = Math.min(zoom, (h * 0.46) / maxDy); // the near side stays on screen
-    } else {
-      zoom = (top - margin - py) / maxDy;
-      zoom = Math.min(zoom, (w / 2 - 10) / marsDx); // the inner planets stay on screen
     }
-    camera.zoom = Math.max(0.05, zoom);
-    camera.updateProjectionMatrix();
+    // the free region, inside a margin that grows with the screen
+    const m = Math.min(64, Math.max(16, Math.min(w, h) * 0.045));
+    const b = box ?? (side ? { left: 0, top: 0, right: w * 0.45, bottom: h } : { left: 0, top: h * 0.58, right: w, bottom: h });
+    const r = side
+      ? { l: b.right + m * 1.5, r: w - m, t: m, b: h - m }
+      : { l: m, r: w - m, t: Math.max(m, 56), b: b.top - m };
+    const rw = Math.max(40, r.r - r.l), rh = Math.max(40, r.b - r.t);
+    const zoom = Math.max(0.05, Math.min(rw / (x1 - x0), rh / (y1 - y0)));
+    tgt.zoom = zoom;
+    tgt.px = r.l + (rw - zoom * (x1 - x0)) / 2 - zoom * x0;
+    tgt.py = r.t + (rh - zoom * (y1 - y0)) / 2 - zoom * y0;
+    // no room worth drawing in (a tall sign-up on a small phone): the system rises out of the frame
+    // instead of shrinking to a speck behind the words, and comes back when there is room again
+    if (rh < 110 || rw < 110) {
+      tgt.zoom = Math.max(zoom, Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.5);
+      tgt.px = w / 2;
+      tgt.py = -tgt.zoom * y1 - 40;
+    }
+    if (snap || !primed || reduced) { Object.assign(cur, tgt); primed = true; }
+    apply();
     const dpr = stage.renderer.getPixelRatio();
-    for (const m of lineMats) { m.resolution.set(w * dpr, h * dpr); m.linewidth = dpr; }
+    for (const mt of lineMats) { mt.resolution.set(w * dpr, h * dpr); mt.linewidth = dpr; }
   }
-  fit();
+  fit(true);
 
   /* ---------- motion ---------- */
   const from = new THREE.Vector3(), to = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -165,7 +188,13 @@ export function mountTitle(stage: Stage): TitleScene {
   const stop = stage.onUpdate((dt, time) => {
     if (T0 < 0) T0 = time;
     const T = time - T0;
-    if (stage.container.clientWidth !== fitW || stage.container.clientHeight !== fitH) fit();
+    if (stage.container.clientWidth !== fitW || stage.container.clientHeight !== fitH) fit(true);
+    // ease the frame toward its target when the words change shape (sign-up opening, a long name)
+    const ek = 1 - Math.exp(-dt * 5);
+    if (Math.abs(cur.zoom - tgt.zoom) > 1e-4 || Math.abs(cur.px - tgt.px) > 0.2 || Math.abs(cur.py - tgt.py) > 0.2) {
+      cur.zoom += (tgt.zoom - cur.zoom) * ek; cur.px += (tgt.px - cur.px) * ek; cur.py += (tgt.py - cur.py) * ek;
+      apply();
+    }
     sun.spin.rotation.y += dt * 0.03;
     for (const p of planets) {
       if (!reduced) p.a += p.w * dt;
@@ -202,7 +231,7 @@ export function mountTitle(stage: Stage): TitleScene {
   });
 
   return {
-    frameAround(b) { box = b; fit(); },
+    frameAround(b, l) { box = b; if (l) layout = l; fit(false); },
     onSettled(fn) {
       if (settled) { fn(); return () => {}; }
       waiting.push(fn);

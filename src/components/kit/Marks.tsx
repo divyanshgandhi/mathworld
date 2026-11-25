@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { MASTERY, type MasteryKey } from "@/design/tokens";
+import { Icon } from "./Icon";
 
 const ORDER: MasteryKey[] = ["gold", "got", "learn", "new"];
 
@@ -29,7 +30,7 @@ export function masterySummary(marks: readonly MasteryKey[]) {
 }
 
 /** A small grid of mastery marks (a times table's ten facts). One accessible name for the whole grid. */
-export function Pips({ marks, columns = 5, size = 7, label, className = "" }: { marks: readonly MasteryKey[]; columns?: number; size?: number; label?: string; className?: string }) {
+export function Pips({ marks, columns = 5, size = 8, label, className = "" }: { marks: readonly MasteryKey[]; columns?: number; size?: number; label?: string; className?: string }) {
   return (
     <span
       role="img"
@@ -65,5 +66,35 @@ export function WaveDots({ total, won, current = false, words = true, className 
       ))}
       {words && <span className="ml-1.5 type-body-sm text-ink-3" aria-hidden>{won} won</span>}
     </div>
+  );
+}
+
+/** Where a planet stands for this cadet. The words are what a child reads beside the mark. */
+export const PLANET_STATUS = {
+  cleared: "Cleared",
+  now: "Next mission",
+  open: "Open",
+  locked: "Locked",
+} as const;
+export type PlanetStatus = keyof typeof PLANET_STATUS;
+
+/**
+ * A planet's status as a mark that reads without colour: Cleared is a gold ring with a tick, Next
+ * mission a bright ring with a core, Open a hairline ring, Locked a padlock. Decorative unless `label`.
+ * Use it beside a planet's name on the Star map or a list of missions, never instead of the name.
+ */
+export function PlanetStatusMark({ status, size = 22, label = false, className = "" }: { status: PlanetStatus; size?: number; label?: boolean; className?: string }) {
+  return (
+    <span
+      className={`mw-status ${className}`}
+      data-status={status}
+      style={{ "--mark": `${size}px` } as CSSProperties}
+      role={label ? "img" : undefined}
+      aria-label={label ? PLANET_STATUS[status] : undefined}
+      aria-hidden={label ? undefined : true}
+    >
+      {status === "cleared" && <Icon name="check" size={Math.round(size * 0.62)} />}
+      {status === "locked" && <Icon name="lock" size={Math.round(size * 0.78)} />}
+    </span>
   );
 }
