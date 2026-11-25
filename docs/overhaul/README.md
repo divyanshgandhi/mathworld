@@ -46,6 +46,16 @@ After the merges, these seams were wired:
 - Battle cards open one at a time: a New Power-Up card is read before the clear or offer card.
 - Removed: the unused `STOP_NAMES` alias and the framework favicon.
 
+## Teaching layer, mounted (wave 2 sign-off)
+The manual track's parts are on the real screens now (steps in [w2-manual.md](w2-manual.md); the script is [docs/teaching.md](../teaching.md)):
+- **Help, one tap away.** The top bar's help button opens the Field Manual on the Resting Bay (page "squads"), Star map ("squads"), Hangar ("orbs") and Academy ("help"). In a battle, the pause menu's How to play opens it on "count"; Escape closes the manual and leaves the menu. The console's Show me how stays Nova's worked example.
+- **The film again.** On a hub, the manual carries a quiet "Watch the film again" (`/intro?replay&from=<screen>`). Battles leave it out.
+- **Greetings, once.** Star map, Hangar, Academy and the first flashcard deck greet with `<Greeting>` (`greet:<screen>`). The bay's own Nova line is its greeting on the first arrival ("Hi, {name}! This is your Resting Bay. Press Launch to fly."), so it never shows two. The Hangar's floats over the rocket, the flashcards' over the card, so nothing moves when it goes. The Academy's intro line waits for the second visit.
+- **The first battle** opens with `nova_greet_battle` (`greet:battle`, replacing `nova_l0_intro`), then the guided first shot: "Count the ships." rings the fleet (`arena.fleetRect()`), "Type how many." rings the digit keys, "Now press Fire." rings Fire. While the guide runs, the arena plays no briefing line, no first-sight scan and no empty-fleet line. A brand-new cadet's first fleet is `1 × b`, b from 3 to 5. Captions keep off the rocket and its number (`arena.rocketRect()`).
+- **Cadet Bay** has the pause menu (Resume, How to play, Sound) and a focusable game root, so Enter fires after the menu closes.
+- **The film** no longer tells the miss rule in the hangar (`captain_brief3`, `captain_brief4`); the battle shows it.
+- Every spoken line still to bake is in [lines-to-bake.md](lines-to-bake.md).
+
 ## Review routes
 Run the dev server and open these. Add `?dev` to the game routes to skip progress gates.
 
@@ -63,3 +73,6 @@ Run the dev server and open these. Add `?dev` to the game routes to skip progres
 | `/dev/economy` | This device's orb ledger and patrol status |
 | `/dev/teach`, `/dev/teach/console` | The Field Manual pictures, greetings, ship sprites and the guided first shot on a mock console |
 | `/intro?replay&from=/bay` | The film again for a cadet who has seen it; Skip and the end return to `from` |
+| `/manual?topic=count` | The Field Manual on one page, full screen (Close goes back, or to the bay) |
+| `/play/moon?dev&a=3&b=4` as a new cadet | The guided first shot on a planet battle (it shows once per cadet: sign up again to see it again) |
+| `/intro` as a new cadet | The film, then Cadet Bay with its greeting and the guided first shot |

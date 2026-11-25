@@ -87,6 +87,8 @@ These come in when the player needs them, never in the first five minutes:
 
 This is what I saw in the code and the baked lines, not in play. Each item names the owner.
 
+**Status after mounting (wave 2 sign-off).** Fixed: 4 (the greeting replaced `nova_l0_intro`), 5 (the first fleet is `1 × b`), 6 (the console shows structure only from the hint ladder), 8 (no empty-fleet line on the guided wave), 9 in part (no Nova line or first-sight scan during the guide; the fleet's idle bob, about 0.015 units, still runs), 10, 11, 12 (the Hangar's line is child size now), 13 (the Academy's line waits for the second visit), 14. The film's hangar no longer tells the miss rule (part of 1). Open, because they need a re-bake: 1 (`captain_brief2`), 2, 3, 7 (see `docs/overhaul/lines-to-bake.md`).
+
 1. **The hangar briefing teaches four ideas by telling** (film). `captain_brief2`:
    - it is 30 words in 4 sentences, with 11.9 s of audio;
    - its ideas are a spaceship, a co-pilot, plasma balls, and too few or too many;
