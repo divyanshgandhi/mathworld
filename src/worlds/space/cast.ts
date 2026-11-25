@@ -77,9 +77,10 @@ interface Face {
 interface Pose { browL: number; browR: number; tilt: number; eye: number; arc: number; smile: number; open: number; wide: number; gx: number; gy: number }
 const POSES: Record<Expression, Pose> = {
   neutral: { browL: 0, browR: 0, tilt: 0, eye: 1, arc: 0, smile: 0.35, open: 0, wide: 1, gx: 0, gy: 0 },
-  happy: { browL: 0.35, browR: 0.35, tilt: 0.1, eye: 0.92, arc: 0, smile: 1, open: 0, wide: 1.3, gx: 0, gy: 0 },
-  thinking: { browL: 0.8, browR: -0.25, tilt: -0.15, eye: 0.85, arc: 0, smile: -0.15, open: 0, wide: 0.6, gx: 0.6, gy: 0.55 },
-  oops: { browL: 0.75, browR: 0.75, tilt: 0.9, eye: 1.18, arc: 0, smile: -0.6, open: 0.42, wide: 0.5, gx: 0, gy: -0.1 },
+  // pushed about 40% past a natural read, so each face registers at the size a child is on screen
+  happy: { browL: 0.5, browR: 0.5, tilt: 0.14, eye: 0.86, arc: 0, smile: 1, open: 0.12, wide: 1.5, gx: 0, gy: 0 },
+  thinking: { browL: 1.05, browR: -0.4, tilt: -0.22, eye: 0.78, arc: 0, smile: -0.28, open: 0, wide: 0.5, gx: 0.8, gy: 0.7 },
+  oops: { browL: 1, browR: 1, tilt: 1, eye: 1.28, arc: 0, smile: -0.85, open: 0.55, wide: 0.45, gx: 0, gy: -0.1 },
   cheer: { browL: 0.9, browR: 0.9, tilt: 0.15, eye: 1, arc: 1, smile: 1, open: 1, wide: 1.2, gx: 0, gy: 0 },
 };
 
