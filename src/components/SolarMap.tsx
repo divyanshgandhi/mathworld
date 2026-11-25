@@ -280,7 +280,9 @@ function NarrowMap({ stops, sel, state, stopProps }: { stops: JourneyStop[]; sel
   useLayoutEffect(() => {
     const el = list.current?.querySelector<HTMLElement>(`[data-stop="${stops[here].id}"]`);
     if (!el || !list.current) return;
-    el.scrollIntoView({ block: "center" });
+    // the cadet's stop and its panel (with Launch) in view: centred when they fit, else from the top
+    const group = el.closest("li") ?? el;
+    group.scrollIntoView({ block: group.offsetHeight + 96 > innerHeight ? "start" : "center" });
     const top = list.current.getBoundingClientRect().top, r = el.getBoundingClientRect();
     setTravelled(r.top - top + 48);
   }, [stops, here]);
@@ -298,7 +300,7 @@ function NarrowMap({ stops, sel, state, stopProps }: { stops: JourneyStop[]; sel
           {stops.map((s, i) => {
             const size = narrowSize(s.id), chosen = i === sel, st = stateOf(s);
             return (
-              <li key={s.id} className="flex flex-col">
+              <li key={s.id} className="flex scroll-mt-[72px] flex-col">
                 <UiButton {...stopProps(s, i)} className={`grid min-h-[96px] grid-cols-[96px_1fr] items-center gap-3 rounded-chip py-3 pr-3 text-left transition-colors ${chosen ? "bg-raised" : "hover:bg-raised"}`}>
                   <span className="grid place-items-center">
                     <span className="relative">
