@@ -77,19 +77,6 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
 /** A press with the mouse or a finger leaves focus on the game, so Enter still fires and digits still type. */
 const keep = (e: React.MouseEvent) => e.preventDefault();
 
-/** One Power-Up (or empty) slot: a round labelled button, the glyph inside, the name under it where there is room. */
-export function Slot({ label, glyph, onPress, disabled, pressed, pulse }: {
-  label: string; glyph: ReactNode; onPress: () => void; disabled?: boolean; pressed?: boolean; pulse?: boolean;
-}) {
-  return (
-    <Button className={css.slot} onMouseDown={keep} aria-label={`Power-Up ${label}`} title={label} aria-pressed={pressed} disabled={disabled} onClick={onPress}>
-      <span className={css.ring}>{glyph}{pulse && !disabled && <span className={css.orbit} aria-hidden />}</span>
-      <span className={css.slotName} aria-hidden>{label}</span>
-    </Button>
-  );
-}
-export const EmptySlot = () => <span className={css.empty} aria-hidden />;
-
 /**
  * The console: one instrument band with the same anatomy everywhere (keypad, Fire, Power-Ups, Delete, help).
  * `slots` holds the one Power-Ups button (PowerUpsButton), or an empty reserved space of the same size.

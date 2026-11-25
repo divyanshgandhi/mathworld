@@ -213,12 +213,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const o = ui.outcome, h = ui.hint ?? null, lesson = ui.lesson;
 
   // ---- the two message lines under the question ----
-  const hintWords = wordsInStrip && w && h && (h.squads !== "off" || h.each !== "off") ? (
+  const hintWords = wordsInStrip && w && h && (h.squads === "on" || h.each === "on") ? (
     <>
-      {h.squads !== "off" && <span className={h.squads === "soft" ? css.soft : undefined}><b>{fmtN(ra)}</b> {plural(ra, "squad", "squads")}</span>}
-      {h.squads !== "off" && h.each !== "off" && <span className={css.soft}> · </span>}
+      {h.squads === "on" && <span><b>{fmtN(ra)}</b> {plural(ra, "squad", "squads")}</span>}
+      {h.squads === "on" && h.each === "on" && <span className={css.soft}> · </span>}
       {/* the same words the scan writes in the world (fleetView's squadsText / eachText) */}
-      {h.each !== "off" && <span className={h.each === "soft" ? css.soft : undefined}><b>{fmtN(rb)}</b> in each squad</span>}
+      {h.each === "on" && <span><b>{fmtN(rb)}</b> in each squad</span>}
     </>
   ) : null;
   let lineA: ReactNode = null, lineB: ReactNode = hintWords;

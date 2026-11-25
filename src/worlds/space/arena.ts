@@ -31,7 +31,7 @@ import { createBackdrop } from "@/battle/systems/backdrop";
 import { createCameraRig, frameBox, measure, type Safe } from "@/battle/systems/camera";
 import { createCannon } from "@/battle/systems/cannon";
 import { createCharge } from "@/battle/systems/charge";
-import { AXIS_H, createFleetView, FLEET_Y, fmt, type AxisShow } from "@/battle/systems/fleetView";
+import { AXIS_H, createFleetView, FLEET_Y, fmt } from "@/battle/systems/fleetView";
 import { createFx } from "@/battle/systems/fx";
 import { createKillFx } from "@/battle/systems/kill";
 import { createMisses } from "@/battle/systems/misses";
@@ -73,6 +73,9 @@ const POWERUP_DEBOUNCE_MS = 400;
  * shows in the world for ~1.6 s (survivors gather and are counted, or the extras fizz out and are
  * counted), then the full fleet is back and the keypad is live ~2 s after the outcome.
  */
+/** What the console may print for an axis: the words, or nothing. */
+export type HintShow = "on" | "off";
+
 export interface ArenaUi {
   planet: PlanetId;
   planetName: string;
@@ -104,9 +107,10 @@ export interface ArenaUi {
   structure?: Structure;
   /**
    * Structure "discover": what the hint ladder has shown for this fleet. `squads` / `each`: the axis
-   * labels ("soft" is an unprompted first-sight hint). `powerUp`: the Power-Up that fits, flagged on miss 2.
+   * labels, `on` only once their count has finished (never `soft`: the first-sight hint is retired).
+   * `powerUp`: the Power-Up that fits, flagged on miss 2.
    */
-  hint?: { level: number; squads: AxisShow; each: AxisShow; powerUp: TrickId | null } | null;
+  hint?: { level: number; squads: HintShow; each: HintShow; powerUp: TrickId | null } | null;
   /** The digits being typed (drawn on the rocket's nose). */
   charge?: number | null;
 }

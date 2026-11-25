@@ -172,7 +172,7 @@
 .mwc-key:hover:not([data-disabled]) { border-color: var(--color-gold); }
 .mwc-key:active:not([data-disabled]) { background: var(--color-raised); transform: translateY(1px); }
 .mwc-key[data-disabled] { color: var(--color-ink-3); border-color: var(--color-line-1); cursor: default; }
-.mwc-key:focus-visible, .mwc-fire:focus-visible, .mwc-slot:focus-visible, .mwc-help:focus-visible, .mwc-sector:focus-visible {
+.mwc-key:focus-visible, .mwc-fire:focus-visible, .mwc-help:focus-visible, .mwc-sector:focus-visible {
   outline: 2px solid var(--color-gold);
   outline-offset: 3px;
 }
@@ -214,28 +214,13 @@
 }
 .mwc-fire[data-disabled] .mwc-fireNumber { color: var(--color-ink-3); }
 
-/* Power-Up slots and the help button: round, labelled */
+/* the Power-Ups button's place and the help button: round, labelled */
 .mwc-slots {
   grid-area: slots;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-}
-.mwc-slot {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 44px;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink-1);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 .mwc-ring {
   position: relative;
@@ -247,23 +232,6 @@
   border: 1px solid var(--color-line-2);
   transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
 }
-.mwc-slot:hover:not([data-disabled]) .mwc-ring { border-color: var(--color-gold); }
-.mwc-slot:active:not([data-disabled]) .mwc-ring { background: var(--color-raised); }
-.mwc-slot[aria-pressed="true"] .mwc-ring { border-color: var(--color-ink-1); background: var(--color-raised); }
-.mwc-slot[data-disabled] { color: var(--color-ink-3); cursor: default; }
-.mwc-slot[data-disabled] .mwc-ring { border-color: var(--color-line-1); }
-.mwc-slotName {
-  display: none;
-  max-width: 104px;
-  font-size: 16px;
-  font-weight: 500;
-  font-stretch: 110%;
-  line-height: 1.15;
-  text-align: center;
-  white-space: normal;
-  text-wrap: balance;
-}
-.mwc-empty { width: var(--ring, 44px); height: var(--ring, 44px); flex: none; }
 
 /* the Power-Up the hint names: a dashed gold orbit turning slowly round it (the house motif, no glow) */
 .mwc-orbit {
@@ -489,10 +457,6 @@
 .mwc-console[data-layout="strip"] .mwc-help[data-disabled] .mwc-ring { border-color: var(--color-line-1); }
 .mwc-console[data-layout="strip"] .mwc-helpWords { font-size: 16px; }
 .mwc-console[data-layout="strip"] .mwc-puButton { height: var(--key); padding-right: 22px; }
-@media (min-width: 1300px) {
-  .mwc-console[data-layout="strip"] .mwc-slotName { display: block; }
-  .mwc-console[data-layout="strip"] .mwc-slot { width: 104px; }
-}
 /* outside the strip the help ring is just Nova's face */
 .mwc-console:not([data-layout="strip"]) .mwc-help .mwc-ring { border: 0; width: auto; height: auto; }
 

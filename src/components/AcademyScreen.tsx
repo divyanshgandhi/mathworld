@@ -13,7 +13,6 @@ import { Button, HomeLink, Icon, IconButton, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
 import { FieldManual } from "./teach/FieldManual";
 import { ScreenTour } from "./teach/Tour";
-import { Greeting } from "./teach/Greeting";
 import { greetKey } from "@/teach/keys";
 import { PlanetSprite } from "./world/PlanetSprite";
 import { preloadSprites } from "./world/spriteStore";
@@ -93,7 +92,6 @@ export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
       <Starfield seed={23} />
       <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Academy" orbs={state.orbs} onHelp={onHelp ?? (() => setHelp(true))} />
       {/* the list only: a trick film has Nova's own voice and captions */}
-      <Greeting screen="academy" seen={{ seen: state.seen, emit }} />
       <FieldManual open={help} onClose={() => setHelp(false)} topic="help" seen={{ seen: state.seen, emit }} replayFrom="/academy" />
       <ScreenTour id="academy" seen={{ seen: state.seen, emit }} />
       <main className="relative z-10 mx-auto w-full max-w-[920px] px-4 pb-16 pt-4 sm:px-8 md:pt-10">
