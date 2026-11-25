@@ -56,6 +56,24 @@ The manual track's parts are on the real screens now (steps in [w2-manual.md](w2
 - **The film** no longer tells the miss rule in the hangar (`captain_brief3`, `captain_brief4`); the battle shows it.
 - Every spoken line still to bake is in [lines-to-bake.md](lines-to-bake.md).
 
+## Review round handoff notes
+The owner's seven points and the round's closed decisions are in `OVERHAUL.md`, "Review round". Merged in this order:
+
+| Track | Note | What it built |
+| --- | --- | --- |
+| playfield | [r1-playfield.md](r1-playfield.md), dissection [playfield.md](playfield.md) | Nothing on the fleet before an answer, scans that count one number at a time in lanes outside the fleet, labels that cannot collide, fleet size on phones, `arena.playfield()` |
+| cockpit | [r1-cockpit.md](r1-cockpit.md) | One Power-Ups button and its list, the three-row phone console, sectors under the question, orbs that agree with their line, the mission-over card |
+| map | [r1-map.md](r1-map.md) | The Star map as a pager (one planet a page, arrows, keys, ten dots), a card as wide as its words |
+| tour | [r1-tour.md](r1-tour.md) | Spotlight tours (bay, battle, map, Hangar, Academy) that replace the greetings, "Show me around" in the Field Manual |
+| film | [r1-film.md](r1-film.md) | The pacing pass: replies 0.15 to 0.45 s, heard captions leave with the voice, waits of 5 s, joins of 1 s, the film's clock as data (`pace.ts`) |
+
+## Integration (review round)
+- The battle tour mounts in `WaveArena.tsx`: once (`tour:battle`), at the start of wave 2 of the cadet's first planet battle (campaign, no planet cleared), before any answer, holding the game (`hold.on("tour")`) while it shows.
+- The Star map tour mounts in `SolarMap.tsx` in place of the map's greeting. The Hangar and Academy greeting mounts are gone; their tours speak for them. The map greeting's words stay in `src/teach/greetings.ts` for /dev/teach only.
+- The film's first battle has a pause-menu way out ("Leave for now", to the Title).
+- `ui.hint.squads` and `ui.hint.each` are typed `"on" | "off"` (`HintShow`); the console prints structure words only when one is `on`.
+- Removed: the old icon-only Power-Up `Slot` and `EmptySlot` and their styles.
+
 ## Review routes
 Run the dev server and open these. Add `?dev` to the game routes to skip progress gates.
 
@@ -76,3 +94,8 @@ Run the dev server and open these. Add `?dev` to the game routes to skip progres
 | `/manual?topic=count` | The Field Manual on one page, full screen (Close goes back, or to the bay) |
 | `/play/moon?dev&a=3&b=4` as a new cadet | The guided first shot on a planet battle (it shows once per cadet: sign up again to see it again) |
 | `/intro` as a new cadet | The film, then Cadet Bay with its greeting and the guided first shot |
+| `/intro?dev&pace=heard`, `/intro?dev&pace=read` | The film paced as with sound on, or as read alone (sound off); it stays muted |
+| `/dev/teach/tour` | The spotlight tour on mock targets: every side, long lines, edges, missing and moving anchors |
+| `/play/moon?dev&tour=battle` | The battle tour on the real cockpit, forced as soon as the screen is calm (review only) |
+| `/map?at=<planet>`, `/map?locked=<planet>` | The Star map opened on one planet, or on a locked one with its line |
+| `/dev/console` (Power-Ups pickers) | The Power-Ups list in every state, and the mission-over card |
