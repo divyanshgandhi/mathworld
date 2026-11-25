@@ -3,12 +3,13 @@ import {
   Carousel, CarouselContent, CarouselIndicator, CarouselIndicatorGroup, CarouselItem, CarouselNext, CarouselPrevious, CarouselViewport, createCarouselController,
 } from "@ui-sdk/react/carousel";
 import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { buttonClass, PillLink } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
 import { manualKey } from "@/teach/keys";
 import { MANUAL_PAGES, pageOf, type ManualTopic } from "@/teach/manual";
 import { useSeen, type SeenSource } from "@/teach/seen";
+import { tourState } from "@/teach/tourState";
 import { ManualPicture } from "./ManualScenes";
 
 /**
@@ -22,6 +23,8 @@ import { ManualPicture } from "./ManualScenes";
  * - Close is always on screen, and Escape closes it too.
  * - Each page the player lands on is recorded as seen (`manual:<page>`), once.
  * - `seen` is optional: without it the manual reads and writes the log itself (see src/teach/seen.ts).
+ * - "Show me around" comes first when the screen has a tour (a mounted ScreenTour): it closes the
+ *   manual and runs that screen's tour again.
  * - `replayFrom` (a hub's path, such as "/bay") adds a quiet "Watch the film again", which plays the
  *   intro film and comes back there. Battles leave it out: the film is not for the middle of a fight.
  */
@@ -53,6 +56,7 @@ function ManualBody({ topic, seen, replayFrom }: { topic?: ManualTopic | null; s
   const [page, setPage] = useState(() => pageOf(topic) + 1);
   const [carousel] = useState(createCarouselController);
   const last = page === MANUAL_PAGES.length;
+  const tour = useSyncExternalStore(tourState.subscribe, () => tourState.current, () => null);
 
   // arrow keys page the manual from anywhere in the sheet (the viewport and the dots handle their own)
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -72,7 +76,8 @@ function ManualBody({ topic, seen, replayFrom }: { topic?: ManualTopic | null; s
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKey}>
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 pl-5 pr-3 sm:h-[72px] sm:pl-7 sm:pr-4">
         <DialogTitle className="m-0 type-display text-[22px] sm:text-[26px]">How to play</DialogTitle>
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-1 sm:gap-2">
+          {tour && <DialogClose onClick={() => tourState.askReplay(tour)} className={`${buttonClass("quiet", "sm")} px-3`}>Show me around</DialogClose>}
           {filmLink("hidden sm:inline-flex [@media(max-height:520px)]:inline-flex")}
           <DialogClose aria-label="Close" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
         </span>

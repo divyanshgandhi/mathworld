@@ -8,7 +8,7 @@ import { Icon } from "./Icon";
 /** The orb count: the gold orb icon, the number, and the word (the word hides on phones). */
 export function OrbCount({ n, className = "" }: { n: number; className?: string }) {
   return (
-    <span className={`flex items-center gap-2.5 type-number text-[17px] font-medium tracking-[0.06em] ${className}`} aria-label={`${n} orbs`}>
+    <span data-guide="orbs" className={`flex items-center gap-2.5 type-number text-[17px] font-medium tracking-[0.06em] ${className}`} aria-label={`${n} orbs`}>
       <Icon name="orb" size={20} className="text-gold" />
       <span aria-hidden>{n.toLocaleString("en-US")}</span>
       <small className="hidden text-[15px] font-normal tracking-normal text-ink-2 sm:inline" aria-hidden>orbs</small>
@@ -44,7 +44,7 @@ export function TopBar({ title, left, orbs, onHelp, helpLabel = "How to play", r
       <span className="flex-1" />
       {right}
       {orbs != null && <OrbCount n={orbs} />}
-      {onHelp && <IconButton icon="help" label={helpLabel} onClick={onHelp} />}
+      {onHelp && <IconButton icon="help" label={helpLabel} onClick={onHelp} data-guide="help" />}
       <SoundButton />
     </header>
   );

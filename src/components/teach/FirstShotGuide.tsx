@@ -1,11 +1,13 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import type { Bus } from "@/battle/bus";
 import { audio } from "@/engine/audio";
 import type { ArenaUi } from "@/worlds/space/arena";
 import { freeArea, GUIDE_START, guideShows, guideStep, placeCaption, COUNT_MS, type Box, type GuideAnchor, type GuideEvent, type Side } from "@/teach/guide";
 import { GUIDE_FIRST_SHOT } from "@/teach/keys";
 import { useSeen, type SeenSource } from "@/teach/seen";
+import { tourState } from "@/teach/tourState";
+import { ScreenTour } from "./Tour";
 
 /**
  * The guided first shot: a coach layer for a player's very first wave, gone for good once that
@@ -36,14 +38,33 @@ export function FirstShotGuide({ ui, bus, seen, fleetRect, rocketRect, root }: {
   root?: HTMLElement | null;
 }) {
   const { seen: met, mark } = useSeen(GUIDE_FIRST_SHOT, seen);
-  if (met !== false) return null;
-  return <Guide ui={ui} bus={bus} mark={mark} fleetRect={fleetRect} rocketRect={rocketRect} root={root} />;
+  return (
+    <>
+      {met === false && <Guide ui={ui} bus={bus} mark={mark} fleetRect={fleetRect} rocketRect={rocketRect} root={root} />}
+      <DevBattleTour />
+    </>
+  );
+}
+
+/**
+ * `?dev&tour=battle` on a battle route runs the battle tour on whatever anchors the console has, as
+ * soon as the guided first shot is not running (for review; the real mount is the integrator's, see
+ * docs/overhaul/r1-tour.md).
+ */
+const noSub = () => () => {};
+const devTourAsked = () => { const q = new URLSearchParams(location.search); return q.has("dev") && q.get("tour") === "battle"; };
+function DevBattleTour() {
+  const on = useSyncExternalStore(noSub, devTourAsked, () => false);
+  return on ? <ScreenTour id="battle" hold force /> : null;
 }
 
 const now = () => performance.now();
 
 function Guide({ ui, bus, mark, fleetRect, rocketRect, root }: { ui: ArenaUi | null; bus: Bus | null; mark: () => void; fleetRect?: () => DOMRect | null; rocketRect?: () => DOMRect | null; root?: HTMLElement | null }) {
   const [state, send] = useReducer(guideStep, GUIDE_START);
+  // a tour never runs while the guided first shot does
+  const running = state.step !== "done";
+  useEffect(() => (running ? tourState.guideOn() : undefined), [running]);
 
   useEffect(() => { send({ type: "ui", ui: ui ? { wave: ui.wave, canFire: ui.canFire, lesson: ui.lesson, done: ui.done, offer: ui.offer } : null, now: now() }); }, [ui]);
   useEffect(() => {

@@ -8,4 +8,7 @@ export { FirstShotGuide } from "./FirstShotGuide";
 export { ShipSprite, useShipSprite } from "./ShipSprite";
 export { ManualPicture } from "./ManualScenes";
 export { useReducedMotion, useLoop } from "./motion";
+export { Tour, ScreenTour, useTour, findAnchor, pageBusy } from "./Tour";
+export { TOURS, TOUR_IDS, tourKey, type TourId, type TourStep } from "@/teach/tour";
+export { tourState } from "@/teach/tourState";
 export { useSeen, memorySource, resetSeen, type SeenSource } from "@/teach/seen";

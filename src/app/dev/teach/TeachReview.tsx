@@ -116,7 +116,7 @@ export function TeachReview() {
       </section>
 
       <FieldManual open={open} onClose={() => setOpen(false)} topic={topic} seen={source} />
-      {greet && <Greeting key={greet.n} screen={greet.screen} seen={source} />}
+      {greet && <Greeting key={greet.n} screen={greet.screen} seen={source} always />}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { BattleHud } from "./battle/BattleHud";
 import { Button, HomeLink, Icon, IconButton, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
 import { FieldManual } from "./teach/FieldManual";
+import { ScreenTour } from "./teach/Tour";
 import { Greeting } from "./teach/Greeting";
 import { greetKey } from "@/teach/keys";
 import { PlanetSprite } from "./world/PlanetSprite";
@@ -94,6 +95,7 @@ export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
       {/* the list only: a trick film has Nova's own voice and captions */}
       <Greeting screen="academy" seen={{ seen: state.seen, emit }} />
       <FieldManual open={help} onClose={() => setHelp(false)} topic="help" seen={{ seen: state.seen, emit }} replayFrom="/academy" />
+      <ScreenTour id="academy" seen={{ seen: state.seen, emit }} />
       <main className="relative z-10 mx-auto w-full max-w-[920px] px-4 pb-16 pt-4 sm:px-8 md:pt-10">
         <h2 className="m-0 type-display text-[clamp(44px,7vw,80px)] leading-[0.95]">{ACADEMY_WORDS.heading}</h2>
         {newHere === false && <p className="m-0 mt-4 max-w-[36ch] type-child text-ink-2">{ACADEMY_WORDS.intro}</p>}
@@ -125,8 +127,8 @@ function TrickList({ seen, reached, next, highlight, onWatch }: {
     <div ref={list} className="relative mt-10">
       {/* the journey's dashed path runs down the left, through each planet */}
       <span aria-hidden className="absolute bottom-10 left-[17px] top-4 border-l border-dashed border-line-2" />
-      {groups.map(({ planet, films }) => (
-        <section key={planet} aria-labelledby={`at-${planet}`} className="relative mb-6">
+      {groups.map(({ planet, films }, i) => (
+        <section key={planet} aria-labelledby={`at-${planet}`} data-guide={i === 0 ? "academy-list" : undefined} className="relative mb-6">
           <h3 id={`at-${planet}`} className="m-0 flex items-center gap-4 py-2">
             <PlanetSprite id={planet} size={36} alt="" />
             <span className="type-name text-[17px] text-ink-2">{STOP_WORDS[planet].name}</span>

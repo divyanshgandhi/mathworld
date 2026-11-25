@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { NovaLine } from "@/components/kit/Brand";
 import { MOTION } from "@/design/tokens";
 import { GREETINGS, type GreetScreen } from "@/teach/greetings";
+import { TOURED_SCREENS } from "@/teach/tour";
 import { useSeen, type SeenSource } from "@/teach/seen";
 import { readMs } from "@/teach/words";
 
@@ -19,10 +20,19 @@ import { readMs } from "@/teach/words";
  * - While the seen state is loading it shows nothing, so a returning player is never greeted twice.
  * - `inline` reserves no space once it has gone: put it where a gap closing does not move a control.
  * - `edge="top"` floats it just under the top bar instead (a screen whose bottom holds the words to read, such as the Hangar's dock).
+ * - A screen with a tour (`TOURED_SCREENS`: bay, map, hangar, academy) shows its tour instead, so
+ *   there the greeting renders nothing (review-round decision 8). `always` keeps it (the /dev/teach review).
  */
-export function Greeting({ screen, seen, enabled = true, placement = "float", edge = "bottom", className = "", onDone }: {
+export function Greeting(props: GreetingProps & { always?: boolean }) {
+  if (!props.always && TOURED_SCREENS.includes(props.screen)) return null;
+  return <GreetingLine {...props} />;
+}
+
+type GreetingProps = {
   screen: GreetScreen; seen?: SeenSource; enabled?: boolean; placement?: "float" | "inline"; edge?: "bottom" | "top"; className?: string; onDone?: () => void;
-}) {
+};
+
+function GreetingLine({ screen, seen, enabled = true, placement = "float", edge = "bottom", className = "", onDone }: GreetingProps) {
   const line = GREETINGS[screen];
   const { seen: met, mark } = useSeen(line.key, seen);
   // decided once, on the first render that knows the answer: a greeting never comes back mid-visit
