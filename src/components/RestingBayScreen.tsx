@@ -116,7 +116,7 @@ function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boole
  * The Resting Bay (/bay): the cadet's home between missions, in 2D (design/bay-accretion.html).
  * - The hero is the next mission's planet, named by the planet, with one line of status, the waves
  *   won, the one primary action (Launch) and Nova's line.
- * - `patrol` is the slot under the mission for the daily patrol (built next wave).
+ * - `patrol` is the slot under the mission for the daily patrol: a node, or a function given the bay's cadet.
  * - The times tables as ten rows of mastery marks: one opens in place to its ten facts and
  *   "Practise the 7s", which starts flashcards on that table.
  * - Places to go (Star map, Hangar, Academy), and a quiet Switch cadet that asks first.
@@ -124,7 +124,10 @@ function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boole
  * - Nova's line is the bay's greeting on the first arrival (seen key `greet:bay`), so the bay never
  *   floats a second greeting over it.
  */
-export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patrol?: ReactNode } = {}) {
+/** What the patrol slot is given when `patrol` is a function: the bay's own cadet, so a patrol shares its log. */
+export type BaySlotContext = { state: PlayerState; log: LoggedEvent[]; emit: ReturnType<typeof useCadet>["emit"] };
+
+export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patrol?: ReactNode | ((c: BaySlotContext) => ReactNode) } = {}) {
   const router = useRouter();
   const { cadet, log, state, emit } = useCadet();
   const ps = useMemo(() => (state ? postersOf(state) : null), [state]);
@@ -194,7 +197,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
               <span>Launch<span className="mw-bay-launch-long"> to {inLine(name)}</span></span>
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
-            <div data-slot="daily-patrol" className="empty:hidden">{patrol}</div>
+            <div data-slot="daily-patrol" className="empty:hidden">{typeof patrol === "function" ? patrol({ state, log, emit }) : patrol}</div>
             <NovaLine className="mw-bay-nova">{novaLine(state, log, who, !!first, name, ps)}</NovaLine>
           </div>
         </section>

@@ -1,6 +1,6 @@
-import { RestingBayScreen } from "@/components/RestingBayScreen";
+import { RestingBayWithPatrol } from "@/components/hub/DailyPatrol";
 
-/** The Resting Bay: the cadet's cabin hub. The game owns the whole screen. */
+/** The Resting Bay: the cadet's cabin hub, with the daily patrol in its slot. The game owns the whole screen. */
 export default function BayPage() {
-  return <RestingBayScreen />;
+  return <RestingBayWithPatrol />;
 }

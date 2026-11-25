@@ -1,6 +1,6 @@
 "use client";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import "./hub.css";
 import type { EventInput } from "@/db/events";
 import type { PlayerState } from "@/director/fold";
@@ -10,9 +10,11 @@ import { EmptyState } from "../kit/Empty";
 import { Icon } from "../kit/Icon";
 import { Keypad } from "../kit/Keypad";
 import { Greeting } from "../teach/Greeting";
+import type { Fact } from "@/rig/pools";
 import { deckFor } from "./deck";
 
-type Result = { a: number; b: number; guess: number; ok: boolean };
+export type CardResult = { a: number; b: number; guess: number; ok: boolean };
+type Result = CardResult;
 /** How long a right answer stays on the card before the next one. A miss waits for the player. */
 const RIGHT_MS = 900;
 /** How long a miss shows its picture before Next card wakes up. */
@@ -27,9 +29,18 @@ const LOOK_MS = 1200;
  * Every card appends `flashcard_answered` (the fold gives a fast, right card a gentle mastery nudge).
  * Pass `table` to practise one times table ("Practise the 7s"); leave it out for the mixed deck.
  * The first deck ever opens with Nova's one-line greeting under the header (seen key `greet:flashcards`).
+ * Optional (the daily patrol uses them): `facts` is a fixed deck, `title` the sheet's name,
+ * `retryMisses` brings a missed fact back once at the end, `progress="dots"` shows dots instead of
+ * "Card 2 of 5", `greet={false}` skips Nova's line, `onFinish` runs once with every answer when the
+ * last card is done, and `end` replaces the default end card.
  */
-export function Flashcards({ state, emit, onClose, table = null }: { state: PlayerState; emit: (e: EventInput) => void; onClose: () => void; table?: number | null }) {
-  const [deck] = useState(() => deckFor(state, seeded(Math.floor(Math.random() * 1e6) + 1), table));
+export function Flashcards({ state, emit, onClose, table = null, facts, title: name, retryMisses = false, progress = "count", greet = true, onFinish, end }: {
+  state: PlayerState; emit: (e: EventInput) => void; onClose: () => void; table?: number | null;
+  facts?: Fact[]; title?: string; retryMisses?: boolean; progress?: "count" | "dots"; greet?: boolean;
+  onFinish?: (results: CardResult[]) => void; end?: (results: CardResult[]) => ReactNode;
+}) {
+  const [deck, setDeck] = useState<Fact[]>(() => facts ? facts.map(({ a, b }) => ({ a, b })) : deckFor(state, seeded(Math.floor(Math.random() * 1e6) + 1), table));
+  const retried = useRef(new Set<number>());
   const [i, setI] = useState(0);
   const [entry, setEntry] = useState("");
   const [result, setResult] = useState<Result | null>(null);
@@ -50,7 +61,19 @@ export function Flashcards({ state, emit, onClose, table = null }: { state: Play
     const r = { a: card.a, b: card.b, guess: n, ok };
     setResult(r);
     setDone((d) => [...d, r]);
+    // a miss comes back once, at the end (never a second time)
+    if (!ok && retryMisses && !retried.current.has(i)) {
+      retried.current.add(i);
+      retried.current.add(deck.length);
+      setDeck((d) => [...d, { a: card.a, b: card.b }]);
+    }
   };
+  const finishedOnce = useRef(false);
+  useEffect(() => {
+    if (!finished || finishedOnce.current || deck.length === 0) return;
+    finishedOnce.current = true;
+    onFinish?.(done);
+  }, [finished, deck.length, done, onFinish]);
 
   // a right answer moves on by itself; a miss waits for Next card (or Enter), which wakes up after a
   // short look so a mashed Enter cannot skip the picture of the fact
@@ -67,7 +90,7 @@ export function Flashcards({ state, emit, onClose, table = null }: { state: Play
     return () => { window.clearTimeout(t); window.removeEventListener("keydown", key); setReady(false); };
   }, [result, advance]);
 
-  const title = table ? `The ${table}s` : "Flashcards";
+  const title = name ?? (table ? `The ${table}s` : "Flashcards");
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -75,12 +98,17 @@ export function Flashcards({ state, emit, onClose, table = null }: { state: Play
         <header className="mw-topbar">
           <DialogTitle className="mw-topbar-title">{title}</DialogTitle>
           <span className="flex-1" />
-          {!finished && deck.length > 0 && <span className="type-body text-ink-2" aria-live="polite">Card {i + 1} of {deck.length}</span>}
+          {!finished && deck.length > 0 && progress === "count" && <span className="type-body text-ink-2" aria-live="polite">Card {i + 1} of {deck.length}</span>}
+          {!finished && deck.length > 0 && progress === "dots" && (
+            <span className="mw-cards-dots" role="img" aria-label={`Card ${i + 1} of ${deck.length}`}>
+              {deck.map((_, k) => <i key={k} data-state={k < i ? "done" : k === i ? "now" : undefined} />)}
+            </span>
+          )}
           <DialogClose aria-label="Close flashcards" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
         </header>
 
         {/* laid over the top of the card, so nothing moves when it goes */}
-        {deck.length > 0 && !finished && (
+        {greet && deck.length > 0 && !finished && (
           <div className="relative z-10 h-0">
             <Greeting screen="flashcards" placement="inline" seen={{ seen: state.seen, emit }} className="absolute inset-x-0 top-1 mx-auto w-fit max-w-[min(92%,520px)] rounded-panel border border-line-1 bg-panel px-4 py-3" />
           </div>
@@ -91,6 +119,8 @@ export function Flashcards({ state, emit, onClose, table = null }: { state: Play
               Play your first mission to meet some facts. Then they will show up here.
             </EmptyState>
           </div>
+        ) : finished && end ? (
+          end(done)
         ) : finished ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-10 text-center">
             <p className="m-0 type-display text-[clamp(48px,9vw,96px)]" role="status">{right} of {deck.length} right</p>
