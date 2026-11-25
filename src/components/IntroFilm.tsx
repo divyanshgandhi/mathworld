@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExtern
 import { Button, NovaLine, Sheet } from "@/components/kit";
 import { CADET, MOTION, type CadetColor } from "@/design/tokens";
 import { flushed, history, post } from "@/engine/outbox";
+import { keepWhole } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import type { Bay, BayUi } from "@/worlds/space/cadetBay";
 import type { Chapter, Film, FilmCaption, FilmUi } from "@/worlds/space/intro";
@@ -54,9 +55,9 @@ function Caption({ line, narrow, live = false }: { line: FilmCaption; narrow: bo
   return (
     <div className="max-w-full rounded-chip border border-line-1 bg-sheet px-4 py-2.5 text-left text-ink-1 sm:px-5 sm:py-3" data-film-caption>
       {line.who ? (
-        <NovaLine speaker={line.who} portrait={line.who === "Nova" ? undefined : <></>} size={narrow ? "body" : "child"} live={live}>{line.text}</NovaLine>
+        <NovaLine speaker={line.who} portrait={line.who === "Nova" ? undefined : <></>} size={narrow ? "body" : "child"} live={live}>{keepWhole(line.text)}</NovaLine>
       ) : (
-        <p className={`m-0 max-w-[34ch] ${narrow ? "type-body" : "type-child"}`} role={live ? "status" : undefined}>{line.text}</p>
+        <p className={`m-0 max-w-[34ch] ${narrow ? "type-body" : "type-child"}`} role={live ? "status" : undefined}>{keepWhole(line.text)}</p>
       )}
     </div>
   );
@@ -68,6 +69,9 @@ function Caption({ line, narrow, live = false }: { line: FilmCaption; narrow: bo
  * and the battle HUD after it. `?dev` adds a chapter dock. `?replay` plays the film again for a
  * cadet who has finished it: nothing is recorded, and the end (or Skip) goes back to `from`.
  */
+/** Recorded when the film hands over to the battle (played through or skipped), so a reload resumes the battle. */
+export const FILM_DONE = "film:done";
+
 export function IntroFilm() {
   const box = useRef<HTMLDivElement>(null), ruler = useRef<HTMLDivElement>(null);
   const stage = useRef<Stage | null>(null), film = useRef<Film | null>(null), bay = useRef<Bay | null>(null);
@@ -109,7 +113,8 @@ export function IntroFilm() {
     requestAnimationFrame(() => requestAnimationFrame(() => setVeil("lifting")));
     setTimeout(() => setVeil("off"), (still ? 0 : FILM_FADE.in) + 100);
   }, []);
-  useEffect(() => { ending.current = again ? () => router.replace(from) : () => void startBay(); }, [again, from, router, startBay]);
+  // the film is over the moment the battle opens: a reload from here on carries on in the battle, not at the film's start
+  useEffect(() => { ending.current = again ? () => router.replace(from) : () => { post({ type: "seen", payload: { key: FILM_DONE } }); void startBay(); }; }, [again, from, router, startBay]);
 
   /**
    * Does this piece of a line fit the caption plate in two lines on this screen? The film asks before it
@@ -120,7 +125,7 @@ export function IntroFilm() {
     if (!twin || !p || !name) return text.length <= 84;
     name.textContent = who ? `${who}:` : "";
     if (face) (face as SVGElement).style.display = who === "Nova" ? "" : "none";
-    (p.lastChild as Text).data = ` ${text}`;
+    (p.lastChild as Text).data = ` ${keepWhole(text)}`;
     return p.getBoundingClientRect().height <= parseFloat(getComputedStyle(p).lineHeight) * 2.2;
   }, []);
 
@@ -144,7 +149,7 @@ export function IntroFilm() {
       if (!j.player && !devMode) return router.replace("/");
       const watching = wantReplay && (!!j.introCompleted || devMode);
       if (j.introCompleted && !devMode && !watching) return router.replace("/bay");
-      if (j.player && !watching) setInBay((await history()).some((e) => e.type === "attempt_submitted" && e.payload.planetId === "earth"));
+      if (j.player && !watching) setInBay((await history()).some((e) => (e.type === "seen" && e.payload.key === FILM_DONE) || (e.type === "attempt_submitted" && e.payload.planetId === "earth")));
       setAgain(watching);
       setPlayer(j.player);
     })();

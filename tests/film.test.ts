@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readingTime, scheduleCaptions, splitCaption } from "@/engine/overlay";
+import { keepWhole, readingTime, scheduleCaptions, splitCaption } from "@/engine/overlay";
 import { BATTLE_LINES, FILM_LINES } from "@/worlds/space/lines";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
@@ -16,6 +16,21 @@ describe("film captions", () => {
   it("a caption stays up for 1.5 s plus 0.3 s a word", () => {
     expect(readingTime("Two! Brilliant.")).toBeCloseTo(2.1);
     expect(readingTime("Knock, knock, knock.")).toBeCloseTo(2.4);
+  });
+
+  it("read alone (sound off, or no clip) a caption stays up at a Grade 3 reader's pace: 1 s plus 0.67 s a word", () => {
+    expect(readingTime("Two! Brilliant.", false)).toBeCloseTo(2.34);
+    // the longest film line, read alone, holds for 90 words a minute at least, however it is cut
+    const text = FILM_LINES.teacher_intro, n = text.split(/\s+/).length;
+    const { hold } = scheduleCaptions(splitCaption(text, twoLines(36)), 0, false);
+    expect(hold).toBeGreaterThanOrEqual((n / 90) * 60);
+    // heard, the same line may go with the voice
+    expect(scheduleCaptions([text], 6.59).hold).toBeLessThan(hold);
+  });
+
+  it("a hyphenated word stays on one line", () => {
+    expect(keepWhole(FILM_LINES.nova_hi)).toBe("Hi! I am Nova, your co\u2011pilot. Ready for launch?");
+    expect(keepWhole("Knock - knock")).toBe("Knock - knock"); // a dash between words is left alone
   });
 
   it("every line of the film is cut into captions of at most two lines, on a phone and on a desktop", () => {
