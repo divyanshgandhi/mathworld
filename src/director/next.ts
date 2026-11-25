@@ -3,7 +3,7 @@ import { seeded, type Rng } from "@/engine/util";
 import { GOLD_STREAK_FOR_JUMP, isSolved, M0 } from "@/rig/adaptive";
 import { drawFrom, ENUMERABLE_TIERS, factKey, factsOf, MAX_TIER, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
 import { placeParts, selectTrick, type TrickId } from "@/rig/tricks";
-import type { PlayerState, WaveRole } from "./fold";
+import { cleanRecord, type PlayerState, type WaveRole } from "./fold";
 
 export interface Wave extends Fact {
   tier: number;
@@ -106,8 +106,8 @@ export function nextWave(s: PlayerState, seed: number): Wave {
     if (f) return make(f, "transfer", true);
   }
 
-  // Two Golds in a row: probe the next planet. A third Gold there earns the Hyper-Jump over it.
-  if (s.goldStreak === GOLD_STREAK_FOR_JUMP - 1 && tier < MAX_TIER) {
+  // Two Golds in a row on a clean record: probe the next planet. A third Gold there earns the Hyper-Jump over it.
+  if (s.goldStreak === GOLD_STREAK_FOR_JUMP - 1 && cleanRecord(s) && tier < MAX_TIER) {
     const next = tier + 1;
     return make(ENUMERABLE_TIERS.includes(next) ? orient(weakest(s, next, mix(seed, s.waves, 3)), rng, next) : drawFrom(next, rng), "probe");
   }
