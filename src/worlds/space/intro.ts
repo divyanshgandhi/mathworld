@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { COLOR } from "@/design/tokens";
 import { audio } from "@/engine/audio";
 import { CameraRig, type V3 } from "@/engine/camera";
 import { Director, type Step } from "@/engine/director";
@@ -6,61 +7,80 @@ import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { approach, clamp, ease, keyframes, seeded } from "@/engine/util";
 import { prepare, warmVoice } from "@/engine/voice";
-import { animateCharacter, CAPTAIN, CLASSMATES, eyePosition, face, headPosition, makeCharacter, PLAYER, PRINCIPAL, seat, SKIN, TEACHER, type Character } from "./cast";
-import { buildClassroom, DOOR_POINT, PLAYER_SEAT, SEATS } from "./classroom";
+import { applyLook, LOOKS, type LookId } from "@/worlds/looks";
+import { animateCharacter, ANSWERERS, CAPTAIN, CLASSMATES, eyePosition, face, headPosition, makeCharacter, NAMED, PLAYER, PRINCIPAL, seat, SKIN, TEACHER, type Character, type Expression } from "./cast";
+import { buildClassroom, CHAIR_BACK, DESK_DEPTH, DESK_HEIGHT, DOOR_POINT, PLAYER_SEAT, SEAT_HEIGHT, SEATS } from "./classroom";
 import { buildEarth, EARTH_RADIUS } from "./earth";
 import { makeHand } from "./hand";
 import { buildHangar } from "./hangar";
 import { buildTown } from "./town";
 
 /**
- * The opening film. Storyline and voice lines follow the Gemini showcase: Earth, the dive, an
- * ordinary Tuesday, waking up in class, two quick questions, the knock, the captain, the names,
- * the cadet picked by name, the hangar briefing, Nova, and ignition. Every line is a baked Gradium
- * Phonon clip except the cadet's name, which Phonon speaks live in the teacher's voice.
+ * The opening film: Earth, the dive, an ordinary Tuesday, waking up in class, two quick questions,
+ * the knock, the Captain, the names, the cadet picked by name, the hangar briefing, Nova, and
+ * ignition. Every line is a baked Gradium Phonon clip except the cadet's name, which Phonon speaks
+ * live in the teacher's voice.
+ *
+ * Film grammar: a new setup is a cut, and inside a setup the camera only drifts. Fades are one
+ * family (eased, the colour of the void); the single exception is the dive, which goes through cloud.
  */
 type Env = "space" | "town" | "class" | "hangar";
 interface Shot extends Step { env: Env; chapter: Chapter; firstPerson?: boolean; pick?(v: number): void; raise?(): void }
 export type Chapter = "orbit" | "dive" | "wake" | "knock" | "hangar";
-export interface FilmUi { prompt: { eq: string; options: number[]; stage: "raise" | "choose" } | null; cta: string | null; started: boolean; ended: boolean; chapter: Chapter | null }
+/** `raise`: the invitation to raise a hand; `called`: the hand is up and the teacher is calling on you; `choose`: pick the answer. */
+export interface FilmUi { prompt: { eq: string; options: number[]; stage: "raise" | "called" | "choose" } | null; cta: string | null; started: boolean; ended: boolean; chapter: Chapter | null }
 
 export const SPACE_AT = new THREE.Vector3(0, 0, -6000);
 const TOWN_AT = new THREE.Vector3(1500, 0, 0), HANGAR_AT = new THREE.Vector3(-1500, 0, 0);
 const CLASS_CENTRE = new THREE.Vector3(0, 1, 1.2);
-const HALL = [new THREE.Vector3(7.0, 0, -3.2), new THREE.Vector3(6.2, 0, -3.4)];
-const ARRIVE = { principal: new THREE.Vector3(4.5, 0, -2.4), captain: new THREE.Vector3(3.5, 0, -3.8) };
-const MOODS = {
-  tuesday: { sat: 0.62, tint: [1.03, 1.0, 0.95], exposure: 0.95, hall: 0.2, spill: 0, fill: 0, buzz: true },
-  knock: { sat: 0.86, tint: [1.04, 1.0, 0.95], exposure: 1.0, hall: 0.85, spill: 16, fill: 5, buzz: false },
-} as const;
+/** The desk in front of the cadet stands empty, so the cadet (and the camera) can see the teacher and the board. */
+const EMPTY_SEAT = 1;
+// the walk in: from down the hall, through the middle of the doorway, to their marks clear of the open door
+const HALL = [new THREE.Vector3(7.6, 0, -3.75), new THREE.Vector3(6.1, 0, DOOR_POINT.z)];
+const ARRIVE = { principal: new THREE.Vector3(4.75, 0, -2.2), captain: new THREE.Vector3(3.95, 0, -3.1) };
+/** Each set picks one of the three looks; no shot sets its own background, bloom, exposure or grade. */
+const LOOK_OF: Record<Env, LookId> = { space: "space", town: "interior", class: "interior", hangar: "hero" };
+/** The one story grade: the ordinary Tuesday is a touch muted, and colour arrives with the knock. `hall` is how much the hallway lights the room. */
+const MOODS = { tuesday: { sat: 0.86, hall: 0 }, knock: { sat: 1, hall: 1 } } as const;
+/** One fade grammar, in seconds: out to the void, and back in. */
+const FADE = { out: 0.7, in: 0.9 };
+/** How long the class waits for a hand, and when a classmate's goes up. */
+const RAISE = { window: 9, rival: 5.5 };
+/** The lens, in degrees of vertical field of view: the film's own on a wide screen, and a wider one for a tall phone. */
+const FOV = 48, FOV_TALL = 76;
+const smooth = (k: number) => { k = clamp(k); return k * k * (3 - 2 * k); };
 
 export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) => void; onEnd?: () => void } = {}) {
   const { scene, camera, mats: M } = stage;
   const rnd = seeded(11);
+  const calm = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   void audio.preload();
   const overlay = createOverlay(stage.container, stage.renderer.domElement);
   const cam = new CameraRig();
-  const hemi = new THREE.HemisphereLight(0xdfe6f0, 0x6b5a4a, 0.8);
+  // the cool fill of whichever look is on
+  const hemi = new THREE.HemisphereLight(LOOKS.space.fill.sky, LOOKS.space.fill.ground, LOOKS.space.fill.intensity);
   scene.add(hemi);
 
   const earth = buildEarth(scene, M, rnd, SPACE_AT);
-  const town = buildTown(scene, M, rnd, TOWN_AT);
-  const room = buildClassroom(scene, M, rnd);
+  const town = buildTown(scene, M, rnd, TOWN_AT, LOOKS.interior);
+  const room = buildClassroom(scene, M, rnd, LOOKS.interior);
   const hangar = buildHangar(scene, M, rnd, HANGAR_AT);
+  // the hangar set is lit for its ship; the film adds the hero look's key from the camera side for the
+  // people in it (from that side the polished deck throws no glare back at the lens)
+  const hangarKey = new THREE.DirectionalLight(LOOKS.hero.key.color, 0);
+  hangarKey.position.copy(HANGAR_AT).add(new THREE.Vector3(-3, 7, 11));
+  hangarKey.target.position.copy(HANGAR_AT).add(new THREE.Vector3(-1, 1.5, 0));
+  scene.add(hangarKey, hangarKey.target);
 
-  // first-person hand for the yawn, with a soft light so it never reads as a dark blob
+  // the cadet's own hand, for the yawn
   const hand = makeHand(M, SKIN[PLAYER.skin], PLAYER.top);
   camera.add(hand.group);
   hand.group.visible = false;
-  const handLight = new THREE.PointLight(0xffe2c4, 0, 1.2, 2);
-  handLight.position.set(-0.15, 0.1, -0.05);
-  camera.add(handLight);
-
-  /** The yawn pose, 0 = down out of frame, 1 = palm turned in over the mouth. */
+  /** The yawn pose, 0 = down out of frame, 1 = up under the mouth: low in the frame, so the board stays in view. */
   const HAND_POSE = (up: number) => {
-    hand.group.position.set(0.11 - 0.07 * up, -0.33 + 0.26 * up, -0.21);
-    hand.group.rotation.set(-0.5 + 0.3 * up, -0.95 + 0.25 * up, 0.55 - 0.15 * up);
-    hand.curl(0.35 * up);
+    hand.group.position.set(0.085 - 0.03 * up, -0.34 + 0.2 * up, -0.3);
+    hand.group.rotation.set(-0.35 + 0.2 * up, -1.0 + 0.25 * up, 0.5 - 0.2 * up);
+    hand.curl(0.3 * up);
   };
   let novaLen = 4;
 
@@ -69,8 +89,9 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   let player!: Character;
   let j = 0;
   SEATS.forEach(([x, z], i) => {
+    if (i === EMPTY_SEAT) return;
     const c = makeCharacter(i === PLAYER_SEAT ? PLAYER : CLASSMATES[j++], M, rnd);
-    seat(c, x, 0.47, z + 0.5);
+    seat(c, x, SEAT_HEIGHT, z + CHAIR_BACK, { chair: room.chairs[i], desk: DESK_HEIGHT, edge: CHAIR_BACK - DESK_DEPTH / 2 });
     c.group.rotation.y = Math.PI;
     scene.add(c.group);
     if (i === PLAYER_SEAT) player = c; else kids.push(c);
@@ -83,21 +104,46 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   captainH.group.rotation.y = 0.42;
   hangar.group.add(captainH.group);
   const people = () => [...kids, player, teacher, principal, captain];
+  const everyone = () => [...people(), captainH];
 
   let speaker: Character | "nova" | null = null;
-  const talk = (c: Character | "nova" | null) => { speaker = c; for (const p of [...people(), captainH]) p.rig.talking = p === c; };
+  const talk = (c: Character | "nova" | null) => { speaker = c; for (const p of everyone()) p.rig.talking = p === c; };
+  const headOf = (c: Character) => headPosition(c);
+  /** Point a group's eyes at a spot. A character never looks at their own head: they address the room instead. */
+  const gaze = (who: Character[], at: THREE.Vector3) => { for (const p of who) p.rig.look = headOf(p).distanceTo(at) < 0.4 ? CLASS_CENTRE : at; };
   /** Everyone looks at `t`; the teacher looks at `teacherAt` (the class, when she is the one talking). */
-  const lookAt = (t: THREE.Vector3, teacherAt: THREE.Vector3 = t) => {
-    for (const p of people()) {
-      // whoever is being looked at addresses the room: grown-ups face the class, kids the teacher
-      const self = headPosition(p).distanceTo(t) < 0.4;
-      p.rig.look = !self ? t : p.spec.role && p.spec.role !== "kid" ? CLASS_CENTRE : headPosition(teacher);
-    }
-    teacher.rig.look = teacherAt;
-  };
-  const glide = (p: V3, l: V3, speed = 2.2) => cam.shot(p, l, speed);
+  const lookAt = (t: THREE.Vector3, teacherAt: THREE.Vector3 = t) => { gaze(people(), t); teacher.rig.look = teacherAt; };
+  const feel = (who: Character[], e: Expression) => { for (const p of who) p.rig.mood = e; };
   const cut = (p: V3, l: V3) => cam.shot(p, l, 0);
+  /** A setup: cut to it, then drift slowly toward a second framing. */
+  const setup = (p: V3, l: V3, p2: V3 = p, l2: V3 = l, speed = 0.3) => { cam.shot(p, l, 0); cam.shot(p2, l2, speed); };
   const at = (o: THREE.Vector3, x: number, y: number, z: number): V3 => [o.x + x, o.y + y, o.z + z];
+
+  /** A phone held upright sees a narrow slice of the room, so two setups stand further back for it. */
+  const tall = () => camera.aspect < 1;
+  // the standing setups of the classroom, by name
+  const SETUP = {
+    /** The teacher at the board, from among the desks: she and what she has written are both in frame. */
+    teacher: () => tall()
+      ? setup([0.55, 1.62, 1.7], [-0.62, 1.55, -4.9], [0.5, 1.62, 1.4], [-0.64, 1.55, -4.9], 0.22)
+      : setup([1.0, 1.5, -0.3], [-0.75, 1.6, -4.9], [0.85, 1.5, -0.6], [-0.78, 1.6, -4.9], 0.22),
+    /** The whole class from behind, the cadet in the middle of the frame. */
+    wide: () => setup([1.3, 2.25, 4.7], [-0.4, 0.5, -1.8], [1.1, 2.2, 4.4], [-0.4, 0.5, -1.8], 0.2),
+    /** Over the class to the board, low among the desks: today's word is up there. */
+    lesson: () => tall()
+      ? setup([-0.3, 1.5, 3.2], [-0.4, 1.7, -4.9], [-0.3, 1.5, 2.7], [-0.4, 1.7, -4.9], 0.25)
+      : setup([-1.5, 1.45, 3.6], [-0.3, 1.6, -4.9], [-1.3, 1.45, 3.1], [-0.3, 1.6, -4.9], 0.25),
+    /** One child's face, from the front and a little to the side. */
+    child: (c: Character, side = 1) => { const h = headOf(c); setup([h.x + side * 0.8, h.y + 0.12, h.z - 1.45], [h.x, h.y - 0.02, h.z], [h.x + side * 0.7, h.y + 0.1, h.z - 1.3], [h.x, h.y - 0.02, h.z], 0.3); },
+    /** The class from the board side: every face, turning. */
+    faces: () => setup([-3.6, 1.35, -3.3], [0.6, 0.85, 0.9], [-3.3, 1.35, -3.1], [0.7, 0.85, 0.9], 0.25),
+    door: () => setup([0.7, 1.45, -2.0], [6.0, 1.2, -3.5], [1.1, 1.45, -2.1], [6.0, 1.2, -3.5], 0.3),
+    captain: () => setup([1.9, 1.58, -2.2], [3.95, 1.62, -3.1], [2.15, 1.6, -2.3], [3.95, 1.64, -3.1], 0.22),
+    /** The room from the back corner by the door side: every desk, the teacher, the visitors. */
+    names: () => tall()
+      ? setup([0.5, 3.2, 4.9], [-0.1, 0.1, -0.6], [0.4, 3.1, 4.8], [-0.1, 0.1, -0.6], 0.15)
+      : setup([4.9, 2.55, 4.75], [-0.9, 0.75, -1.0], [4.5, 2.45, 4.6], [-0.8, 0.75, -1.0], 0.15),
+  };
 
   // ui published to React (the choices, the ignition button)
   let ui: FilmUi = { prompt: null, cta: null, started: false, ended: false, chapter: null };
@@ -106,29 +152,30 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   // the cadet's name: spoken live by Phonon in the teacher's voice, prepared while the film plays
   let cadet = "", nameLine: AudioBuffer | null = null;
 
-  // environments: four sets far apart in one scene; switching changes sky, fog, light and grade
+  // environments: four sets far apart in one scene; switching changes the look and the light rig
   let env: Env | null = null, mood: keyof typeof MOODS = "tuesday", firstPerson = false, doorTarget = 0, shake = 0;
-  let fade = 0, fadeColor = "#000", lids = 1, blur = 0;
+  let fade = 0, fadeColor: string = COLOR.void, lids = 1, blur = 0;
   function setEnv(e: Env) {
     env = e;
     const space = e === "space", tw = e === "town", cls = e === "class", hg = e === "hangar";
-    scene.background = tw ? null : new THREE.Color(space ? 0x030612 : cls ? 0x1f1b24 : 0x050918);
-    scene.fog = tw ? new THREE.FogExp2(0xf5cfa0, 0.0026) : hg ? new THREE.FogExp2(0x081126, 0.008) : null;
-    camera.far = space ? 3000 : tw ? 700 : 120;
-    camera.near = space ? 0.5 : 0.02;
+    const look = applyLook(stage, LOOK_OF[e]);
+    scene.fog = tw ? town.fog : null;
+    camera.far = space ? 3000 : tw ? 700 : 160;
+    camera.near = space || tw ? 0.5 : 0.02; // nothing is near the lens outdoors, and a deeper near plane keeps far surfaces from fighting
     camera.updateProjectionMatrix();
-    hemi.color.set(space ? 0x3a5a8c : tw ? 0xfff0d4 : hg ? 0x7dd3fc : 0xfff1dc);
-    hemi.groundColor.set(space ? 0x070a18 : tw ? 0x3f6e3b : hg ? 0x1e293b : 0x6e543f);
-    hemi.intensity = space ? 0.5 : tw ? 0.85 : hg ? 0.6 : 0.62;
-    earth.sun.intensity = space ? 3 : 0;
-    town.sun.intensity = tw ? 3.0 : 0;
+    hemi.color.setHex(look.fill.sky);
+    hemi.groundColor.setHex(look.fill.ground);
+    hemi.intensity = look.fill.intensity;
+    earth.sun.color.setHex(look.key.color);
+    earth.sun.intensity = space ? look.key.intensity : 0;
+    town.sun.intensity = tw ? look.key.intensity : 0;
     hangar.lights(hg);
-    Object.assign(stage.bloom, space ? { strength: 0.65, threshold: 1.0 } : hg ? { strength: 0.5, threshold: 1.1 } : { strength: 0.3, threshold: 1.25 });
-    const m = cls ? MOODS[mood] : { sat: 1, tint: [1, 1, 1], exposure: tw ? 0.98 : 1.02 };
-    stage.grade.sat.value = m.sat;
-    stage.grade.tint.value.set(m.tint[0], m.tint[1], m.tint[2]);
-    stage.renderer.toneMappingExposure = m.exposure;
+    hangarKey.intensity = hg ? look.key.intensity : 0;
+    stage.grade.tint.value.set(1, 1, 1);
+    stage.grade.sat.value = look.sat * (cls ? MOODS[mood].sat : 1);
   }
+  const fadeOut = (t: number, from: number, d = FADE.out) => smooth((t - from) / d);
+  const fadeIn = (t: number, d = FADE.in) => 1 - smooth(t / d);
 
   const S = SPACE_AT, T = TOWN_AT, H = HANGAR_AT;
   const eye = () => eyePosition(player);
@@ -173,37 +220,37 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   }
 
   /**
-   * A classroom question: the teacher asks and finishes; then a few seconds to raise your hand
-   * (Space or the button). Raise it and she calls on you, then the two answers appear. Wait too
-   * long and a classmate's hand goes up and they answer. The teacher replies after a breath.
+   * A classroom question: the teacher asks and finishes; then the class waits for a hand (Space or
+   * the button). Raise yours and it goes up at once, she calls on you, and the two answers appear.
+   * Wait, and a classmate's hand goes up and they answer. The teacher replies after a breath.
    */
-  function question(o: { name: string; eq: string; answer: number; options: number[]; ask: string; kid: number; kidClip: string; ok: string; close: string }): Shot {
+  function question(o: { name: string; eq: string; answer: number; options: number[]; ask: string; kid: number; kidClip: string; ok: string; close: string; open: () => void }): Shot {
     type Phase = "ask" | "raise" | "called" | "choose" | "answer" | "reply" | "done";
     let phase: Phase = "ask", at0 = 0, len = 0, result: "right" | "close" | "classmate" = "right", keen = false;
     const to = (p: Phase) => { phase = p; at0 = director.t; };
-    const prompt = (stage: "raise" | "choose") => setUi({ prompt: { eq: o.eq, options: o.options, stage } });
+    const prompt = (stage: "raise" | "called" | "choose") => setUi({ prompt: { eq: o.eq, options: o.options, stage } });
     const shot: Shot = {
       name: o.name, env: "class", chapter: "wake",
       enter() {
         phase = "ask"; at0 = 0; keen = false;
         room.write(o.eq);
-        lookAt(headPosition(teacher), CLASS_CENTRE);
+        feel(people(), "neutral");
+        lookAt(headOf(teacher), CLASS_CENTRE);
         len = speak(o.ask, "Teacher", teacher);
-        glide([-0.7, 1.65, -1.0], [-1.55, 1.4, -4.0], 2.2); // a medium on the teacher while she asks
+        o.open();
       },
       update(t) {
         const since = t - at0;
         if (since >= len && speaker !== null && phase !== "raise" && phase !== "choose") talk(null);
-        if (phase === "ask" && since >= len + 0.35) {
+        if (phase === "ask" && since >= len + 0.4) {
           to("raise");
           talk(null);
+          overlay.caption("", ""); // the question is on the board and in the invitation now
           prompt("raise");
-          glide([-1.4, 2.25, 4.0], [-0.3, 1.4, -3.6], 1.6);
+          SETUP.wide();
         } else if (phase === "raise") {
-          const left = 1 - since / 5;
-          overlay.timer(clamp(left));
-          if (since > 2.4 && !keen) { keen = true; kids[o.kid].rig.raise = true; } // someone else is keen too
-          if (left <= 0) classmate();
+          if (since > RAISE.rival && !keen) { keen = true; kids[o.kid].rig.raise = true; kids[o.kid].rig.mood = "happy"; } // someone else is keen too
+          if (since >= RAISE.window) classmate();
         } else if (phase === "called" && since >= len + 0.3) {
           to("choose");
           prompt("choose");
@@ -211,31 +258,41 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
           to("reply");
           for (const p of people()) p.rig.raise = false;
           room.write(o.eq.replace("?", String(o.answer)));
-          lookAt(headPosition(teacher), CLASS_CENTRE);
+          lookAt(headOf(teacher), CLASS_CENTRE);
+          feel([teacher], "happy");
           len = speak(result === "close" ? o.close : o.ok, "Teacher", teacher);
+          SETUP.teacher();
         } else if (phase === "reply" && since >= len + 0.8) to("done");
       },
       done: () => phase === "done",
     };
     function classmate() {
       to("answer");
-      overlay.timer(null);
       setUi({ prompt: null });
       result = "classmate";
       const who = kids[o.kid];
       who.rig.raise = true;
-      lookAt(headPosition(who));
-      len = speak(o.kidClip, "Classmate", who, null, `${o.answer}!`);
+      who.rig.mood = "happy";
+      lookAt(headOf(who));
+      who.rig.look = headOf(teacher);
+      len = speak(o.kidClip, "Classmate", who);
+      SETUP.child(who, who.group.position.x > 0 ? -1 : 1);
     }
     shot.raise = () => {
       if (phase !== "raise" || director.current !== shot) return;
       to("called");
-      overlay.timer(null);
-      setUi({ prompt: null });
+      prompt("called");
       kids[o.kid].rig.raise = false;
+      kids[o.kid].rig.mood = "neutral";
       player.rig.raise = true;
-      lookAt(headPosition(player));
+      player.rig.r = Math.max(player.rig.r, 0.25); // the arm is already moving on the frame of the press
+      audio.sfx("blip_ok");
+      lookAt(headOf(player));
+      player.rig.look = headOf(teacher);
       len = speak("teacher_yes", "Teacher", teacher);
+      // push in on the cadet, hand in the air
+      const h = headOf(player);
+      cam.shot([h.x + 0.9, h.y + 0.85, h.z + 2.6], [h.x - 0.3, h.y - 0.35, h.z - 1.6], 1.4);
     };
     shot.pick = (v: number) => {
       if (phase === "raise") shot.raise?.(); // answering straight away still raises the hand first
@@ -245,14 +302,17 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
       result = v === o.answer ? "right" : "close";
       audio.sfx(result === "right" ? "blip_ok" : "blip_close");
       talk(player);
+      player.rig.mime = true; // the cadet's own answer has no recording to follow
+      player.rig.mood = result === "right" ? "happy" : "thinking";
       overlay.caption("You", result === "right" ? `${v}!` : `${v}?`);
-      len = 0.9;
+      SETUP.child(player, 1);
+      len = 1.1;
     };
     return shot;
   }
 
-  const q1 = question({ name: "q1", eq: "4 + 4 = ?", answer: 8, options: [8, 9], ask: "teacher_intro", kid: 1, kidClip: "kid_eight", ok: "teacher_eight_ok", close: "teacher_eight_close" });
-  const q2 = question({ name: "q2", eq: "5 − 3 = ?", answer: 2, options: [3, 2], ask: "teacher_q2", kid: 3, kidClip: "kid_two", ok: "teacher_two_ok", close: "teacher_two_close" });
+  const q1 = question({ name: "q1", eq: "4 + 4 = ?", answer: 8, options: [8, 9], ask: "teacher_intro", kid: ANSWERERS[0], kidClip: "kid_eight", ok: "teacher_eight_ok", close: "teacher_eight_close", open: () => SETUP.teacher() });
+  const q2 = question({ name: "q2", eq: "5 − 3 = ?", answer: 2, options: [3, 2], ask: "teacher_q2", kid: ANSWERERS[1], kidClip: "kid_two", ok: "teacher_two_ok", close: "teacher_two_close", open: () => SETUP.faces() }); // the class hears the second one
 
   /** A step that is nothing but dialogue (plus its own camera and staging in `enter`). */
   const talkShot = (s: Omit<Shot, "update" | "done"> & { beats: Beat[]; lead?: number; tail?: number; extra?: (t: number) => void }): Shot => {
@@ -260,130 +320,159 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
     return { ...s, enter() { dl.begin(); s.enter?.(); }, update(t) { dl.update(t); s.extra?.(t); }, done: dl.done };
   };
   const T_ = () => teacher, CAP = () => captain, CAPH = () => captainH, PR = () => principal;
+  const named = () => NAMED.map((k) => kids[k]);
+  let diveFrom = new THREE.Vector3(), cardShown = false;
+  const turnFrom = new THREE.Vector3();
 
   const steps: Shot[] = [
-    { name: "orbit", env: "space", chapter: "orbit", d: 3.6,
-      enter() { audio.mood("space"); fade = 0; lids = 1; overlay.caption("", ""); overlay.card("SECTOR 001 · MILKY WAY", "EARTH", "An ordinary blue planet…"); cut(at(S, -14, 9, 150), at(S, 0, 0, 0)); glide(at(S, 10, 6, 128), at(S, 0, 0, 0), 0.7); } },
-    { name: "dive", env: "space", chapter: "dive", d: 2.5,
-      enter() { overlay.card("", ""); audio.sfx("dive"); cam.hold(); },
+    { name: "orbit", env: "space", chapter: "orbit", d: 4.4,
+      enter() { audio.mood("space"); lids = 1; overlay.caption("", ""); overlay.card("", "Earth", "An ordinary blue planet", "low"); cut(at(S, -14, 9, 150), at(S, 0, 0, 0)); cam.shot(at(S, 10, 6, 128), at(S, 0, 0, 0), 0.55); },
+      update(t) { fadeColor = COLOR.void; fade = fadeIn(t); if (t > 3.5) overlay.card("", ""); } },
+    { name: "dive", env: "space", chapter: "dive", d: 2.6,
+      // the plunge starts from wherever the orbit left the camera, so there is no jump at the cut
+      enter() { overlay.card("", ""); audio.sfx("dive"); cam.hold(); diveFrom = cam.p.clone(); },
       update(t) {
-        const k = Math.min(1, t / 2.5), e = Math.pow(k, 2.3), d = 128 - e * (128 - EARTH_RADIUS - 2);
-        cam.p.set(S.x + 10 * (1 - e), S.y + 6 * (1 - e) + 3 * e, S.z + d);
+        const k = clamp(t / 2.6), e = k * k; // gathers speed from the first frame, fastest at the cloud
+        cam.p.set(diveFrom.x + (S.x - diveFrom.x) * e, diveFrom.y + (S.y + 3 - diveFrom.y) * e, diveFrom.z + (S.z + EARTH_RADIUS + 10 - diveFrom.z) * e);
         cam.l.set(S.x, S.y + 2 * e, S.z);
-        fadeColor = "#fff8ec"; fade = Math.max(0, (k - 0.65) / 0.35);
+        fadeColor = COLOR.approach; fade = fadeOut(t, 1.3, 0.85); // into the cloud, which closes before the ground rushes up
       } },
-    { name: "town", env: "town", chapter: "dive", d: 4.6,
+    { name: "town", env: "town", chapter: "dive", d: 5.6,
       // wide over the rooftops, then square on to the porch so the school's name reads in full
-      enter() { audio.sfx("chime"); overlay.card("8:42 AM", "An Ordinary Tuesday…", "", "top"); cut(at(T, 30, 24, 52), at(T, 0, 4, 0)); glide(at(T, 0, 3.1, 13.5), at(T, 0, 3.5, 5.9), 1.15); },
+      enter() { audio.sfx("chime"); overlay.card("", "An ordinary Tuesday", "8:42 in the morning", "top"); cut(at(T, 30, 24, 52), at(T, 0, 4, 0)); cam.hold(); },
       update(t) {
-        if (t > 2.5) overlay.card("", ""); // the sign gets the frame to itself
-        if (t < 0.8) { fadeColor = "#fff8ec"; fade = 1 - t / 0.8; }
-        else if (t > 3.8) { fadeColor = "#04060d"; fade = (t - 3.8) / 0.8; }
+        // one eased crane down from over the rooftops: slow away, gentle in, then it rests on the sign
+        const k = smooth(t / 3.9);
+        cam.p.set(T.x + 30 * (1 - k), 24 + (3.1 - 24) * k, 52 + (13.5 - 52) * k);
+        cam.l.set(T.x, 4 + (3.5 - 4) * k, 5.9 * k);
+        if (t > 3.1) overlay.card("", ""); // the sign gets the frame to itself
+        if (t < 1) { fadeColor = COLOR.approach; fade = fadeIn(t, 1); }
+        else if (t > 5.6 - FADE.out) { fadeColor = COLOR.void; fade = fadeOut(t, 5.6 - FADE.out); }
         else fade = 0;
       } },
-    { name: "wake", env: "class", chapter: "wake", firstPerson: true, d: 3.0,
+    { name: "wake", env: "class", chapter: "wake", firstPerson: true, d: 3.1,
       enter() {
         audio.mood("classroom"); fade = 0; overlay.card("", ""); overlay.caption("", "");
         mood = "tuesday"; doorTarget = 0;
         room.write("4 + 4 = ?");
-        lookAt(headPosition(teacher), CLASS_CENTRE);
+        feel(people(), "neutral");
+        lookAt(headOf(teacher), CLASS_CENTRE);
         const e = eye();
-        cut([e.x, e.y, e.z], [e.x, 0.6, e.z - 1.2]);
+        cut([e.x, e.y, e.z], [e.x, 0.45, e.z - 1.0]);
         lids = 0; blur = 8;
       },
       update(t) {
         lids = lidCurve(t); blur = Math.max(0, 8 * (1 - t / 2.2));
-        const e = eye();
+        // eyes open on the desk, then lift toward the front of the room
+        const e = eye(), up = smooth((t - 1.2) / 1.9);
         cam.p.copy(e);
-        cam.l.set(e.x + Math.sin(t * 0.9) * 0.08, 0.6 + t * 0.15, e.z - 1.2);
+        cam.l.set(e.x + Math.sin(t * 0.9) * 0.06 * (1 - up), 0.45 + up * 0.75, e.z - 1.0 - up * 1.5); // the drowsy drift is gone by the time the head is up
       } },
-    { name: "yawn", env: "class", chapter: "wake", firstPerson: true, d: 3.4,
-      enter() { lids = 1; blur = 0; audio.sfx("yawn"); hand.group.visible = true; handLight.intensity = 0.05; },
+    { name: "yawn", env: "class", chapter: "wake", firstPerson: true, d: 3.2,
+      enter() { lids = 1; blur = 0; audio.sfx("yawn"); hand.group.visible = true; HAND_POSE(0); },
       update(t) {
-        // the right hand comes up from the lower right, palm turned in to cover the yawning
-        // mouth, fingers loosely together, holds, then drops away
-        const up = t < 0.75 ? ease(t / 0.75) : t < 2.45 ? 1 : 1 - ease(clamp((t - 2.45) / 0.75));
+        // the hand comes up under the mouth from the lower right, holds, then drops away; the head
+        // tips back with the yawn, which lifts the board into the middle of the frame
+        const up = t < 0.8 ? ease(t / 0.8) : t < 2.3 ? 1 : 1 - ease(clamp((t - 2.3) / 0.8));
         HAND_POSE(up);
-        lids = 1 - 0.12 * clamp((t - 0.6) / 0.5) * (1 - clamp((t - 2.3) / 0.5)); // a sleepy squint while yawning
+        lids = 1 - 0.16 * smooth((t - 0.5) / 0.5) * (1 - smooth((t - 2.2) / 0.6)); // a sleepy squint
         const e = eye();
         cam.p.copy(e);
-        cam.l.set(e.x, 1.0 + 0.45 * up, e.z - 1.2); // head tips back
-        if (t > 3.3) { hand.group.visible = false; handLight.intensity = 0; }
+        cam.l.set(e.x, 1.2 + 0.32 * up, e.z - 2.5);
+        if (t > 3.12) hand.group.visible = false;
       } },
-    { name: "turn", env: "class", chapter: "wake", firstPerson: true, d: 1.4,
-      enter() { lids = 1; const e = eye(); cam.shot([e.x, e.y, e.z], [-1.7, 1.55, -4.05], 2.2); },
-      update(t) { if (t > 0.7 && firstPerson) { firstPerson = false; glide([-1.4, 2.25, 4.0], [-0.3, 1.4, -3.6], 1.6); } } },
+    { name: "turn", env: "class", chapter: "wake", firstPerson: true, d: 1.8,
+      // still through the cadet's eyes: an unhurried look over to the teacher, who is about to speak
+      enter() { lids = 1; turnFrom.copy(cam.l); cam.hold(); },
+      update(t) { const e = eye(), k = smooth(t / 1.3); cam.p.copy(e); cam.l.set(turnFrom.x + (-1.6 - turnFrom.x) * k, turnFrom.y + (1.5 - turnFrom.y) * k, turnFrom.z + (-4.05 - turnFrom.z) * k); } },
     q1,
     q2,
-    talkShot({ name: "mult", env: "class", chapter: "wake", lead: 0.2, tail: 0.9,
-      enter() { room.write("× MULTIPLICATION"); lookAt(headPosition(teacher), CLASS_CENTRE); glide([-0.4, 2.0, -1.3], [-0.6, 2.0, -5.3], 1.8); },
+    talkShot({ name: "mult", env: "class", chapter: "wake", lead: 0.3, tail: 0.9,
+      enter() { room.write("× Multiplication"); feel(people(), "neutral"); feel([teacher], "happy"); lookAt(headOf(teacher), CLASS_CENTRE); SETUP.lesson(); },
       beats: [{ id: "teacher_mult", who: "Teacher", c: T_ }] }),
-    { name: "knock", env: "class", chapter: "knock", d: 2.6,
-      enter() { talk(null); overlay.caption("", "KNOCK!  KNOCK!  KNOCK!"); audio.sfx("knock"); shake = 0.08; lookAt(DOOR_POINT); cut([1.1, 1.9, -1.5], [6.0, 1.6, -3.4]); },
-      update(t) { if (t > 1.2 && doorTarget === 0) { doorTarget = 1.45; mood = "knock"; audio.sfx("door"); audio.mood("heroic"); overlay.caption("", ""); } } },
-    talkShot({ name: "officers", env: "class", chapter: "knock", lead: 1.5, tail: 0.5,
+    { name: "knock", env: "class", chapter: "knock", d: 3.1,
+      // the sound first, on the faces that hear it; then the door, as it opens
+      enter() { talk(null); overlay.caption("", "Knock, knock, knock."); audio.sfx("knock"); shake = 0.025; feel(people(), "oops"); lookAt(DOOR_POINT); SETUP.faces(); },
+      update(t) {
+        if (t > 1.3 && doorTarget === 0) { doorTarget = 1; mood = "knock"; audio.sfx("door"); audio.mood("heroic"); overlay.caption("", ""); SETUP.door(); }
+        if (t > 2.0) feel(people(), "neutral");
+      } },
+    talkShot({ name: "officers", env: "class", chapter: "knock", lead: 2.3, tail: 0.5,
       enter() {
-        doorTarget = 1.45; mood = "knock";
-        for (const [c, to, delay] of [[principal, ARRIVE.principal, 0], [captain, ARRIVE.captain, 0.3]] as const) {
+        doorTarget = 1; mood = "knock";
+        for (const [c, to, delay] of [[principal, ARRIVE.principal, 0], [captain, ARRIVE.captain, 0.35]] as const) {
           c.group.visible = true;
           c.group.position.copy(HALL[0]);
-          c.rig.walk = { pts: [HALL[0], HALL[1], to], t0: stage.time + delay, d: 1.6, face: CLASS_CENTRE };
+          face(c.group, HALL[1]);
+          c.rig.walk = { pts: [HALL[0], HALL[1], to], t0: stage.time + delay, d: 2.1, face: CLASS_CENTRE };
+          c.rig.look = CLASS_CENTRE;
         }
-        lookAt(new THREE.Vector3(4.5, 1.6, -2.6));
-        glide([0.6, 1.95, -0.6], [4.2, 1.5, -3.0], 2.2);
+        gaze([...kids, player, teacher], new THREE.Vector3(4.6, 1.5, -2.7));
+        cam.shot([1.25, 1.5, -2.0], [4.4, 1.32, -2.7], 0.6); // no cut: the door shot widens to hold them both as they walk in
       },
       beats: [
-        { id: "principal_sorry", who: "Principal", c: PR },
-        { id: "principal_intro", who: "Principal", c: PR, go: () => { lookAt(headPosition(captain)); glide([1.6, 1.85, -1.9], [3.5, 1.75, -3.8], 1.8); } },
+        { id: "principal_sorry", who: "Principal", c: PR, go: () => { feel([principal], "happy"); gaze([...kids, player, teacher], headOf(principal)); } },
+        { id: "principal_intro", who: "Principal", c: PR, go: () => { principal.rig.look = headOf(captain); gaze([...kids, player, teacher], headOf(captain)); } },
       ] }),
-    talkShot({ name: "captain", env: "class", chapter: "knock", lead: 0.3, tail: 0.6,
-      enter() { lookAt(headPosition(captain)); glide([1.9, 1.8, -2.3], [3.5, 1.8, -3.8], 2.0); },
+    talkShot({ name: "captain", env: "class", chapter: "knock", lead: 0.35, tail: 0.6,
+      enter() { lookAt(headOf(captain)); captain.rig.look = CLASS_CENTRE; principal.rig.look = headOf(captain); feel([principal], "neutral"); SETUP.captain(); },
       beats: [
         { id: "captain_danger", who: "Captain", c: CAP },
-        // the teacher answers, proud; then the captain asks her to name them
-        { id: "teacher_proud", who: "Teacher", c: T_, gap: 0.7, go: () => { lookAt(headPosition(teacher), headPosition(captain)); glide([-0.7, 1.65, -1.0], [-1.55, 1.4, -4.0], 2.2); } },
-        { id: "captain_names", who: "Captain", c: CAP, gap: 0.5, go: () => { lookAt(headPosition(captain), headPosition(captain)); glide([1.6, 1.85, -1.9], [3.5, 1.75, -3.8], 2.4); } },
+        // the teacher answers, surprised and then proud; then the Captain asks her to name them
+        { id: "teacher_proud", who: "Teacher", c: T_, gap: 0.7, go: () => { lookAt(headOf(teacher), headOf(captain)); captain.rig.look = headOf(teacher); feel([teacher], "oops"); SETUP.teacher(); },
+          after: (t, start, len) => { if (t > start + len * 0.45) feel([teacher], "happy"); } },
+        { id: "captain_names", who: "Captain", c: CAP, gap: 0.5, go: () => { lookAt(headOf(captain)); captain.rig.look = headOf(teacher); SETUP.captain(); } },
       ] }),
-    talkShot({ name: "names", env: "class", chapter: "knock", lead: 0.35, tail: 0.6,
-      enter() { lookAt(headPosition(teacher), CLASS_CENTRE); glide([-2.2, 2.35, 4.3], [0.2, 1.35, -2.4], 2.0); },
+    talkShot({ name: "names", env: "class", chapter: "knock", lead: 0.4, tail: 1.5,
+      enter() { lookAt(headOf(teacher), CLASS_CENTRE); gaze([captain, principal], CLASS_CENTRE); feel([teacher], "happy"); SETUP.names(); },
       beats: [{ id: "teacher_names", who: "Teacher", c: T_, after: (t, start, len) => {
-        // the four names fill the last ~55% of the line: each kid stands as theirs is called
-        [0, 2, 5, 6].forEach((k, i) => { if (t > start + len * (0.47 + i * 0.13)) kids[k].rig.stand = 1; });
+        // the four names fill the last half of the line: each child stands as theirs is called
+        named().forEach((kid, i) => {
+          if (t > start + len * (0.47 + i * 0.13) && kid.rig.stand === 0) { kid.rig.stand = 1; kid.rig.mood = "happy"; kid.rig.look = headOf(teacher); teacher.rig.look = headOf(kid); gaze(kids.filter((k) => k.rig.stand === 0), headOf(kid)); }
+        });
       } }] }),
-    talkShot({ name: "picked", env: "class", chapter: "knock", lead: 0.5, tail: 2.6,
+    talkShot({ name: "picked", env: "class", chapter: "knock", lead: 0.5, tail: 4.9,
       enter() {
-        lookAt(headPosition(player));
-        const ph = headPosition(player);
-        glide([0.4, 1.32, -0.35], [ph.x, ph.y + 0.02, ph.z], 2.5); // eye level: the cadet's face as their name is called
+        cardShown = false;
+        lookAt(headOf(player));
+        player.rig.look = headOf(teacher);
+        SETUP.child(player, 1);
       },
       beats: [{ id: "teacher_pick_generic", who: "Teacher", c: T_, live: () => nameLine, text: () => `And our fifth cadet is… ${cadet || "you"}!`,
         go: () => audio.sfx("fanfare"),
         after: (t, start, len) => {
-          if (t > start + len * 0.8) { player.rig.stand = 1; player.rig.raise = true; }
-          if (t > start + len + 0.5) overlay.card("STARFLEET CADET PROGRAM", `CADET ${(cadet || "YOU").toUpperCase()}`, "Transferring to Earth Orbit Hangar…", "top");
-          if (t > start + len + 1.9) { fadeColor = "#040712"; fade = (t - (start + len + 1.9)) / 0.7; }
+          if (t > start + len * 0.8 && player.rig.stand === 0) { player.rig.stand = 1; player.rig.mood = "happy"; }
+          // the camera stays on the cadet's face as they rise
+          const h = headOf(player);
+          cam.shot([h.x + 0.72, h.y + 0.1, h.z - 1.32], [h.x, h.y - 0.02, h.z], 6);
+          if (player.rig.s > 0.9) player.rig.mood = "cheer";
+          // out to the void, and the cadet's new name on it
+          const out = start + len + 1.9;
+          if (t > out) { fadeColor = COLOR.void; fade = fadeOut(t, out); overlay.caption("", ""); }
+          if (t > out + FADE.out && !cardShown) { cardShown = true; overlay.card("", `Cadet ${cadet || "you"}`, "Next stop: the Star Fleet hangar"); }
+          if (t > start + len + 4.9 - 0.75) overlay.card("", "");
         } }] }),
-    talkShot({ name: "hangar", env: "hangar", chapter: "hangar", lead: 0.9, tail: 0.4,
-      enter() { hangar.reset(); overlay.card("", ""); audio.mood("hangar"); cut(at(H, -1.5, 4.4, 13.8), at(H, 0, 3.3, -1.8)); glide(at(H, -2.6, 3.6, 11.4), at(H, -0.6, 3.2, -1.5), 1.3); },
-      extra(t) { fadeColor = "#040712"; fade = t < 0.7 ? 1 - t / 0.7 : 0; },
+    talkShot({ name: "hangar", env: "hangar", chapter: "hangar", lead: 1.1, tail: 0.4,
+      enter() { hangar.reset(); overlay.card("", ""); audio.mood("hangar"); setup(at(H, -1.5, 4.4, 13.8), at(H, 0, 3.3, -1.8), at(H, -2.2, 3.9, 12.2), at(H, -0.4, 3.2, -1.6), 0.35); },
+      extra(t) { fadeColor = COLOR.void; fade = fadeIn(t - 0.2); },
       beats: [
-        { id: "captain_brief1", who: "Captain", c: CAPH, go: () => glide(at(H, -2.3, 2.15, 5.6), at(H, -3.6, 1.75, 1.8), 1.1) }, // in to the captain
-        { id: "captain_brief2", who: "Captain", c: CAPH, gap: 0.6, go: () => glide(at(H, 2.8, 3.8, 11.8), at(H, 0, 3.3, -1.8), 0.9) },
-        { id: "captain_nova", who: "Captain", c: CAPH, gap: 0.7, go: () => glide(at(H, 0.6, 3.4, 7.6), at(H, 2.6, 3.0, 0.8), 1.4) },
+        { id: "captain_brief1", who: "Captain", c: CAPH, go: () => setup(at(H, -2.0, 1.95, 5.4), at(H, -3.75, 1.62, 1.8), at(H, -2.25, 1.9, 4.9), at(H, -3.78, 1.64, 1.8), 0.25) }, // in to the Captain
+        { id: "captain_brief2", who: "Captain", c: CAPH, gap: 0.6, go: () => setup(at(H, 3.4, 3.4, 11.6), at(H, -0.2, 3.1, -1.8), at(H, 2.6, 3.7, 10.6), at(H, -0.1, 3.3, -1.8), 0.12) }, // the ship he is talking about
+        { id: "captain_nova", who: "Captain", c: CAPH, gap: 0.7, go: () => setup(at(H, -2.0, 1.95, 5.4), at(H, -3.75, 1.62, 1.8), at(H, -2.25, 1.9, 4.9), at(H, -3.78, 1.64, 1.8), 0.25) },
       ] }),
     { name: "nova", env: "hangar", chapter: "hangar", d: Infinity,
-      enter() { audio.sfx("nova_chirp"); novaLen = speak("nova_hi", "Nova", "nova"); glide(at(H, 4.4, 3.15, 5.6), at(H, 3.0, 2.95, 1.2), 2.2); }, // Nova centre frame, the ship behind her
+      enter() { audio.sfx("nova_chirp"); hangar.nova.express("happy"); novaLen = speak("nova_hi", "Nova", "nova"); setup(at(H, 4.9, 3.1, 5.9), at(H, 3.1, 2.9, 1.3), at(H, 4.5, 3.05, 5.1), at(H, 3.1, 2.9, 1.3), 0.3); }, // Nova centre frame, the ship behind her
       update(t) {
-        hangar.nova.group.position.set(3.2 + Math.sin(t * 1.8) * 0.25, 2.8, 0.8 + Math.min(0.9, t * 0.5));
+        hangar.nova.group.position.set(3.2 + Math.sin(t * 0.8) * 0.12, 2.8, 0.8 + 0.9 * smooth(t / 2.2));
         if (t >= novaLen && speaker !== null) talk(null);
-        if (t > novaLen + 0.3 && !ui.cta) { overlay.caption("", ""); setUi({ cta: "Ignite thrusters · Launch" }); }
+        if (t > novaLen + 0.4 && !ui.cta) { overlay.caption("", ""); setUi({ cta: "Launch" }); }
       } },
-    { name: "launch", env: "hangar", chapter: "hangar", d: 4.6,
-      enter() { talk(null); overlay.caption("", ""); setUi({ cta: null }); audio.sfx("ignition"); audio.sfx("fanfare"); hangar.launch(); shake = 0.22; glide(at(H, -4.2, 2.8, 9.8), at(H, 0, 4.5, -12), 1.4); },
+    { name: "launch", env: "hangar", chapter: "hangar", d: 5.6,
+      enter() { talk(null); overlay.caption("", ""); setUi({ cta: null }); hangar.nova.express("cheer"); audio.sfx("ignition"); audio.sfx("fanfare"); hangar.launch(); shake = 0.06; setup(at(H, -4.2, 2.8, 9.8), at(H, 0, 3.2, -4), at(H, -4.2, 2.8, 9.8), at(H, 0, 4.6, -12), 0.9); },
       update(t) {
-        if (t < 2.2) shake = Math.max(shake, 0.14 * (1 - t / 2.2));
-        if (t > 2.3) overlay.card("MISSION 01 · EARTH ORBIT", "CADET BAY", "Level 0 · Empty & Mirror");
-        if (t > 3.6) { fadeColor = "#030612"; fade = (t - 3.6) / 0.9; }
+        if (t < 2.2) shake = Math.max(shake, 0.04 * (1 - t / 2.2));
+        fadeColor = COLOR.void; fade = fadeOut(t, 2.9);
+        if (t > 2.9 + FADE.out) overlay.card("", "Cadet Bay", "Your first mission");
       } },
   ];
 
@@ -401,12 +490,13 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   });
 
   function reset() {
-    for (const p of people()) { p.rig.raise = false; p.rig.talking = false; p.rig.walk = null; if (p.rig.seat) { p.rig.stand = 0; p.rig.s = 0; } }
+    for (const p of everyone()) { p.rig.raise = false; p.rig.talking = false; p.rig.walk = null; p.rig.mood = "neutral"; if (p.rig.seat) { p.rig.stand = 0; p.rig.s = 0; } }
     for (const c of [principal, captain]) { c.group.visible = false; c.group.position.copy(HALL[0]); }
-    mood = "tuesday"; doorTarget = 0; room.door.rotation.y = 0;
+    mood = "tuesday"; doorTarget = 0; room.reset();
     overlay.card("", ""); overlay.caption("", ""); overlay.timer(null);
-    hand.group.visible = false; lids = 1; blur = 0; fade = 0; firstPerson = false;
+    hand.group.visible = false; lids = 1; blur = 0; fade = 0; firstPerson = false; shake = 0;
     hangar.reset();
+    hangar.nova.express("neutral");
     room.write("4 + 4 = ?");
     setUi({ prompt: null, cta: null, ended: false });
   }
@@ -415,35 +505,43 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
     reset();
     const first = { orbit: "orbit", dive: "dive", wake: "wake", knock: "knock", hangar: "hangar" }[chapter];
     const i = Math.max(0, director.find(first));
-    if (i >= director.find("knock")) { setEnv("class"); room.write("× MULTIPLICATION"); glide([-1.4, 2.25, 4.0], [-0.3, 1.4, -3.6], 0); lookAt(headPosition(teacher), CLASS_CENTRE); }
+    if (i >= director.find("knock")) { setEnv("class"); room.write("× Multiplication"); SETUP.wide(); lookAt(headOf(teacher), CLASS_CENTRE); }
     audio.unlock();
     void warmVoice(["Hadley", "Zoey"]); // the cadet's name, then Nova's live lesson lines
     setUi({ started: true });
     director.go(i);
   }
 
+  const kick = new THREE.Vector3();
   const stop = stage.onUpdate((dt, time) => {
     director.update(dt);
     const voice = audio.level();
     if (env === "space") earth.update(dt);
     if (env === "town") town.update(time);
     if (env === "class") {
-      const m = MOODS[mood], tint = stage.grade.tint.value;
-      stage.grade.sat.value = approach(stage.grade.sat.value, m.sat, 1.5, dt);
-      tint.set(approach(tint.x, m.tint[0], 1.5, dt), approach(tint.y, m.tint[1], 1.5, dt), approach(tint.z, m.tint[2], 1.5, dt));
-      stage.renderer.toneMappingExposure = approach(stage.renderer.toneMappingExposure, m.exposure, 1.5, dt);
-      room.door.rotation.y = approach(room.door.rotation.y, doorTarget, 2.5, dt);
-      room.update(time, dt, { hall: m.hall, spill: m.spill, fill: m.fill, buzz: m.buzz, on: true });
+      const m = MOODS[mood];
+      stage.grade.sat.value = approach(stage.grade.sat.value, LOOKS.interior.sat * m.sat, 1.5, dt);
+      room.update(time, dt, { on: true, hall: m.hall, door: doorTarget });
       for (const p of people()) animateCharacter(p, time, dt, rnd, p === speaker ? voice : 0);
       player.rig.head.visible = !(firstPerson && cam.p.distanceTo(eye()) < 0.6);
     } else {
-      room.update(time, dt, { hall: 0, spill: 0, fill: 0, buzz: false, on: false });
+      room.update(time, dt, { on: false, hall: 0, door: doorTarget });
     }
-    if (env === "hangar") { hangar.update(time, dt, voice, speaker === "nova"); animateCharacter(captainH, time, dt, rnd, speaker === captainH ? voice : 0); }
-    shake *= 0.88;
-    cam.sway = env === "class" && !firstPerson ? 1 : 0;
+    if (env === "hangar") {
+      hangar.update(time, dt, voice, speaker === "nova");
+      // Nova turns to whoever is watching: she hovers and sways, but around the line to the lens
+      const n = hangar.nova.group, np = n.getWorldPosition(kick);
+      n.rotation.y = Math.atan2(camera.position.x - np.x, camera.position.z - np.z) + Math.sin(time * 0.7) * 0.14;
+      animateCharacter(captainH, time, dt, rnd, speaker === captainH ? voice : 0);
+    }
+    // a rumble, not noise: two slow sines per axis, fading at the same rate at any frame rate
+    shake *= Math.exp(-dt * 5);
+    // a tall phone frame gets a wider lens, so a shot composed for a wide screen still holds its subject
+    const fov = FOV + (FOV_TALL - FOV) * smooth((1.5 - camera.aspect) / 0.9);
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+    cam.sway = env === "class" && !firstPerson && !calm ? 1 : 0;
     cam.apply(camera, dt, time);
-    if (shake > 0.001) camera.position.add(new THREE.Vector3((rnd() - 0.5) * shake, (rnd() - 0.5) * shake, 0));
+    if (shake > 0.001 && !calm) camera.position.add(kick.set(Math.sin(time * 41) + Math.sin(time * 67.3), Math.sin(time * 53) + Math.sin(time * 71.9), 0).multiplyScalar(shake * 0.5));
     overlay.fade(fade, fadeColor);
     overlay.lids(lids);
     overlay.blur(blur);
@@ -481,7 +579,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
       void prepare(`And our fifth cadet is... ${cadet}!`, "Hadley").then((b) => { nameLine = b; });
     },
     get ui() { return ui; },
-    dispose() { stop(); window.removeEventListener("keydown", onKey); overlay.dispose(); audio.stopVoice(); hand.group.removeFromParent(); handLight.removeFromParent(); },
+    dispose() { stop(); window.removeEventListener("keydown", onKey); overlay.dispose(); audio.stopVoice(); hand.group.removeFromParent(); camera.fov = FOV; camera.updateProjectionMatrix(); },
   };
 }
 export type Film = ReturnType<typeof mountIntro>;

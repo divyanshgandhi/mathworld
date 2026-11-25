@@ -1,10 +1,10 @@
 {
   "teacher_intro": {
     "voice": "Hadley",
-    "text": "Okay class, you have mastered addition and subtraction. As we all know, four plus four is... who is going to tell me?",
-    "duration": 8.4,
-    "src": "/vo/teacher_intro.mp3",
-    "end": 7.802
+    "text": "Okay class, you know how to add and take away. So, four plus four is... who is going to tell me?",
+    "duration": 7.2,
+    "end": 6.591,
+    "src": "/vo/teacher_intro.mp3"
   },
   "kid_eight": {
     "voice": "Fennick the Young Elf",

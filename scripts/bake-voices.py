@@ -31,8 +31,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 TEACHER, KID, PRINCIPAL, CAPTAIN, NOVA = "Hadley", "Fennick the Young Elf", "Preston", "Miles", "Zoey"
 
 LINES = [
-    # The classroom (storyline as in the Gemini showcase)
-    ("teacher_intro", TEACHER, "Okay class, you have mastered addition and subtraction. As we all know, four plus four is... who is going to tell me?"),
+    # The classroom. The teacher's first line says what the class can do, not that they have "mastered" it:
+    # the game's first two stops are adding and taking away, and its mastery words mean something.
+    ("teacher_intro", TEACHER, "Okay class, you know how to add and take away. So, four plus four is... who is going to tell me?"),
     ("kid_eight", KID, "Ooh! Eight! It is eight!"),
     ("teacher_eight_ok", TEACHER, "Eight! Spot on, lovely work."),
     ("teacher_eight_close", TEACHER, "Ooh, super close! Four plus four is eight."),

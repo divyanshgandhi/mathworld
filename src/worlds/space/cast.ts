@@ -1,346 +1,585 @@
 import * as THREE from "three";
-import { add, PALETTE, type Materials } from "@/engine/materials";
-import { clamp, type Rng } from "@/engine/util";
+import { COLOR, hex } from "@/design/tokens";
+import { add, outline, type Materials } from "@/engine/materials";
+import { clamp, keyframes, type Rng } from "@/engine/util";
+
+/** Mix two colours (token strings or hex numbers): how the film derives its palette from the tokens. */
+export const mix = (a: string | number, b: string | number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
 
 /**
- * The Storybook cast: hand-built characters with jointed limbs (hips, knees, shoulders, elbows),
- * mitten hands, ears, iris eyes, voice-driven mouths, layered hair and role costumes.
- * Facing +z, feet at y = 0.
+ * The cast of the film: one build system, matte bodies, and faces that act (eyes, brows, mouth).
+ * Characters face +z with their feet at y = 0. Nothing here glows: eye highlights and Nova's eyes
+ * stay well under every look's bloom threshold.
  */
 export type Role = "kid" | "teacher" | "principal" | "captain";
-type Hair = "short" | "bun" | "pigtails" | "curly" | "long" | "bald" | "swept";
-type Extra = "glasses" | "tie" | "mustache";
+export type Hair = "short" | "swept" | "bun" | "puffs" | "pigtails" | "curly" | "long" | "bob" | "bald";
+type Extra = "glasses" | "tie" | "mustache" | "hood";
 export interface Spec { role?: Role; skin: number; hair: number; hs: Hair; top: number; bot: number; shoe?: number; eyes?: number; ex?: Extra[] }
+export type Expression = "neutral" | "happy" | "thinking" | "oops" | "cheer";
+export const EXPRESSIONS: Expression[] = ["neutral", "happy", "thinking", "oops", "cheer"];
 
+/**
+ * One proportion system, in metres: L hip height (thigh and shin are half each), Ht torso, R torso
+ * radius, H head radius, A arm length. A child is about 3.3 heads tall (1.29 m) and an adult about
+ * 4.5 (1.70 to 1.88 m): big heads read as faces from across a classroom, a child who stands is
+ * clearly taller than the same child sitting on a 0.32 m chair, and every adult reads as an adult.
+ */
 interface Build { L: number; Ht: number; R: number; H: number; A: number }
-const KID: Build = { L: 0.4, Ht: 0.42, R: 0.16, H: 0.21, A: 0.36 };
-const ADULT: Build = { L: 0.78, Ht: 0.7, R: 0.2, H: 0.19, A: 0.6 };
+export const BUILD: Record<Role, Build> = {
+  kid: { L: 0.54, Ht: 0.36, R: 0.14, H: 0.205, A: 0.4 },
+  teacher: { L: 0.84, Ht: 0.5, R: 0.165, H: 0.19, A: 0.58 },
+  principal: { L: 0.78, Ht: 0.52, R: 0.205, H: 0.19, A: 0.58 },
+  captain: { L: 0.9, Ht: 0.58, R: 0.2, H: 0.19, A: 0.64 },
+};
+/** Limb thickness as a share of the torso radius: thigh, shin, upper arm, forearm, hand. Chunky for children. */
+const LIMB = { kid: [0.44, 0.38, 0.31, 0.28, 0.37], adult: [0.42, 0.35, 0.29, 0.26, 0.32] } as const;
 
-export const SKIN = [0xf1c7a5, 0xd9a27e, 0xa86b4a, 0x7a4a32, 0xf5d6c0, 0xc68f6a];
+/**
+ * Skin and hair are the colours of people, which the UI tokens have no roles for, so they are
+ * declared once here. Clothes take their colours from the tokens: gold for the cadet and the Star
+ * Fleet, sky and blue and ember and cream for the class, ink for the grown-ups.
+ */
+export const SKIN = [0xf0c8a4, 0xd9a47c, 0xa9714d, 0x7b4f35, 0xf3d5bc, 0xc48e68];
+const HAIR = { black: 0x1f1c24, espresso: 0x3a2a22, brown: 0x6b4630, auburn: 0x8f4f2c, blond: 0xd3ab5e, grey: 0x9aa2b0 };
+const CLOTH = {
+  gold: mix(COLOR.gold, COLOR.horizon, 0.14), ember: mix(COLOR.ember, COLOR.approach, 0.22), sky: hex(COLOR.sky), blue: hex(COLOR.disk),
+  cream: mix(COLOR.approach, COLOR.gold, 0.12), slate: mix(COLOR.horizon, COLOR.sky, 0.32), sage: mix(COLOR.sky, COLOR.gold, 0.5), brick: mix(COLOR.ember, COLOR.shadow, 0.42),
+  navy: mix(COLOR.shadow, COLOR.disk, 0.3), ink: mix(COLOR.shadow, COLOR.horizon, 0.5), white: hex(COLOR.approach),
+};
+const DARK = mix(COLOR.void, COLOR.shadow, 0.6);
+
+/**
+ * The classmates, in seat order (the cadet's own seat and the empty desk in front of it are
+ * skipped): the four the teacher names, the two who answer her questions, and one more.
+ */
 export const CLASSMATES: Spec[] = [
-  { skin: 0, hair: 0x2b1b12, hs: "pigtails", top: 0xff8f70, bot: 0x4a5a8a, eyes: 0x5b3a1f },
-  { skin: 2, hair: 0x2e1f18, hs: "curly", top: 0x6cc3a0, bot: 0x3d405b, eyes: 0x2b1b12 },
-  { skin: 4, hair: 0xc98a3c, hs: "short", top: 0x7fa7ff, bot: 0x55597a, eyes: 0x3f7fbf },
-  { skin: 3, hair: 0x120c0a, hs: "bun", top: 0xf2c14e, bot: 0x3d405b, eyes: 0x2b1b12 },
-  { skin: 1, hair: 0x3a2416, hs: "long", top: 0xb79cff, bot: 0x4a5a8a, eyes: 0x5b3a1f },
-  { skin: 5, hair: 0x6b3a1f, hs: "swept", top: 0xef6f8a, bot: 0x55597a, eyes: 0x4a7a3a },
-  { skin: 0, hair: 0xe2c27a, hs: "long", top: 0x8fd3ff, bot: 0x3d405b, eyes: 0x3f7fbf },
-  { skin: 2, hair: 0x1a1212, hs: "short", top: 0xffb36b, bot: 0x4a5a8a, eyes: 0x2b1b12 },
+  { skin: 2, hair: HAIR.black, hs: "puffs", top: CLOTH.ember, bot: CLOTH.navy },
+  { skin: 4, hair: HAIR.blond, hs: "short", top: CLOTH.sky, bot: CLOTH.navy },
+  { skin: 3, hair: HAIR.black, hs: "curly", top: CLOTH.sage, bot: CLOTH.ink },
+  { skin: 0, hair: HAIR.auburn, hs: "pigtails", top: CLOTH.slate, bot: CLOTH.ink },
+  { skin: 5, hair: HAIR.black, hs: "swept", top: CLOTH.blue, bot: CLOTH.ink },
+  { skin: 0, hair: HAIR.brown, hs: "bob", top: CLOTH.cream, bot: CLOTH.brick, ex: ["hood"] },
+  { skin: 2, hair: HAIR.espresso, hs: "bun", top: CLOTH.brick, bot: CLOTH.navy },
 ];
-export const PLAYER: Spec = { skin: 1, hair: 0x2b1b12, hs: "swept", top: PALETTE.invader, bot: 0x3d405b, eyes: 0x3a2416 };
-export const TEACHER: Spec = { role: "teacher", skin: 4, hair: 0x5a3a24, hs: "bun", top: 0x0d9488, bot: 0x3b3a52, eyes: 0x4a7a3a, ex: ["glasses"] };
-export const PRINCIPAL: Spec = { role: "principal", skin: 2, hair: 0x94a3b8, hs: "bald", top: 0x57534e, bot: 0x292524, eyes: 0x2b1b12, ex: ["glasses", "tie", "mustache"] };
-export const CAPTAIN: Spec = { role: "captain", skin: 0, hair: 0x2b1b12, hs: "short", top: 0x1e3a8a, bot: 0x0f172a, eyes: 0x2b4a7a };
+/** The four classmates the teacher names, in the order she calls them, and the two who answer when the cadet does not. */
+export const NAMED = [0, 1, 4, 5], ANSWERERS = [2, 3];
+export const PLAYER: Spec = { skin: 1, hair: HAIR.espresso, hs: "swept", top: CLOTH.gold, bot: CLOTH.navy, ex: ["hood"] };
+export const TEACHER: Spec = { role: "teacher", skin: 4, hair: HAIR.auburn, hs: "bun", top: mix(COLOR.gold, COLOR.ember, 0.3), bot: CLOTH.ink, ex: ["glasses"] };
+export const PRINCIPAL: Spec = { role: "principal", skin: 2, hair: HAIR.grey, hs: "bald", top: CLOTH.slate, bot: CLOTH.ink, ex: ["glasses", "tie", "mustache"] };
+export const CAPTAIN: Spec = { role: "captain", skin: 5, hair: HAIR.black, hs: "short", top: CLOTH.navy, bot: mix(COLOR.void, COLOR.shadow, 0.8) };
+
+interface Face {
+  eyes: THREE.Group[]; pupils: THREE.Mesh[]; arcs: THREE.Mesh[]; brows: THREE.Mesh[]; browY: number; set: number; er: number;
+  line: THREE.Mesh; open: THREE.Mesh; grin: THREE.Mesh; mouthY: number; r: number;
+  /** The pose the face is in now: it eases toward the expression's pose every frame. */
+  now: Pose;
+}
+interface Pose { browL: number; browR: number; tilt: number; eye: number; arc: number; smile: number; open: number; wide: number; gx: number; gy: number }
+const POSES: Record<Expression, Pose> = {
+  neutral: { browL: 0, browR: 0, tilt: 0, eye: 1, arc: 0, smile: 0.35, open: 0, wide: 1, gx: 0, gy: 0 },
+  happy: { browL: 0.35, browR: 0.35, tilt: 0.1, eye: 0.92, arc: 0, smile: 1, open: 0, wide: 1.3, gx: 0, gy: 0 },
+  thinking: { browL: 0.8, browR: -0.25, tilt: -0.15, eye: 0.85, arc: 0, smile: -0.15, open: 0, wide: 0.6, gx: 0.6, gy: 0.55 },
+  oops: { browL: 0.75, browR: 0.75, tilt: 0.9, eye: 1.18, arc: 0, smile: -0.6, open: 0.42, wide: 0.5, gx: 0, gy: -0.1 },
+  cheer: { browL: 0.9, browR: 0.9, tilt: 0.15, eye: 1, arc: 1, smile: 1, open: 1, wide: 1.2, gx: 0, gy: 0 },
+};
 
 export interface Rig {
   body: THREE.Group; hips: THREE.Group[]; knees: THREE.Group[]; shoulders: THREE.Group[]; elbows: THREE.Group[];
-  head: THREE.Group; mouth: THREE.Mesh; eyes: THREE.Group[]; torso: THREE.Group; prop: THREE.Object3D | null;
-  H: number; L: number; blink: number; ph: number;
+  head: THREE.Group; torso: THREE.Group; prop: THREE.Object3D | null; face: Face;
+  H: number; L: number; Ht: number; A: number; R: number; blink: number; ph: number;
   /** raise amount and target */ r: number; raise: boolean;
+  /** Both arms up (0..1, follows the `cheer` expression). */
+  cheer: number;
+  /** The voice as the body hears it: a quick envelope for the mouth, a slow one for the hands. */
+  v: number; va: number;
+  /** How much the hands are in the conversation (0..1): eased, so a line never starts or ends with a snap. */
+  ge: number;
   talking: boolean; look: THREE.Vector3 | null;
-  seat: { y: number; z: number } | null; s: number; stand: number;
+  /** Speak with no voice to follow (the cadet's own answer has no recording): the mouth keeps its own time. */
+  mime: boolean;
+  /** The face the character is making. */
+  mood: Expression;
+  /** Where this character sits: the seated hip height, the spot, and the chair and desk it belongs to. */
+  seat: { x: number; hip: number; z: number; chair: THREE.Object3D | null; chairZ: number; desk: number; edge: number } | null;
+  /** Progress of the sit-to-stand move (0 seated, 1 standing) and its target. */
+  s: number; stand: number;
   walk: { pts: THREE.Vector3[]; t0: number; d: number; face?: THREE.Vector3 } | null;
 }
 export interface Character { group: THREE.Group; rig: Rig; spec: Spec }
 
 const V = (x: number, y: number) => new THREE.Vector2(x, y);
-const cap = (r: number, len: number) => new THREE.CapsuleGeometry(r, Math.max(0.001, len), 8, 18);
-
-/** A mitten hand: palm, four finger pads in one rounded block, and an opposable thumb. */
-function hand(parent: THREE.Object3D, skin: THREE.Material, r: number, side: number) {
-  const h = new THREE.Group();
-  parent.add(h);
-  add(h, new THREE.SphereGeometry(r, 24, 18), skin, 0, -r * 0.2, 0).scale.set(1, 1.25, 0.66);
-  add(h, new THREE.SphereGeometry(r * 0.86, 20, 14), skin, 0, -r * 1.05, r * 0.05).scale.set(1.04, 0.9, 0.62);
-  const th = add(h, cap(r * 0.3, r * 0.55), skin, side * -r * 0.78, -r * 0.35, r * 0.25);
-  th.rotation.set(0.4, 0, side * 0.75);
-  return h;
-}
+const cap = (r: number, len: number) => new THREE.CapsuleGeometry(r, Math.max(0.001, len), 6, 16);
+const ball = (r: number, w = 24, h = 16) => new THREE.SphereGeometry(r, w, h);
 
 export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
-  const role = spec.role ?? "kid", adult = role !== "kid";
-  const { L, Ht, R, H, A } = adult ? ADULT : KID;
+  const role = spec.role ?? "kid", kid = role === "kid";
+  const { L, Ht, R, H, A } = BUILD[role], [kt, ks, ku, kf, kh] = LIMB[kid ? "kid" : "adult"];
   const g = new THREE.Group(), body = new THREE.Group();
   g.add(body);
-  const skin = M.skin(SKIN[spec.skin]), top = M.fabric(spec.top), bot = M.fabric(spec.bot), hair = M.clay(spec.hair, { roughness: spec.hs === "curly" ? 0.85 : 0.55 });
-  const shoe = M.clay(spec.shoe ?? 0x2b2d42, { roughness: 0.45 }), sole = M.clay(0xf3eee6, { roughness: 0.7 });
-  const dark = M.clay(PALETTE.dark, { roughness: 0.3 }), nc = { cast: false };
-  const longSleeves = adult;
+  const matte = (c: number, roughness = 0.9) => M.clay(c, { roughness });
+  const skinC = SKIN[spec.skin], skin = matte(skinC, 0.78), top = matte(spec.top), bot = matte(spec.bot), hair = matte(spec.hair, 0.95);
+  const shoe = matte(spec.shoe ?? (kid ? CLOTH.white : DARK), 0.8), sole = matte(kid ? mix(COLOR.horizon, COLOR.sky, 0.25) : mix(COLOR.void, COLOR.horizon, 0.5), 0.9);
+  const dark = matte(DARK, 0.7), gold = matte(hex(COLOR.gold), 0.6), nc = { cast: false };
+  const skirt = role === "teacher";
 
-  // legs: hip → thigh → knee → shin → sneaker
-  const hips: THREE.Group[] = [], knees: THREE.Group[] = [];
+  // legs: hip → thigh → knee → shin → shoe. The sole meets the floor at y = 0.
+  const hips: THREE.Group[] = [], knees: THREE.Group[] = [], a = L / 2, rt = R * kt, rs = R * ks, legMat = skirt ? dark : bot;
   for (const s of [-1, 1]) {
     const hip = new THREE.Group();
-    hip.position.set(s * R * 0.45, L, 0);
+    hip.position.set(s * R * 0.5, L, 0);
     body.add(hip);
-    add(hip, cap(R * 0.37, L * 0.5 - R * 0.37), bot, 0, -L * 0.25, 0);
+    add(hip, cap(rt, a - rt), legMat, 0, -a / 2, 0);
     const knee = new THREE.Group();
-    knee.position.y = -L * 0.5;
+    knee.position.y = -a;
     hip.add(knee);
-    add(knee, cap(R * 0.33, L * 0.5 - R * 0.3), adult ? bot : skin, 0, -L * 0.25, 0);
-    if (!adult) add(knee, new THREE.CylinderGeometry(R * 0.36, R * 0.36, L * 0.06, 20), bot, 0, -L * 0.02, 0); // shorts hem
-    add(knee, new THREE.SphereGeometry(R * 0.42, 24, 16), shoe, 0, -L * 0.5 + R * 0.1, R * 0.18).scale.set(0.95, 0.6, 1.55);
-    add(knee, new THREE.SphereGeometry(R * 0.43, 24, 12), sole, 0, -L * 0.5 - R * 0.06, R * 0.18).scale.set(1.0, 0.22, 1.62);
+    const sr = R * (kid ? 0.46 : 0.38);
+    add(knee, cap(rs, a - rs - sr * 0.5), kid ? skin : legMat, 0, -a / 2 + sr * 0.2, 0);
+    if (kid) add(knee, new THREE.CylinderGeometry(rt * 1.03, rt * 1.0, a * 0.2, 18), bot, 0, -a * 0.02, 0); // the hem of the shorts
+    add(knee, ball(sr, 20, 12), shoe, 0, -a + sr * 0.6, sr * 0.36).scale.set(0.92, 0.6, 1.5);
+    add(knee, ball(sr, 20, 8), sole, 0, -a + sr * 0.17, sr * 0.36).scale.set(0.96, 0.17, 1.56);
     hips.push(hip); knees.push(knee);
   }
-  add(body, new THREE.CylinderGeometry(R * 0.98, R * 1.02, R * 0.55, 32), bot, 0, L + R * 0.12, 0);
+  add(body, ball(R * 1.0, 28, 16), bot, 0, L + R * 0.02, 0).scale.set(1, 0.6, 0.8);
+  if (skirt) add(body, new THREE.CylinderGeometry(R * 1.0, R * 1.22, L * 0.52, 32, 1), bot, 0, L * 0.76, 0).scale.set(1, 1, 0.82);
 
-  // torso: a lathed body with soft shoulders, flattened front to back
+  // torso: a lathed shape with square shoulders, flattened front to back
   const torso = new THREE.Group();
   torso.position.y = L;
   body.add(torso);
-  const shape = [V(0, 0), V(R * 0.97, 0), V(R * 1.0, Ht * 0.2), V(R * 1.03, Ht * 0.55), V(R * 1.1, Ht * 0.8), V(R * 0.98, Ht * 0.94), V(R * 0.6, Ht * 1.0), V(H * 0.34, Ht * 1.03), V(0, Ht * 1.03)];
-  add(torso, new THREE.LatheGeometry(shape, 48), top).scale.set(1, 1, 0.8);
+  const belly = role === "principal" ? 1.16 : kid ? 1.04 : 1, chest = role === "captain" ? 1.18 : role === "principal" ? 1.06 : 1;
+  const profile = (k: number) => [V(0, 0), V(R * 0.98 * k, 0), V(R * 1.02 * belly * k, Ht * 0.2), V(R * belly * k, Ht * 0.5), V(R * chest * k, Ht * 0.78), V(R * 0.96 * chest * k, Ht * 0.9), V(R * 0.7 * chest * k, Ht * 0.985), V(H * 0.3 * k, Ht * 1.03), V(0, Ht * 1.03)];
+  const shirt = role === "teacher" ? matte(CLOTH.cream) : role === "principal" ? matte(CLOTH.white) : top;
+  add(torso, new THREE.LatheGeometry(profile(1), 40), shirt).scale.set(1, 1, 0.8);
+  const SH = R * chest * 0.98;
   if (role === "teacher" || role === "principal") {
-    // an open cardigan or suit jacket over the shirt: the same body, slightly bigger, open at the front
-    const coat = role === "teacher" ? M.fabric(0xd9a441) : M.fabric(spec.top);
-    const shirt = role === "teacher" ? M.fabric(0xf6f1e7) : M.fabric(0xf3f4f6);
-    (torso.children[0] as THREE.Mesh).material = shirt;
-    add(torso, new THREE.LatheGeometry(shape.map((p) => V(p.x * 1.06, p.y * 0.99)), 48, Math.PI * 0.12, Math.PI * 1.76), coat).scale.set(1, 1, 0.82);
-    if (role === "teacher") { const sc = add(torso, new THREE.TorusGeometry(H * 0.46, R * 0.12, 14, 36), M.fabric(0xfef3c7), 0, Ht * 0.98, 0); sc.rotation.x = Math.PI / 2; sc.scale.set(1, 0.86, 1); }
+    // an open cardigan or jacket over the shirt: the same shape, a little bigger, open down the front
+    add(torso, new THREE.LatheGeometry(profile(1.07).map((p) => V(p.x, p.y * 0.985)), 40, Math.PI * 0.13, Math.PI * 1.74), top).scale.set(1, 1, 0.82);
   } else if (role === "captain") {
-    const gold = M.clay(0xfbbf24, { roughness: 0.28, metalness: 0.75 }), trim = M.clay(0x0f1f3d, { roughness: 0.4, metalness: 0.25 });
-    for (const s of [-1, 1]) add(torso, new THREE.SphereGeometry(R * 0.62, 24, 16), gold, s * R * 1.02, Ht * 0.92, 0).scale.set(1.15, 0.5, 1.0);
-    add(torso, new THREE.OctahedronGeometry(R * 0.26, 0), M.glow(0x38bdf8, 2.2), R * 0.4, Ht * 0.72, R * 0.83, nc);
-    add(torso, new THREE.CylinderGeometry(R * 1.0, R * 1.0, R * 0.32, 32), trim, 0, Ht * 0.12, 0).scale.set(1, 1, 0.82);
-    add(torso, new THREE.BoxGeometry(R * 0.5, R * 0.34, R * 0.12), gold, 0, Ht * 0.12, R * 0.82);
-    for (let i = 0; i < 3; i++) add(torso, new THREE.SphereGeometry(R * 0.07, 12, 8), gold, 0, Ht * (0.32 + i * 0.17), R * 0.84, nc);
-    const cape = add(torso, new THREE.BoxGeometry(R * 2.1, Ht * 1.25, R * 0.12), M.fabric(0x1d4ed8), 0, Ht * 0.42, -R * 0.92);
-    cape.rotation.x = 0.12;
+    // the Star Fleet uniform: a high collar, a gold belt and closure, epaulettes and a short cape
+    add(torso, new THREE.CylinderGeometry(H * 0.4, H * 0.44, H * 0.3, 24), top, 0, Ht * 1.03, 0);
+    add(torso, new THREE.CylinderGeometry(R * 1.04, R * 1.04, R * 0.2, 32), gold, 0, Ht * 0.17, 0).scale.set(1, 1, 0.81);
+    add(torso, new THREE.BoxGeometry(R * 0.1, Ht * 0.6, 0.012), gold, R * 0.3, Ht * 0.56, R * chest * 0.74, nc).rotation.x = -0.04;
+    for (const s of [-1, 1]) add(torso, new THREE.BoxGeometry(R * 0.72, R * 0.13, R * 0.66), gold, s * (SH - R * 0.1), Ht * 0.95, 0).rotation.z = s * -0.1;
+    add(torso, new THREE.BoxGeometry(SH * 1.9, Ht * 1.1, R * 0.1), matte(hex(COLOR.disk)), 0, Ht * 0.42, -R * 0.9).rotation.x = 0.09;
   } else {
-    const ring = add(torso, new THREE.TorusGeometry(H * 0.4, R * 0.07, 12, 32), M.fabric(new THREE.Color(spec.top).multiplyScalar(0.8).getHex()), 0, Ht * 1.0, 0);
-    ring.rotation.x = Math.PI / 2;
+    // a tee with a darker neckband; the hoodie adds a thick collar, a pocket and two cord ends
+    const band = matte(mix(spec.top, COLOR.void, 0.22));
+    const hood = spec.ex?.includes("hood");
+    add(torso, new THREE.TorusGeometry(H * 0.4, R * (hood ? 0.17 : 0.07), 10, 28), hood ? top : band, 0, Ht * (hood ? 0.99 : 1.0), 0).rotation.x = Math.PI / 2;
+    if (hood) {
+      add(torso, ball(R * 0.6, 20, 12), band, 0, Ht * 0.26, R * 0.64).scale.set(1.25, 0.62, 0.36);
+      for (const s of [-1, 1]) add(torso, cap(R * 0.035, R * 0.3), matte(CLOTH.white), s * R * 0.2, Ht * 0.8, R * 0.83, nc);
+    }
   }
   if (spec.ex?.includes("tie")) {
-    add(torso, new THREE.BoxGeometry(R * 0.26, Ht * 0.52, 0.025), M.fabric(0xb91c1c), 0, Ht * 0.62, R * 0.83).rotation.x = -0.08;
-    add(torso, new THREE.SphereGeometry(R * 0.15, 14, 10), M.fabric(0xb91c1c), 0, Ht * 0.9, R * 0.78).scale.set(1, 0.8, 0.7);
+    const tie = matte(hex(COLOR.ember));
+    add(torso, new THREE.BoxGeometry(R * 0.2, Ht * 0.5, 0.02), tie, 0, Ht * 0.62, R * 0.86 * belly).rotation.x = -0.1;
+    add(torso, ball(R * 0.13, 12, 8), tie, 0, Ht * 0.9, R * 0.74).scale.set(1, 0.8, 0.7);
   }
 
-  // arms: shoulder → upper arm → elbow → forearm → hand
+  // arms: shoulder → upper arm → elbow → forearm → mitten hand, set into the corner of the shoulders
   const shoulders: THREE.Group[] = [], elbows: THREE.Group[] = [];
   let prop: THREE.Object3D | null = null;
+  const up = A * 0.48, fore = A * 0.5, ru = R * ku, rf = R * kf;
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group();
-    sh.position.set(s * (R * 1.08 + R * 0.2), Ht * 0.88, 0);
-    torso.add(sh);
-    add(sh, new THREE.SphereGeometry(R * 0.32, 20, 14), role === "captain" ? top : top, 0, 0, 0);
-    add(sh, cap(R * 0.28, A * 0.45 - R * 0.28), top, 0, -A * 0.24, 0);
+    const shd = new THREE.Group();
+    shd.position.set(s * SH, Ht * 0.88, 0);
+    torso.add(shd);
+    add(shd, ball(ru * 1.06, 16, 12), top);
+    add(shd, cap(ru, up - ru), top, 0, -up / 2, 0);
     const el = new THREE.Group();
-    el.position.y = -A * 0.48;
-    sh.add(el);
-    add(el, cap(R * 0.25, A * 0.42 - R * 0.25), longSleeves ? top : skin, 0, -A * 0.22, 0);
-    if (longSleeves) add(el, new THREE.TorusGeometry(R * 0.26, R * 0.06, 10, 24), role === "captain" ? M.clay(0xfbbf24, { metalness: 0.7, roughness: 0.3 }) : top, 0, -A * 0.42, 0).rotation.x = Math.PI / 2;
-    else add(sh, new THREE.CylinderGeometry(R * 0.33, R * 0.31, A * 0.06, 20), top, 0, -A * 0.36, 0); // sleeve hem
-    const hd = hand(el, skin, R * 0.27, s);
-    hd.position.y = -A * 0.5;
+    el.position.y = -up;
+    shd.add(el);
+    const longSleeve = !kid || !!spec.ex?.includes("hood");
+    add(el, cap(rf, fore - rf), longSleeve ? top : skin, 0, -fore / 2, 0);
+    if (!longSleeve) add(shd, new THREE.CylinderGeometry(ru * 1.05, ru * 1.02, up * 0.3, 16), top, 0, -up * 0.82, 0); // the sleeve's hem
+    else if (kid) add(el, new THREE.CylinderGeometry(rf * 1.1, rf * 1.1, fore * 0.14, 16), matte(mix(spec.top, COLOR.void, 0.22)), 0, -fore * 0.86, 0); // a ribbed cuff
+    if (role === "captain") add(el, new THREE.CylinderGeometry(rf * 1.12, rf * 1.12, fore * 0.16, 16), gold, 0, -fore * 0.8, 0);
+    const hr = R * kh, hd = new THREE.Group();
+    hd.position.y = -fore;
+    el.add(hd);
+    add(hd, ball(hr, 18, 14), skin, 0, -hr * 0.5, 0).scale.set(0.92, 1.1, 0.74);
+    add(hd, ball(hr * 0.42, 12, 8), skin, s * -hr * 0.6, -hr * 0.3, hr * 0.34);
     if (role === "teacher" && s === 1) {
-      prop = add(hd, new THREE.CylinderGeometry(0.009, 0.006, 0.55, 10), M.clay(0xb7792b, { roughness: 0.5 }), 0, -0.12, 0.2);
+      prop = add(hd, new THREE.CylinderGeometry(0.008, 0.005, 0.5, 8), matte(mix(COLOR.gold, HAIR.brown, 0.6)), 0, -0.1, 0.2);
       prop.rotation.x = Math.PI / 2.4;
     }
-    shoulders.push(sh); elbows.push(el);
+    shoulders.push(shd); elbows.push(el);
   }
 
-  // neck and head
-  add(torso, new THREE.CylinderGeometry(H * 0.29, H * 0.33, H * 0.42, 24), skin, 0, Ht * 1.05, 0);
+  // neck and head (the head hangs off the torso, so a lean carries it)
+  add(torso, new THREE.CylinderGeometry(H * 0.27, H * 0.31, H * 0.5, 20), skin, 0, Ht * 1.03, 0);
   const head = new THREE.Group();
-  head.position.y = L + Ht + H * 0.22;
-  body.add(head);
-  const hy = H * 0.95;
-  add(head, new THREE.SphereGeometry(H, 48, 32), skin, 0, hy, 0).scale.set(1, 1.04, 0.97);
-  add(head, new THREE.SphereGeometry(H * 0.7, 32, 20), skin, 0, hy - H * 0.36, H * 0.2).scale.set(1, 0.72, 0.88); // jaw and chin
-  const surf = (x: number, y: number) => Math.sqrt(Math.max(0, H * H - x * x - y * y));
-  for (const s of [-1, 1]) {
-    add(head, new THREE.SphereGeometry(H * 0.21, 20, 14), skin, s * H * 0.97, hy - H * 0.02, -H * 0.04).scale.set(0.42, 1, 0.72);
-    add(head, new THREE.SphereGeometry(H * 0.11, 14, 10), M.skin(new THREE.Color(SKIN[spec.skin]).multiplyScalar(0.82).getHex()), s * H * 1.02, hy - H * 0.02, -H * 0.02, nc).scale.set(0.3, 0.8, 0.5);
-  }
-  const eyes: THREE.Group[] = [];
-  const iris = M.clay(spec.eyes ?? 0x3a2416, { roughness: 0.25 }), white = M.clay(0xfbfaf7, { roughness: 0.25 }), glint = M.glow(0xffffff, 0.9);
-  for (const s of [-1, 1]) {
-    const x = s * H * 0.34, y = H * 0.06, eg = new THREE.Group();
-    eg.position.set(x, hy + y, surf(x, y) * 0.94);
-    head.add(eg);
-    eyes.push(eg);
-    add(eg, new THREE.SphereGeometry(H * 0.165, 32, 22), white, 0, 0, 0, nc).scale.set(1, 1.1, 0.55);
-    add(eg, new THREE.SphereGeometry(H * 0.105, 28, 18), iris, 0, -H * 0.005, H * 0.058, nc).scale.set(1, 1.04, 0.45);
-    add(eg, new THREE.SphereGeometry(H * 0.052, 20, 14), dark, 0, -H * 0.005, H * 0.083, nc).scale.set(1, 1, 0.4);
-    add(eg, new THREE.SphereGeometry(H * 0.026, 12, 8), glint, H * 0.04, H * 0.045, H * 0.1, nc);
-    const brow = add(head, new THREE.TorusGeometry(H * 0.15, H * 0.024, 8, 20, Math.PI * 0.62), hair, x, hy + H * 0.3, surf(x, H * 0.3) * 0.96, nc);
-    brow.rotation.z = Math.PI * 0.19 + (role === "captain" ? s * -0.12 : s * 0.05);
-  }
-  add(head, new THREE.SphereGeometry(H * 0.11, 20, 14), skin, 0, hy - H * 0.1, H * 0.98, nc).scale.set(0.9, 0.85, 1);
-  for (const s of [-1, 1]) add(head, new THREE.SphereGeometry(H * 0.13, 14, 10), M.clay(0xff8fa0, { roughness: 0.8, transparent: true, opacity: 0.35 }), s * H * 0.56, hy - H * 0.22, surf(H * 0.56, -H * 0.22) * 0.92, nc).scale.z = 0.35;
-  const my = -H * 0.42, mz = surf(0, my) * 0.9;
-  const mouth = add(head, new THREE.SphereGeometry(H * 0.13, 24, 14), M.clay(0x5a1f2a, { roughness: 0.6 }), 0, hy + my, mz, nc);
-  mouth.scale.set(1, 0.18, 0.45);
-  const lip = add(head, new THREE.TorusGeometry(H * 0.13, H * 0.024, 8, 24, Math.PI * 0.85), M.clay(0xc4706a, { roughness: 0.5 }), 0, hy + my + H * 0.02, mz + H * 0.02, nc);
-  lip.rotation.z = Math.PI + Math.PI * 0.075;
+  head.position.y = Ht + H * (kid ? 0.04 : 0.14);
+  torso.add(head);
+  const hy = H * 0.92, sx = kid ? 1.02 : 0.95, sy = kid ? 0.95 : 1.04, sz = kid ? 0.97 : 0.95;
+  add(head, ball(H, 40, 28), skin, 0, hy, 0).scale.set(sx, sy, sz);
+  if (role === "captain" || role === "principal") add(head, ball(H * 0.64, 24, 16), skin, 0, hy - H * 0.5, H * 0.14).scale.set(role === "captain" ? 1.14 : 1.05, 0.72, 0.92); // a jaw
+  /** The front of the head at (x, y) from its centre, in head units. */
+  const surf = (x: number, y: number) => sz * H * Math.sqrt(Math.max(0, 1 - (x / sx) ** 2 - (y / sy) ** 2));
+  for (const s of [-1, 1]) add(head, ball(H * 0.2, 14, 10), skin, s * H * sx * 0.98, hy - H * 0.08, -H * 0.02).scale.set(0.4, 1, 0.7);
 
-  // hair
-  const hs = spec.hs;
-  if (hs !== "bald") add(head, new THREE.SphereGeometry(H * 1.07, 48, 24, 0, Math.PI * 2, 0, Math.PI * (hs === "curly" ? 0.42 : 0.47)), hair, 0, hy, 0).rotation.x = -0.32;
-  if (hs === "short" || hs === "swept") for (let i = 0; i < 6; i++) {
-    const x = (i - 2.5) * H * 0.16, f = add(head, cap(H * 0.075, H * 0.16), hair, x, hy + H * 0.68, surf(x, H * 0.68) * 0.98 + H * 0.02);
-    f.rotation.set(-0.9, 0, hs === "swept" ? -0.5 : (i - 2.5) * 0.1);
+  // the face: big soft eyes, brows that move, a mouth that smiles, frowns and opens
+  const er = H * (kid ? 0.2 : role === "captain" ? 0.135 : 0.15), ex = kid ? 0.4 : 0.36, ey = kid ? -0.08 : 0.04;
+  /** The brows' resting slant: the Captain's are set, everyone else's are level. */
+  const set = role === "captain" ? -0.3 : 0;
+  const white = matte(mix(COLOR.approach, 0xffffff, 0.5), 0.6), irisMat = matte(spec.eyes ?? mix(HAIR.espresso, COLOR.void, 0.45), 0.5), glint = new THREE.MeshBasicMaterial({ color: mix(COLOR.approach, COLOR.horizon, 0.08) });
+  const eyes: THREE.Group[] = [], pupils: THREE.Mesh[] = [], arcs: THREE.Mesh[] = [], brows: THREE.Mesh[] = [];
+  const lineMat = matte(mix(skinC, COLOR.void, 0.7), 0.9), browMat = matte(mix(spec.hair, COLOR.void, role === "principal" ? 0.5 : 0.2), 0.95);
+  const browUp = kid ? 1.42 : role === "captain" ? 1.5 : 1.6, browY = hy + H * ey + er * browUp;
+  for (const s of [-1, 1]) {
+    const x = s * ex, z = surf(x, ey), eg = new THREE.Group();
+    eg.position.set(x * H, hy + ey * H, z - er * 0.12);
+    eg.rotation.y = s * 0.26;
+    head.add(eg);
+    add(eg, ball(er, 24, 16), white, 0, 0, 0, nc).scale.set(0.9, 1.1, 0.26);
+    const pupil = add(eg, ball(er * 0.8, 22, 14), irisMat, 0, 0, er * 0.13, nc);
+    pupil.scale.set(0.95, 1.1, 0.22);
+    add(pupil, ball(er * 0.2, 10, 8), glint, er * 0.26, er * 0.3, er * 0.72, nc);
+    // the closed, smiling eye: an arch that replaces the eyeball
+    const arc = add(head, new THREE.TorusGeometry(er * 0.7, er * 0.14, 8, 18, Math.PI * 0.8), lineMat, x * H, hy + ey * H - er * 0.3, z + er * 0.1, nc);
+    arc.rotation.set(0, s * 0.26, Math.PI * 0.1);
+    arc.visible = false;
+    const brow = add(head, cap(er * (kid ? 0.13 : role === "captain" ? 0.24 : 0.17), er * (kid ? 0.7 : role === "captain" ? 1.25 : 1.0)), browMat, x * H, browY, surf(x, ey + (er / H) * browUp) + er * 0.04, nc);
+    brow.rotation.z = Math.PI / 2;
+    eyes.push(eg); pupils.push(pupil); arcs.push(arc); brows.push(brow);
   }
-  if (hs === "bun") {
-    // a top knot that shows from the front, a side-parted fringe and soft volume over the ears
-    add(head, new THREE.SphereGeometry(H * 0.42, 32, 24), hair, 0, hy + H * 0.92, -H * 0.42).scale.set(1, 0.9, 1);
-    add(head, new THREE.TorusGeometry(H * 0.3, H * 0.06, 12, 32), M.clay(0xd94a4a, { roughness: 0.5 }), 0, hy + H * 0.78, -H * 0.36).rotation.x = Math.PI / 2 - 0.5;
-    for (const [x, rz, len] of [[-0.28, 1.15, 0.46], [0.18, -1.05, 0.34], [0.46, -0.85, 0.22]] as const) {
-      const f = add(head, cap(H * 0.13, H * len), hair, x * H, hy + H * 0.66, surf(x * H, H * 0.66) * 0.96);
-      f.rotation.set(-0.55, 0, rz);
+  const noseY = kid ? -0.3 : -0.22;
+  add(head, ball(H * (kid ? 0.07 : 0.1), 14, 10), matte(mix(skinC, COLOR.ember, 0.12), 0.78), 0, hy + H * noseY, surf(0, noseY) + H * 0.02, nc).scale.set(1, 0.85, 0.9);
+  const my = kid ? -0.54 : -0.5, mouthY = hy + H * my, mr = H * 0.17, mz = surf(0, my);
+  const line = add(head, new THREE.TorusGeometry(mr, H * 0.028, 8, 20, Math.PI * 0.62), lineMat, 0, mouthY, mz + H * 0.012, nc);
+  line.rotation.z = -Math.PI / 2 - Math.PI * 0.31;
+  // the open mouth: a round one for talking and surprise, and the lower half of one for an open smile
+  const cavity = matte(mix(COLOR.ember, COLOR.void, 0.84), 0.9), tongue = matte(mix(COLOR.ember, COLOR.shadow, 0.5), 0.9);
+  const openM = add(head, ball(H * 0.15, 20, 12), cavity, 0, mouthY, mz - H * 0.025, nc);
+  const grin = add(head, new THREE.SphereGeometry(H * 0.2, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), cavity, 0, mouthY, mz - H * 0.03, nc);
+  add(grin, ball(H * 0.11, 14, 8), tongue, 0, -H * 0.14, H * 0.03, nc).scale.set(1.1, 0.5, 0.6);
+  openM.visible = grin.visible = false;
+  const face: Face = { eyes, pupils, arcs, brows, browY, set, er, line, open: openM, grin, mouthY, r: mr, now: { ...POSES.neutral } };
+
+  // hair: a cap over the crown and a few chunky locks with a clear outline. Never beads.
+  const hs = spec.hs, hr = H * 1.045;
+  /** A cap over the crown: its front edge is the hairline. */
+  const crown = (tilt: number, reach = 0.5) => { const m = add(head, new THREE.SphereGeometry(hr, 36, 18, 0, Math.PI * 2, 0, Math.PI * reach), hair, 0, hy, 0); m.rotation.x = tilt; m.scale.set(sx, sy, sz); return m; };
+  /** A rounded lock, in head units: where, how big on each axis, and its lean. */
+  const lock = (x: number, y: number, z: number, s: [number, number, number], rz = 0, rx = 0) => { const m = add(head, ball(H, 18, 12), hair, x * H, hy + y * H, z * H); m.scale.set(...s); m.rotation.set(rx, 0, rz); return m; };
+  if (role === "captain") {
+    // short hair at the sides and back, under a peaked cap with a gold band and a plain gold badge
+    for (const s of [-1, 1]) lock(s * 0.88, 0.06, -0.3, [0.14, 0.44, 0.5]);
+    lock(0, 0.0, -0.76, [0.8, 0.5, 0.26]);
+    add(head, new THREE.CylinderGeometry(H * 1.16, H * 1.02, H * 0.4, 36), top, 0, hy + H * 0.84, -H * 0.04);
+    add(head, new THREE.CylinderGeometry(H * 1.035, H * 1.03, H * 0.15, 36), gold, 0, hy + H * 0.6, -H * 0.04);
+    const peak = add(head, new THREE.CylinderGeometry(H * 0.9, H * 0.9, H * 0.045, 28, 1, false, -Math.PI / 2, Math.PI), dark, 0, hy + H * 0.56, H * 0.3);
+    peak.rotation.x = 0.2;
+    add(head, new THREE.CylinderGeometry(H * 0.13, H * 0.13, H * 0.04, 5), gold, 0, hy + H * 0.86, H * 1.07, nc).rotation.x = Math.PI / 2;
+  } else if (hs === "short") {
+    crown(-0.6, 0.56);
+    for (const [x, len] of [[-0.4, 0.24], [0, 0.3], [0.4, 0.24]] as const) lock(x, 0.72 - len * 0.2, surf(x, 0.62) / H + 0.02, [0.3, len, 0.17], x * 0.35, -0.3); // short straight bangs
+  } else if (hs === "swept") {
+    crown(-0.6, 0.56);
+    // a fringe combed across the forehead in four locks, and a tuft that will not lie flat
+    for (const [x, y, rz] of [[0.52, 0.62, 0.9], [0.24, 0.72, 0.7], [-0.08, 0.76, 0.55], [-0.4, 0.7, 0.35]] as const) lock(x, y, surf(x, y - 0.08) / H + 0.04, [0.36, 0.18, 0.2], rz, -0.2);
+    lock(-0.2, 1.02, -0.2, [0.16, 0.26, 0.16], 0.5, -0.4);
+  } else if (hs === "bun") {
+    crown(-0.56, 0.56);
+    lock(0, 1.04, -0.38, [0.4, 0.38, 0.4]);
+    for (const [x, rz] of [[-0.42, 0.75], [0.36, -0.6]] as const) lock(x, 0.7, surf(x, 0.6) / H + 0.03, [0.48, 0.2, 0.22], rz, -0.25); // parted to one side
+  } else if (hs === "puffs") {
+    crown(-0.56, 0.56);
+    for (const s of [-1, 1]) lock(s * 0.8, 0.82, -0.14, [0.5, 0.5, 0.5]);
+    for (const x of [-0.4, 0, 0.4]) lock(x, 0.76, surf(x, 0.66) / H + 0.02, [0.24, 0.17, 0.16]);
+  } else if (hs === "pigtails") {
+    crown(-0.56, 0.56);
+    for (const s of [-1, 1]) {
+      lock(s * 1.1, -0.42, -0.2, [0.22, 0.46, 0.22], s * 0.22);
+      add(head, new THREE.TorusGeometry(H * 0.2, H * 0.05, 8, 16), gold, s * H * 1.0, hy - H * 0.02, -H * 0.2).rotation.set(Math.PI / 2, 0, s * 0.25);
     }
-    for (const sd of [-1, 1]) add(head, new THREE.SphereGeometry(H * 0.36, 24, 18), hair, sd * H * 0.82, hy + H * 0.2, -H * 0.12).scale.set(0.55, 1.1, 1.05);
-  }
-  if (hs === "pigtails") for (const s of [-1, 1]) {
-    add(head, new THREE.SphereGeometry(H * 0.32, 24, 16), hair, s * H * 1.02, hy - H * 0.05, -H * 0.25).scale.set(0.9, 1.15, 0.9);
-    add(head, new THREE.TorusGeometry(H * 0.14, H * 0.045, 10, 20), M.clay(0xf2c14e), s * H * 0.92, hy + H * 0.18, -H * 0.2).rotation.y = Math.PI / 2;
-  }
-  if (hs === "curly") {
-    // many small coils on a Fibonacci sphere, so it reads as soft curls rather than a few big balls
-    const n = 84;
-    for (let i = 0; i < n; i++) {
-      const yv = 1 - (i / (n - 1)) * 1.05, rr = Math.sqrt(Math.max(0, 1 - yv * yv)), th = i * 2.399963, x = Math.cos(th) * rr, z = Math.sin(th) * rr;
-      if (yv < 0.3 && z > 0.1) continue; // keep the face and forehead clear
-      if (yv < -0.05 && z > -0.5) continue;
-      const k = 1.04 + rnd() * 0.05;
-      add(head, new THREE.SphereGeometry(H * (0.13 + rnd() * 0.04), 14, 10), hair, x * H * k, hy + yv * H * k, z * H * k);
-    }
-  }
-  if (hs === "long") {
-    add(head, cap(H * 0.82, H * 1.05), hair, 0, hy - H * 0.45, -H * 0.34).scale.set(1, 1, 0.7);
-    for (const s of [-1, 1]) add(head, cap(H * 0.2, H * 0.9), hair, s * H * 0.86, hy - H * 0.45, H * 0.06);
-  }
-  if (hs === "bald") {
-    for (const s of [-1, 1]) add(head, new THREE.SphereGeometry(H * 0.32, 18, 14), hair, s * H * 0.86, hy - H * 0.02, -H * 0.3).scale.set(0.7, 1, 1.1);
+    lock(0, 0.72, 0.56, [0.78, 0.2, 0.34]); // a straight fringe
+  } else if (hs === "curly") {
+    // one big soft shape with a scalloped edge: an afro by its outline
+    lock(0, 0.3, -0.26, [1.24, 1.16, 1.2]);
+    for (const [x, y, z] of [[-0.62, 0.74, 0.5], [-0.2, 0.9, 0.62], [0.24, 0.9, 0.6], [0.64, 0.72, 0.5], [-1.0, 0.3, 0.2], [1.0, 0.3, 0.2]] as const) lock(x, y, z, [0.36, 0.36, 0.36]);
+  } else if (hs === "long") {
+    crown(-0.54, 0.56);
+    lock(0, -0.5, -0.4, [0.9, 1.0, 0.5]);
+    for (const s of [-1, 1]) lock(s * 0.93, -0.42, 0.1, [0.2, 0.72, 0.24], s * -0.06);
+    lock(0.1, 0.72, 0.54, [0.76, 0.2, 0.34], 0.12);
+  } else if (hs === "bob") {
+    lock(0, 0.04, -0.24, [1.17, 1.19, 1.12]);
+    lock(-0.06, 0.72, 0.52, [0.8, 0.22, 0.38], -0.08);
+  } else if (hs === "bald") {
+    // grey at the sides and the back only
+    for (const s of [-1, 1]) lock(s * 0.88, 0.0, -0.3, [0.15, 0.36, 0.5]);
+    lock(0, -0.06, -0.76, [0.8, 0.38, 0.26]);
   }
   if (spec.ex?.includes("glasses")) {
-    const frame = M.clay(0x1f2937, { roughness: 0.3, metalness: 0.4 });
+    const rim = matte(DARK, 0.6);
     for (const s of [-1, 1]) {
-      const x = s * H * 0.34;
-      add(head, new THREE.TorusGeometry(H * 0.18, H * 0.022, 10, 32), frame, x, hy + H * 0.06, surf(x, H * 0.06) + H * 0.06, nc);
-      add(head, new THREE.BoxGeometry(H * 0.02, H * 0.02, H * 0.85), frame, s * H * 0.52, hy + H * 0.1, H * 0.38, nc);
+      const x = s * ex;
+      add(head, new THREE.TorusGeometry(er * 1.22, H * 0.022, 8, 28), rim, x * H, hy + ey * H, surf(x, ey) + er * 0.36, nc).rotation.y = s * 0.26;
+      add(head, new THREE.BoxGeometry(H * 0.02, H * 0.02, H * 0.72), rim, s * H * 0.74, hy + ey * H + er * 0.3, H * 0.36, nc).rotation.y = s * 0.34;
     }
-    add(head, new THREE.BoxGeometry(H * 0.32, H * 0.03, H * 0.03), frame, 0, hy + H * 0.1, surf(0, H * 0.1) + H * 0.07, nc);
+    add(head, new THREE.BoxGeometry(H * (ex * 2) - er * 2.2, H * 0.024, H * 0.024), rim, 0, hy + ey * H + er * 0.2, surf(0, ey) + er * 0.36, nc);
   }
-  if (spec.ex?.includes("mustache")) add(head, new THREE.TorusGeometry(H * 0.15, H * 0.055, 10, 20, Math.PI), hair, 0, hy - H * 0.24, surf(0, -H * 0.24) * 1.0, nc);
-  if (role === "captain") {
-    const navy = M.fabric(0x13254f), gold = M.clay(0xfbbf24, { roughness: 0.28, metalness: 0.75 });
-    add(head, new THREE.CylinderGeometry(H * 1.06, H * 1.0, H * 0.48, 40), navy, 0, hy + H * 0.8, -H * 0.04);
-    add(head, new THREE.TorusGeometry(H * 1.02, H * 0.05, 10, 40), gold, 0, hy + H * 0.6, -H * 0.03).rotation.x = Math.PI / 2;
-    add(head, new THREE.CylinderGeometry(H * 0.8, H * 0.8, H * 0.05, 32, 1, false, -Math.PI / 2, Math.PI), dark, 0, hy + H * 0.56, H * 0.38).rotation.x = 0.12;
-    add(head, new THREE.OctahedronGeometry(H * 0.13, 0), M.glow(0xfbbf24, 1.6), 0, hy + H * 0.84, H * 1.06, nc);
-  }
+  if (spec.ex?.includes("mustache")) for (const s of [-1, 1]) lock(s * 0.13, -0.37, surf(0.13, -0.37) / H + 0.03, [0.2, 0.085, 0.09], s * -0.32);
 
-  const rig: Rig = { body, hips, knees, shoulders, elbows, head, mouth, eyes, torso, prop, H, L, blink: rnd() * 3, ph: rnd() * 6, r: 0, raise: false, talking: false, look: null, seat: null, s: 0, stand: 0, walk: null };
-  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true; });
-  if (role === "captain") g.scale.setScalar(1.06);
+  const rig: Rig = {
+    body, hips, knees, shoulders, elbows, head, torso, prop, face, H, L, Ht, A, R, blink: 1 + rnd() * 3, ph: rnd() * 6,
+    r: 0, raise: false, cheer: 0, v: 0, va: 0, ge: 0, talking: false, mime: false, look: null, mood: "neutral", seat: null, s: 0, stand: 0, walk: null,
+  };
   return { group: g, rig, spec };
 }
 
-/** Sits a character down: hips on the seat, thighs forward, shins down, forearms on the desk. */
-export function seat(c: Character, x: number, seatHeight: number, z: number) {
-  c.rig.seat = { y: seatHeight - c.rig.L, z };
-  c.group.position.set(x, c.rig.seat.y, z);
+/**
+ * Sits a character down on a seat whose top is `seatHeight`, at (x, z). Pass the chair (so it can be
+ * pushed back when the character stands), the height of the desk in front and how far ahead its near
+ * edge is (the hands rest on that edge).
+ */
+export function seat(c: Character, x: number, seatHeight: number, z: number, o: { chair?: THREE.Object3D; desk?: number; edge?: number } = {}) {
+  const u = c.rig, hip = seatHeight + u.R * (c.spec.role && c.spec.role !== "kid" ? LIMB.adult[0] : LIMB.kid[0]) + 0.004; // the thigh rests on the seat, not in it
+  u.seat = { x, hip, z, chair: o.chair ?? null, chairZ: o.chair?.position.z ?? 0, desk: o.desk ?? seatHeight + 0.26, edge: o.edge ?? 0.225 };
+  u.s = u.stand = 0;
+  c.group.position.set(x, hip - u.L, z);
 }
 
 export const headPosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 0.95, 0));
 /** The eye point, for first-person shots. */
-export const eyePosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 1.02, c.rig.H * 0.92));
+export const eyePosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 0.9, c.rig.H * 0.9));
 export const face = (g: THREE.Object3D, t: THREE.Vector3) => (g.rotation.y = Math.atan2(t.x - g.position.x, t.z - g.position.z));
+/** Put a face on. With `snap` it is there at once; otherwise the next frames ease into it. */
+export function setExpression(c: Character, e: Expression, snap = false) {
+  c.rig.mood = e;
+  if (snap) { c.rig.face.now = { ...POSES[e] }; c.rig.cheer = e === "cheer" ? 1 : 0; }
+}
 
-/** Per-frame life: breathing, blinking, a voice-driven mouth, looking, raising a hand, sitting, standing, walking. */
-export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, voice = 0) {
-  const u = c.rig, g = c.group, k = (rate: number) => Math.min(1, dt * rate);
-  u.torso.scale.set(1, 1 + Math.sin(T * 2.2 + u.ph) * 0.012, 1);
-  u.blink -= dt;
-  let ey = 1;
-  if (u.blink < 0) { ey = 0.1; if (u.blink < -0.12) u.blink = 2 + rnd() * 3; }
-  u.eyes.forEach((e) => (e.scale.y = ey));
-  const open = u.talking ? (voice > 0.02 ? 0.18 + voice * 1.05 : 0.25 + Math.abs(Math.sin(T * 11 + u.ph)) * 0.6) : 0.18;
-  u.mouth.scale.y += (open - u.mouth.scale.y) * k(18);
+/** How long the sit-to-stand move takes, in seconds. */
+export const STAND_TIME = 1.25;
+const smooth = (k: number) => { k = clamp(k); return k * k * (3 - 2 * k); };
 
-  let yaw = 0, pitch = 0;
+/**
+ * The sit-to-stand move as an animator would block it, in the character's own side view (z forward
+ * toward the desk, y up; the hand is measured from the hip), as a function of its progress s:
+ * anticipation (the hands leave the desk edge, the body leans in, the chair starts back), the push
+ * up through planted feet with a small overshoot, and the settle. Legs and arms are placed by IK
+ * from these curves, so feet come down, plant and stay planted, and nothing passes through the
+ * chair or the desk.
+ */
+export function standPose(s: number, d: { L: number; Ht: number; A: number }, st: { hip: number; desk: number; edge: number }) {
+  const a = d.L / 2, shY = d.Ht * 0.88, arm = d.A * 0.98;
+  const K = (keys: [number, number][]) => keyframes(keys)(s);
+  const lean = K([[0, 0], [0.08, 0], [0.32, 0.34], [0.46, 0.3], [0.82, -0.03], [1, 0]]);
+  const hip = K([[0, st.hip], [0.2, st.hip], [0.74, d.L + 0.008], [1, d.L]]);
+  const fwd = K([[0, 0], [0.3, 0.02], [0.62, 0.07], [1, 0.05]]);
+  // the hand: off the desk edge and back first, then down to hang under the shoulder
+  const kk = K([[0, 0], [0.02, 0], [0.36, 1], [1, 1]]);
+  const restZ = st.edge + 0.03 - fwd, restY = st.desk + 0.076 - hip;
+  const hangZ = Math.sin(lean) * shY + 0.02, hangY = Math.cos(lean) * shY - arm * 0.985;
+  return {
+    /** Torso pitch, radians forward. */
+    lean,
+    /** Hip height above the floor, and how far the hips have moved toward the desk. */
+    hip, fwd,
+    /** How far the chair has been pushed back. */
+    chair: K([[0, 0], [0.14, 0], [0.56, 0.3], [1, 0.3]]),
+    /** The sole of the foot: forward of the seated hip, and above the floor. */
+    footZ: K([[0, a], [0.22, a], [0.56, 0.05], [1, 0.05]]),
+    footY: K([[0, st.hip - a], [0.22, st.hip - a], [0.52, 0], [1, 0]]),
+    /** The wrist, forward of and above the hip. */
+    handZ: restZ + (hangZ - restZ) * smooth(kk),
+    handY: restY + (hangY - restY) * smooth((kk - 0.1) / 0.9) + 0.04 * Math.sin(Math.PI * clamp(kk / 0.5)),
+    /** The arms swing out a little as the body comes up, which also carries the hands wide of the seat. */
+    splay: 0.22 * Math.sin(Math.PI * clamp(s / 0.75)),
+    /** 1 while the hands are on the desk, 0 once the arms hang. */
+    sit: 1 - kk,
+  };
+}
+
+/** Two-bone IK in the side view: the angle of the first bone from straight down (forward positive) and the bend of the joint. */
+export function ik(a: number, b: number, dz: number, dy: number, bendForward: boolean) {
+  const d = clamp(Math.hypot(dz, dy), Math.abs(a - b) + 1e-4, a + b - 1e-4);
+  const toEnd = Math.atan2(dz, -dy), off = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1));
+  return { first: toEnd + (bendForward ? off : -off), bend: Math.PI - Math.acos(clamp((a * a + b * b - d * d) / (2 * a * b), -1, 1)) };
+}
+
+/** Per-frame life: breathing, blinking, a face that acts, a voice-driven mouth, looking, raising a hand, sitting, standing, walking. */
+export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, level = 0) {
+  const u = c.rig, g = c.group, f = u.face, k = (rate: number) => Math.min(1, dt * rate);
+  // the raw loudness of a voice jumps from frame to frame: the mouth follows a quick envelope of it
+  // and the hands a slow one, so neither ever jitters
+  u.v += (level - u.v) * k(level > u.v ? 22 : 10);
+  u.va += (level - u.va) * k(3.5);
+  const voice = u.v;
+  u.torso.scale.set(1, 1 + Math.sin(T * 2.2 + u.ph) * 0.01, 1);
+
+  // sitting ↔ standing: a timed move, not a blend, so it has anticipation and a settle
+  const st = u.seat, up = u.A * 0.48, fore = u.A * 0.5, shY = u.Ht * 0.88;
+  let lean = 0, sit = 0, splay = 0, hz = 0.02, hy = shY - (up + fore) * 0.985;
+  if (st) {
+    u.s = clamp(u.s + Math.sign(u.stand - u.s) * Math.min(Math.abs(u.stand - u.s), dt / STAND_TIME));
+    const p = standPose(u.s, u, st), fx = Math.sin(g.rotation.y), fz = Math.cos(g.rotation.y);
+    lean = p.lean; sit = p.sit; splay = p.splay; hz = p.handZ; hy = p.handY;
+    g.position.set(st.x + fx * p.fwd, p.hip - u.L, st.z + fz * p.fwd);
+    if (st.chair) st.chair.position.z = st.chairZ - fz * p.chair;
+    if (!u.walk) {
+      const leg = ik(u.L / 2, u.L / 2, p.footZ - p.fwd, p.footY - p.hip, true);
+      u.hips.forEach((h) => (h.rotation.x = -leg.first));
+      u.knees.forEach((n) => (n.rotation.x = leg.bend));
+    }
+  } else if (!u.walk) {
+    u.hips.forEach((h) => (h.rotation.x = 0));
+    u.knees.forEach((n) => (n.rotation.x = 0));
+  }
+  u.torso.rotation.x = lean;
+
+  // the head turns to its target as far as a neck goes; the eyes finish the look
+  let yaw = 0, pitch = 0, gx = 0, gy = 0;
   if (u.look) {
-    const w = headPosition(c), d = Math.atan2(u.look.x - w.x, u.look.z - w.z) - g.rotation.y;
-    yaw = clamp(Math.atan2(Math.sin(d), Math.cos(d)), -1.1, 1.1);
-    pitch = clamp(Math.atan2(w.y - u.look.y, Math.hypot(u.look.x - w.x, u.look.z - w.z)), -0.4, 0.4);
+    const w = headPosition(c), d = Math.atan2(u.look.x - w.x, u.look.z - w.z) - g.rotation.y, want = Math.atan2(Math.sin(d), Math.cos(d));
+    yaw = clamp(want, -1.15, 1.15);
+    pitch = clamp(Math.atan2(w.y - u.look.y, Math.hypot(u.look.x - w.x, u.look.z - w.z)), -0.45, 0.45);
+    gx = clamp((want - yaw) * 1.4 + (yaw - u.head.rotation.y) * 0.8, -1, 1);
+    gy = clamp(-pitch * 0.8, -0.6, 0.6);
   }
   u.head.rotation.y += (yaw - u.head.rotation.y) * k(5);
-  u.head.rotation.x += (pitch * 0.6 + (u.talking ? Math.sin(T * 5.5) * 0.04 : 0) - u.head.rotation.x) * k(5);
-  u.head.rotation.z = Math.sin(T * 1.3 + u.ph) * 0.035;
+  u.head.rotation.x += (pitch * 0.6 - lean * 0.85 + (u.talking ? Math.sin(T * 5.5) * 0.035 : 0) - u.head.rotation.x) * k(8);
+  u.head.rotation.z = Math.sin(T * 1.3 + u.ph) * 0.03 + (u.mood === "thinking" ? 0.12 : 0);
 
-  // sitting ↔ standing
-  if (u.seat) {
-    u.s += (u.stand - u.s) * k(4);
-    g.position.y = u.seat.y * (1 - u.s);
-    g.position.z = u.seat.z + 0.22 * u.s;
-  }
-  const sit = u.seat ? 1 - u.s : 0;
-  if (!u.walk) {
-    u.hips.forEach((h) => (h.rotation.x = -Math.PI / 2 * sit));
-    u.knees.forEach((n) => (n.rotation.x = Math.PI / 2 * sit));
-  }
-  // arms: rest, forearms on the desk when seated, the right arm up when raising a hand
+  // the face eases toward its expression; talking opens the mouth on top of it
+  const to = POSES[u.mood], n = f.now, e = k(9);
+  for (const key of Object.keys(n) as (keyof Pose)[]) n[key] += (to[key] - n[key]) * e;
+  u.blink -= dt;
+  const blinking = u.blink < 0;
+  if (u.blink < -0.11) u.blink = 2.2 + rnd() * 3.4;
+  const closed = n.arc > 0.5;
+  f.eyes.forEach((eg, i) => {
+    eg.visible = !closed;
+    eg.scale.y = blinking ? 0.08 : n.eye;
+    const wide = Math.max(0, n.eye - 1) * 2.2; // surprise: the white shows all round a smaller iris
+    f.pupils[i].scale.set(0.95 * (1 - wide * 0.5), 1.1 * (1 - wide * 0.5), 0.22);
+    f.arcs[i].visible = closed;
+    f.pupils[i].position.x = clamp(gx + n.gx, -1, 1) * f.er * 0.26;
+    f.pupils[i].position.y = clamp(gy + n.gy, -1, 1) * f.er * 0.24;
+  });
+  f.brows.forEach((b, i) => {
+    const side = i === 0 ? -1 : 1, lift = i === 0 ? n.browL : n.browR;
+    b.position.y = f.browY + lift * f.er * 0.42 - (blinking ? f.er * 0.06 : 0);
+    b.rotation.z = Math.PI / 2 - side * ((n.tilt + f.set) * 0.42 + 0.06);
+  });
+  // a voice opens the mouth as loud as it is, and lets it close in the pauses
+  const speak = u.talking ? (u.mime ? 0.16 + Math.abs(Math.sin(T * 11 + u.ph)) * 0.45 : 0.09 + voice * 0.95) : 0;
+  const open = Math.max(n.open, speak), showOpen = open > 0.07, grinning = showOpen && n.smile > 0.5 && n.open > 0.07;
+  f.open.visible = showOpen && !grinning;
+  f.grin.visible = grinning;
+  f.line.visible = !showOpen;
+  f.open.scale.set(n.wide * 0.9, 0.2 + open * 0.95, 0.4);
+  f.open.position.y = f.mouthY - open * u.H * 0.07;
+  f.grin.scale.set(n.wide * 0.9, 0.35 + open * 0.75, 0.45);
+  f.grin.position.y = f.mouthY + u.H * 0.06;
+  f.line.scale.set(n.wide, Math.abs(n.smile) < 0.06 ? 0.06 : n.smile, 1);
+  f.line.position.y = f.mouthY + f.r * n.smile;
+
+  // arms: hands on the desk edge when seated, hanging when standing, the right arm up when raising a hand
   u.r += ((u.raise ? 1 : 0) - u.r) * k(7);
+  u.cheer += ((u.mood === "cheer" ? 1 : 0) - u.cheer) * k(6);
   // standing speakers talk with their hands: forearms lift and sway with the voice
-  const gest = u.talking && sit < 0.5 && !u.walk ? 1 : 0;
+  u.ge += ((u.talking && sit < 0.5 && !u.walk ? 1 : 0) - u.ge) * k(4);
+  const gest = u.ge;
+  // into the torso's own frame (it leans), then solve the arm
+  const ty = hy * Math.cos(lean) + hz * Math.sin(lean), tz = -hy * Math.sin(lean) + hz * Math.cos(lean);
+  const arm = ik(up, fore, tz, ty - shY, false);
   u.shoulders.forEach((sh, i) => {
-    const side = i === 0 ? -1 : 1, up = side === 1 ? u.r : 0;
-    const g1 = gest * (0.35 + 0.18 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + voice * 0.4);
-    sh.rotation.x = -0.55 * sit * (1 - up) - g1 * 0.35 * (1 - up);
-    sh.rotation.z = side * (0.14 + (Math.PI * 0.86 - 0.14) * up) + (up ? Math.sin(T * 9) * 0.05 : 0);
-    u.elbows[i].rotation.x = (-1.05 * sit - 0.28 * (1 - sit) - g1) * (1 - up) - 0.25 * up;
+    const side = i === 0 ? -1 : 1, lift = Math.max(side === 1 ? u.r : 0, u.cheer);
+    const g1 = gest * (0.3 + 0.16 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + u.va * 0.4);
+    const top = u.cheer > 0.02 ? Math.PI * 0.8 : Math.PI * 0.9;
+    sh.rotation.x = (-arm.first - g1 * 0.35) * (1 - lift);
+    sh.rotation.z = side * (0.14 + splay + (top - 0.14 - splay) * lift) + (lift ? Math.sin(T * 9 + i) * 0.05 * lift : 0);
+    u.elbows[i].rotation.x = (-arm.bend - g1) * (1 - lift) - 0.22 * lift;
   });
 
   if (u.walk) {
-    const w = u.walk, kk = clamp((T - w.t0) / w.d), seg = kk * (w.pts.length - 1), i = Math.min(w.pts.length - 2, Math.floor(seg));
+    const w = u.walk, kk = clamp((T - w.t0) / w.d), seg = smooth(kk) * (w.pts.length - 1), i = Math.min(w.pts.length - 2, Math.floor(seg));
     g.position.lerpVectors(w.pts[i], w.pts[i + 1], seg - i);
-    if (kk < 1) {
-      const sw = Math.sin(T * 8);
-      g.position.y = Math.abs(sw) * 0.04;
-      face(g, w.pts[i + 1]);
-      u.hips[0].rotation.x = sw * 0.45; u.hips[1].rotation.x = -sw * 0.45;
-      u.knees[0].rotation.x = Math.max(0, -sw) * 0.6; u.knees[1].rotation.x = Math.max(0, sw) * 0.6;
-      u.shoulders[0].rotation.x = -sw * 0.35; u.shoulders[1].rotation.x = sw * 0.35;
-    } else {
-      if (w.face) face(g, w.face);
-      u.hips.forEach((h) => (h.rotation.x = 0)); u.knees.forEach((n) => (n.rotation.x = 0));
-      u.walk = null;
-    }
+    // strides match the ground covered: the gait slows as the walk eases in and out, and stops with the body
+    const pace = Math.sin(Math.PI * clamp(kk)), sw = Math.sin(T * 7.2 + u.ph) * pace;
+    g.position.y = Math.abs(sw) * 0.025;
+    // the body turns along the path, and over the last steps turns to face where it will stand
+    const along = Math.atan2(w.pts[i + 1].x - g.position.x, w.pts[i + 1].z - g.position.z);
+    const end = w.face ? Math.atan2(w.face.x - w.pts[w.pts.length - 1].x, w.face.z - w.pts[w.pts.length - 1].z) : along;
+    const want = kk > 0.999 ? end : along + Math.atan2(Math.sin(end - along), Math.cos(end - along)) * smooth((kk - 0.6) / 0.4);
+    g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * k(9);
+    u.hips[0].rotation.x = sw * 0.42; u.hips[1].rotation.x = -sw * 0.42;
+    u.knees[0].rotation.x = Math.max(0, -sw) * 0.6; u.knees[1].rotation.x = Math.max(0, sw) * 0.6;
+    u.shoulders[0].rotation.x -= sw * 0.32; u.shoulders[1].rotation.x += sw * 0.32; // the swing rides on the hanging pose
+    if (kk >= 1 && Math.abs(Math.atan2(Math.sin(end - g.rotation.y), Math.cos(end - g.rotation.y))) < 0.01) { g.rotation.y = end; u.walk = null; }
   }
 }
 
 /**
- * Nova, the co-pilot: a hovering clay drone with a face screen that brightens as she speaks.
- * `glow: false` (battle): her screen and ring stay under the bloom threshold, so no halo.
+ * Nova, the co-pilot: a small matte drone with a dark visor and two soft eyes, circled by a hairline
+ * ring that carries one gold bead. She does not glow: her eyes are lit just enough to read in the
+ * dark, and they pulse a little as she speaks, far under the bloom threshold. The `glow` option is
+ * kept so earlier callers compile; it does nothing.
  */
-export function makeNova(M: Materials, { glow = true } = {}) {
-  const k = glow ? 1 : 0.32;
+export function makeNova(M: Materials, opts: { glow?: boolean } = {}) {
+  void opts;
   const g = new THREE.Group(), nc = { cast: false };
-  add(g, new THREE.SphereGeometry(0.32, 48, 32), M.clay(PALETTE.clay, { roughness: 0.4 }));
-  add(g, new THREE.SphereGeometry(0.245, 40, 24), M.clay(PALETTE.ink2, { roughness: 0.2 }), 0, 0.02, 0.16, nc).scale.set(1, 0.76, 0.56);
-  const screen = new THREE.MeshStandardMaterial({ color: PALETTE.cyan, emissive: PALETTE.cyan, emissiveIntensity: 2.6 * k });
-  for (const s of [-1, 1]) add(g, new THREE.CapsuleGeometry(0.028, 0.045, 6, 12), screen, s * 0.085, 0.06, 0.3, nc);
-  const smile = add(g, new THREE.TorusGeometry(0.06, 0.014, 8, 20, Math.PI), screen, 0, -0.04, 0.3, nc);
-  smile.rotation.z = Math.PI;
-  const ringMat = new THREE.MeshStandardMaterial({ color: PALETTE.invader, emissive: PALETTE.invader, emissiveIntensity: 2.4 * k });
-  const ring = add(g, new THREE.TorusGeometry(0.46, 0.018, 10, 96), ringMat, 0, 0, 0, nc);
-  ring.rotation.x = Math.PI / 2.3;
-  add(g, new THREE.CylinderGeometry(0.012, 0.012, 0.2, 8), M.clay(PALETTE.dark), 0, 0.38, 0);
-  add(g, new THREE.SphereGeometry(0.045, 16, 12), ringMat, 0, 0.5, 0, nc);
+  const shell = M.clay(hex(COLOR.approach), { roughness: 0.85 }), sky = M.clay(hex(COLOR.sky), { roughness: 0.8 }), visorMat = M.clay(mix(COLOR.void, COLOR.shadow, 0.5), { roughness: 0.55 });
+  const body = add(g, new THREE.SphereGeometry(0.32, 40, 28), shell);
+  body.scale.set(1, 0.94, 1);
+  outline(body, M); // the ink line every small hero carries
+  // a seam and a soft blue underside, so she reads as built, not as a ball
+  add(g, new THREE.TorusGeometry(0.317, 0.006, 6, 64), M.clay(mix(COLOR.approach, COLOR.horizon, 0.45), { roughness: 0.8 }), 0, -0.07, 0, nc).rotation.x = Math.PI / 2;
+  add(g, new THREE.SphereGeometry(0.3, 32, 12, 0, Math.PI * 2, Math.PI * 0.72, Math.PI * 0.28), sky, 0, -0.012, 0, nc);
+  // the visor: a dark window set into the front
+  const visor = add(g, new THREE.SphereGeometry(0.25, 36, 22), visorMat, 0, 0.03, 0.13, nc);
+  visor.scale.set(1.08, 0.68, 0.86);
+  // eyes: soft upright lozenges, self-lit below any bloom threshold
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hex(COLOR.sky), emissiveIntensity: 0.85, roughness: 1 });
+  const eyes: THREE.Mesh[] = [], arcs: THREE.Mesh[] = [];
   for (const s of [-1, 1]) {
-    add(g, new THREE.SphereGeometry(0.075, 20, 14), M.clay(PALETTE.invader, { roughness: 0.4 }), s * 0.31, 0.02, 0);
-    add(g, new THREE.TorusGeometry(0.075, 0.012, 8, 24), M.clay(0xf3eee6), s * 0.3, 0.02, 0).rotation.y = Math.PI / 2;
+    const e = add(g, new THREE.CapsuleGeometry(0.03, 0.05, 6, 14), eyeMat, s * 0.09, 0.045, 0.332, nc);
+    e.rotation.y = s * 0.3;
+    const arc = add(g, new THREE.TorusGeometry(0.036, 0.011, 8, 16, Math.PI * 0.86), eyeMat, s * 0.09, 0.022, 0.334, nc);
+    arc.rotation.set(0, s * 0.3, Math.PI * 0.07);
+    arc.visible = false;
+    eyes.push(e); arcs.push(arc);
   }
+  // ear pods and the ring with its bead: the game's own mark, in orbit around her
+  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(0.07, 18, 12), sky, s * 0.31, 0.0, 0).scale.set(0.55, 1, 1);
+  const orbit = new THREE.Group();
+  orbit.rotation.set(Math.PI / 2.35, 0, 0.18);
+  g.add(orbit);
+  add(orbit, new THREE.TorusGeometry(0.47, 0.007, 6, 96), sky, 0, 0, 0, nc);
+  add(orbit, new THREE.SphereGeometry(0.034, 14, 10), M.clay(hex(COLOR.gold), { roughness: 0.6 }), 0.47, 0, 0, nc);
+
+  let mood: Expression = "neutral", blink = 2, lid = 1, happy = 0, tilt = 0, look = 0;
   return {
     group: g,
+    /** The face she is making; the film and the review page set it. */
+    express(e: Expression) { mood = e; },
     animate(T: number, dt: number, baseY: number, voice = 0) {
-      g.position.y = baseY + Math.sin(T * 2) * 0.08;
-      ring.rotation.z += dt * (1.5 + voice * 4);
-      g.rotation.y = Math.sin(T * 0.7) * 0.4;
-      screen.emissiveIntensity = (2.2 + voice * 3.5) * k;
-      smile.scale.y = 1 + voice * 1.6;
+      const k = Math.min(1, dt * 9);
+      g.position.y = baseY + Math.sin(T * 2) * 0.08 + (mood === "cheer" ? Math.abs(Math.sin(T * 6)) * 0.07 : 0);
+      orbit.rotation.z += dt * (0.9 + voice * 2.2);
+      g.rotation.y = Math.sin(T * 0.7) * 0.35;
+      tilt += ((mood === "thinking" ? 0.22 : mood === "oops" ? -0.14 : 0) - tilt) * k;
+      g.rotation.z = tilt + Math.sin(T * 1.1) * 0.03;
+      blink -= dt;
+      const blinking = blink < 0;
+      if (blink < -0.1) blink = 2.4 + ((T * 7.3) % 3);
+      happy += ((mood === "happy" || mood === "cheer" ? 1 : 0) - happy) * k;
+      lid += ((blinking ? 0.1 : mood === "oops" ? 0.55 : mood === "thinking" ? 0.8 : 1) - lid) * Math.min(1, dt * 24);
+      look += ((mood === "thinking" ? 1 : 0) - look) * k;
+      const arcsOn = happy > 0.5;
+      eyes.forEach((e, i) => {
+        const s = i === 0 ? -1 : 1;
+        e.visible = !arcsOn; arcs[i].visible = arcsOn;
+        e.scale.set(mood === "oops" ? 1.25 : 1, lid * (mood === "thinking" && s === 1 ? 0.7 : 1), 1);
+        e.position.set(s * 0.09 + look * 0.03, 0.045 + look * 0.03, 0.332);
+      });
+      // the only light she makes: a small pulse in her eyes as she speaks
+      eyeMat.emissiveIntensity = 0.85 + Math.min(1, voice) * 0.25;
     },
   };
 }
+export type Nova = ReturnType<typeof makeNova>;
