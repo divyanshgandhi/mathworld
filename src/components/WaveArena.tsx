@@ -48,7 +48,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       // no cadet on this device: the Title signs them up (dev drills sign up right here)
       if (!j.player && !isDev) return router.replace("/");
       // the film comes first, as on every hub screen
-      if (j.player && !j.introCompleted && !isDev) return router.replace("/intro");
+      if (j.player && !j.introCompleted && !isDev) return location.replace("/intro");
       const events = j.player ? await history() : [];
       // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere):
       // decided before anything mounts, with a visible way back in case the redirect stalls
