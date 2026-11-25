@@ -186,9 +186,10 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
     if (confirming) {
       return (
         <div className="flex flex-col gap-3" role="group" aria-labelledby="hangar-ask">
+          {/* both answers wait out ARM_MS: the second tap of a double tap on Buy is neither a yes nor a no */}
           <p id="hangar-ask" className="type-child text-approach">Buy {confirming.item.name} for {confirming.cost} orbs?</p>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="secondary" size="md" autoFocus onKeyDown={noRepeat} onClick={() => setPhase({ kind: "idle" })} className="w-full">Not now</Button>
+            <Button variant="secondary" size="md" autoFocus onKeyDown={noRepeat} onClick={(e) => { if (e.timeStamp >= confirming.armedAt) setPhase({ kind: "idle" }); }} className="w-full">Not now</Button>
             <Button variant="primary" size="md" glyph={false} onKeyDown={noRepeat} onClick={(e) => { if (e.timeStamp >= confirming.armedAt) void save(confirming.item, confirming.cost); }} className="w-full">Buy</Button>
           </div>
         </div>

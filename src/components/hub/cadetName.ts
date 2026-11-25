@@ -17,7 +17,7 @@ export const NAME_WORDS: Record<Exclude<NameProblem, null>, string> = {
   symbols: "Use letters, numbers and spaces only.",
 };
 /** Shown (not as an error) when a paste or a long name was cut to fit. */
-export const NAME_CUT = `Names can be up to ${NAME_MAX} letters, so we kept the first ${NAME_MAX}.`;
+export const NAME_CUT = `Names can be up to ${NAME_MAX} letters or numbers, so we kept the first ${NAME_MAX}.`;
 
 /**
  * What the field should hold after a change: anything over the limit is cut (so a 40-character paste

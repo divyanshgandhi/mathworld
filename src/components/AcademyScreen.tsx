@@ -145,7 +145,8 @@ function TrickRow({ f, seen, future, next, lit, onWatch }: { f: Film; seen: bool
       <span className="flex items-center gap-4 sm:flex-col sm:gap-1.5">
         <TrickPicture trick={f.trick} a={f.a} b={f.b} width={176} height={84} className="hidden sm:block" />
         <TrickPicture trick={f.trick} a={f.a} b={f.b} width={150} height={64} className="sm:hidden" />
-        <span className="type-number text-[17px] text-ink-2" aria-hidden>{f.a} × {f.b}</span>
+        {/* Empty & Mirror draws two pictures for a fleet with a 0 in it (empty, then its 1 × twin): the caption names both */}
+        <span className="type-number text-[17px] text-ink-2" aria-hidden>{f.a} × {f.b}{f.trick === "empty-mirror" && (f.a === 0 || f.b === 0) ? <> and {f.a === 0 ? 1 : f.a} × {f.b === 0 ? 1 : f.b}</> : null}</span>
       </span>
       <span className="flex min-w-0 flex-col gap-1">
         <span className="type-name text-[21px] leading-tight text-approach">{f.card}</span>
