@@ -39,6 +39,17 @@ function weakest(s: PlayerState, tier: number, seed: number, exclude: Set<string
   });
 }
 
+/**
+ * Earth's skip list: the planner's memory, and (zero is its own new idea) every empty fleet until two
+ * Earth fleets have been cleared, so "squads" and "zero" never arrive together.
+ */
+function earthSkip(s: PlayerState, avoid: Set<string>): Set<string> {
+  const skip = new Set(avoid);
+  const solved = s.history.filter((w) => w.tier === 0 && isSolved(w.outcome)).length;
+  if (solved < 2) for (const f of factsOf(0)) if (f.a === 0 || f.b === 0) skip.add(factKey(f.a, f.b));
+  return skip;
+}
+
 /** An easier fact that sets up the trick for a × b (Wave 1 of a problem string). */
 export function anchorOf(a: number, b: number): Fact | null {
   const lo = Math.min(a, b), hi = Math.max(a, b), other = (x: number) => (a === x ? b : a);
@@ -57,18 +68,40 @@ export function anchorOf(a: number, b: number): Fact | null {
 }
 
 /** Another problem from the same tier that the same trick solves (Wave 3, transfer checks). */
-function sister(trick: TrickId, tier: number, exclude: string, rng: Rng, ramp = 0): Fact | null {
+function sister(trick: TrickId, tier: number, exclude: string, rng: Rng, ramp = 0, avoid: Set<string> = new Set()): Fact | null {
+  const ok = (f: Fact) => selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude && !avoid.has(factKey(f.a, f.b));
   if (ENUMERABLE_TIERS.includes(tier)) {
-    const list = factsOf(tier).filter((f) => selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude);
+    const list = factsOf(tier).filter(ok);
     return list.length ? orient(list[Math.floor(rng() * list.length)], rng, tier) : null;
   }
-  for (let i = 0; i < 300; i++) { const f = drawFrom(tier, rng, ramp); if (selectTrick(f.a, f.b) === trick && factKey(f.a, f.b) !== exclude) return f; }
+  for (let i = 0; i < 300; i++) { const f = drawFrom(tier, rng, ramp); if (ok(f)) return f; }
   return null;
 }
 
+/**
+ * The planner's memory for this mission: facts it must not serve next. A fact cleared first try does
+ * not return in the same mission; a missed fact may return once, later, never straight after (so the
+ * last wave's fact is always out, and a missed fact that has already come back is out too).
+ */
+export function spent(s: PlayerState): Set<string> {
+  const out = new Set<string>(), seen = new Map<string, number>();
+  const mine = s.history.filter((w) => w.tier === s.tier && w.mission === s.mission.n);
+  for (const w of mine) {
+    const n = (seen.get(w.key) ?? 0) + 1;
+    seen.set(w.key, n);
+    if (isSolved(w.outcome) || n >= 2) out.add(w.key);
+  }
+  const last = s.history.at(-1);
+  if (last) out.add(last.key);
+  return out;
+}
+
+/** Facts a bonus or warm-up wave may use: the planet's own, or one the cadet has already played. */
+const known = (s: PlayerState, f: Fact) => { const t = tierOf(f.a, f.b); return t !== null && (t === s.tier || s.history.some((w) => w.key === factKey(f.a, f.b)) || !!s.facts[factKey(f.a, f.b)]); };
+
 function boss(s: PlayerState, tier: number, rng: Rng): Fact {
   if (!ENUMERABLE_TIERS.includes(tier)) return drawFrom(tier, rng, s.mission.n + 1);
-  const recent = new Set(s.history.slice(-3).map((w) => w.key));
+  const recent = new Set([...s.history.slice(-3).map((w) => w.key), ...spent(s)]);
   const fresh = factsOf(tier).filter((f) => !recent.has(factKey(f.a, f.b)));
   const notGold = (fresh.length ? fresh : factsOf(tier)).filter((f) => (s.facts[factKey(f.a, f.b)]?.m ?? M0) < 0.82);
   const pool = (notGold.length ? notGold : factsOf(tier)).slice().sort((x, y) => y.a * y.b - x.a * x.b).slice(0, 3);
@@ -95,14 +128,22 @@ export function nextWave(s: PlayerState, seed: number): Wave {
     ...f, tier, planetId: PLANETS_BY_TIER[tier], role, trick: selectTrick(f.a, f.b), isTransferCheck, sectorLock: Math.min(f.a, f.b) >= 10,
   });
 
+  const avoid = spent(s);
   if (s.offers.cushion) {
-    const last = s.lastStruggle;
-    return make((last && anchorOf(last.a, last.b)) ?? (ENUMERABLE_TIERS.includes(tier) ? weakest(s, Math.max(0, tier - 1), seed) : { a: 2, b: 5 }), "recharge");
+    // a bonus wave stays inside what the cadet has met: an anchor for the last struggle, else the weakest
+    // fact of the planet before (if the cadet played there) or of this one, never a fact just played
+    const last = s.lastStruggle, anchor = last && anchorOf(last.a, last.b);
+    if (anchor && known(s, anchor)) return make(anchor, "recharge");
+    const back = Math.max(0, tier - 1), met = back === tier || s.history.some((w) => w.factTier === back);
+    const from = met ? back : tier;
+    if (ENUMERABLE_TIERS.includes(from)) return make(weakest(s, from, seed, from === 0 ? earthSkip(s, avoid) : avoid), "recharge");
+    return make({ a: 2, b: 5 }, "recharge");
   }
 
   const due = s.transferQueue.find((q) => q.due <= s.waves);
   if (due) {
-    const f = sister(due.trick, tier, due.key, rng, s.mission.n) ?? sister(due.trick, due.tier, due.key, rng);
+    const f = sister(due.trick, tier, due.key, rng, s.mission.n, tier === 0 ? earthSkip(s, avoid) : avoid)
+      ?? sister(due.trick, due.tier, due.key, rng, 0, avoid); // due.tier is the planet of the fact just shown: met
     if (f) return make(f, "transfer", true);
   }
 
@@ -118,10 +159,7 @@ export function nextWave(s: PlayerState, seed: number): Wave {
   if (tier === 0) {
     // zero is its own new idea: an empty fleet comes only once two Earth fleets have been cleared (until
     // then every fleet is a × 1 or 1 × b, something to count), so "squads" and "zero" never arrive together
-    const solved = s.history.filter((w) => w.tier === 0 && isSolved(w.outcome)).length;
-    const skip = new Set(s.history.slice(-1).map((w) => w.key));
-    if (solved < 2) for (const f of factsOf(0)) if (f.a === 0 || f.b === 0) skip.add(factKey(f.a, f.b));
-    return make(orient(weakest(s, 0, mix(seed, s.waves), skip), rng, 0), "tutorial");
+    return make(orient(weakest(s, 0, mix(seed, s.waves), earthSkip(s, avoid)), rng, 0), "tutorial");
   }
 
   const goal = target(s, tier, seed);
@@ -132,9 +170,9 @@ export function nextWave(s: PlayerState, seed: number): Wave {
       return make(easy ? anchor : { a: 1, b: goal.b }, "anchor");
     }
     case 1: return make(goal, "discovery");
-    case 2: return make(sister(selectTrick(goal.a, goal.b), tier, factKey(goal.a, goal.b), rng, s.mission.n) ?? target(s, tier, seed + 7), "application");
+    case 2: return make(sister(selectTrick(goal.a, goal.b), tier, factKey(goal.a, goal.b), rng, s.mission.n, avoid) ?? target(s, tier, seed + 7), "application");
     case 3: {
-      const seen = new Set(s.history.slice(-3).map((w) => w.key));
+      const seen = new Set([...s.history.slice(-3).map((w) => w.key), ...avoid]);
       return make(ENUMERABLE_TIERS.includes(tier) ? orient(weakest(s, tier, mix(seed, s.waves), seen), rng, tier) : drawFrom(tier, rng, s.mission.n), "adaptive");
     }
     default: return make(boss(s, tier, rng), "boss");

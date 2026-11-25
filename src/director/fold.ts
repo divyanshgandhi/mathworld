@@ -38,6 +38,8 @@ export interface WaveRecord {
   a: number; b: number; key: string; factTier: number; tier: number; role: WaveRole; outcome: Outcome; transfer: boolean;
   /** The trick this fleet calls for, and whether it had been explained before this wave (telemetry: transfer). */
   trick: TrickId; afterLesson: boolean;
+  /** The mission it was played in (`mission.n` at the time; the planner's memory for repeats). */
+  mission?: number;
 }
 interface OpenWave { a: number; b: number; role: WaveRole; transfer: boolean; attempts: number; usedRadar: boolean; powerUp: boolean; explained: boolean; firstLatencyMs: number; lessons: TrickId[] }
 
@@ -193,7 +195,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
       return;
     }
     const trick = selectTrick(w.a, w.b), lessonsBefore = (s.seenTricks[trick] ?? 0) - w.lessons.filter((t) => t === trick).length;
-    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer, trick, afterLesson: lessonsBefore > 0 });
+    s.history.push({ a: w.a, b: w.b, key, factTier, tier: s.tier, role: w.role, outcome, transfer: w.transfer, trick, afterLesson: lessonsBefore > 0, mission: s.mission.n });
     s.waves++;
 
     const inTier = factTier === s.tier || w.role === "tutorial";
