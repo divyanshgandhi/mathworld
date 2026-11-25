@@ -3,7 +3,7 @@ import { add, PALETTE } from "@/engine/materials";
 import type { Stage } from "@/engine/stage";
 import { ease, type Rng } from "@/engine/util";
 import { fleetOf, unitLabel, type Fleet, type Ship } from "@/rig/fleet";
-import { makeCarrier, makeDreadnought, makeFighterLite, makeInvader, makeTenSquadPod } from "@/worlds/space/ships";
+import { makeCarrier, makeDreadnought, makeFighterLite, makeInvader, makeTenSquadPod, squadStyle } from "@/worlds/space/ships";
 import { LOOK } from "../look";
 import { holoLabel, holoWidth } from "./holo";
 
@@ -86,6 +86,10 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       formation.scale.setScalar(fv.scale);
       const slotsBefore = (parts: number[], i: number) => parts.slice(0, i).reduce((s, p) => s + p / 10 ** (String(p).length - 1), 0);
       const stagger = Math.min(0.025, 0.5 / Math.max(1, f.ships.length));
+      // squad tones alternate by squad (row) and the first ship of a squad is its leader; a squad of one ship has no leader
+      const gRowOf = (ship: (typeof f.ships)[number]) => slotsBefore(f.rowParts, f.sectors[ship.sector].rowBand) + ship.row;
+      const perSquad = new Map<number, number>();
+      for (const ship of f.ships) perSquad.set(gRowOf(ship), (perSquad.get(gRowOf(ship)) ?? 0) + 1);
       for (const ship of f.ships) {
         const sec = f.sectors[ship.sector], cw = colW[sec.colBand], rh = rowH[sec.rowBand];
         const x = colX[sec.colBand] + ship.col * (cw.w + GAP) + cw.w / 2 - W / 2, y = H / 2 - (rowY[sec.rowBand] + ship.row * (rh.h + GAP) + rh.h / 2);
@@ -95,10 +99,12 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
           gRow: slotsBefore(f.rowParts, sec.rowBand) + ship.row, gCol: slotsBefore(f.colParts, sec.colBand) + ship.col,
           alive: true, pop: 0, enter: -ship.id * stagger, wink: 0, ph: rnd() * 6, base: 1,
         };
-        if (kind === "fighter") { v.g.add(lite ? makeFighterLite(M) : makeInvader(M)); v.base = 0.78; }
-        else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient); v.g.add(p.group); v.micro = p.micro; v.podTag = p.tag; }
-        else if (kind === "carrier") { v.carrier = makeCarrier(M, sec.orient); v.g.add(v.carrier.group); }
-        else { v.dread = makeDreadnought(M, unitLabel(ship.k), sec.orient); v.g.add(v.dread.group); }
+        const style = squadStyle(v.gRow, v.gCol);
+        if ((perSquad.get(v.gRow) ?? 0) < 2) style.leader = false;
+        if (kind === "fighter") { v.g.add(lite ? makeFighterLite(M, style) : makeInvader(M, style)); v.base = 0.78; }
+        else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient, style); v.g.add(p.group); v.micro = p.micro; v.podTag = p.tag; }
+        else if (kind === "carrier") { v.carrier = makeCarrier(M, sec.orient, style); v.g.add(v.carrier.group); }
+        else { v.dread = makeDreadnought(M, unitLabel(ship.k), sec.orient, style); v.g.add(v.dread.group); }
         v.g.scale.setScalar(v.base);
         v.pos.copy(v.home).add(new THREE.Vector3(0, 5, -26));
         v.g.position.copy(v.pos);
