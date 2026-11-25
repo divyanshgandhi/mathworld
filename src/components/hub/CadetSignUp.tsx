@@ -8,6 +8,8 @@ import { Icon } from "@/components/kit/Icon";
 import { CADET, CADET_NAME, type CadetColor } from "@/design/tokens";
 import { checkName, limitName, NAME_CUT, NAME_WORDS } from "./cadetName";
 
+import { rememberCadet } from "./cadets";
+
 export interface Cadet { name: string; avatar: string }
 
 const COLOURS = Object.keys(CADET) as CadetColor[];
@@ -55,7 +57,9 @@ export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
     try {
       const res = await fetch("/api/player", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: checked.name, avatar }) });
       if (!res.ok) throw new Error(String(res.status));
-      onDone((await res.json()).player);
+      const made = (await res.json()).player;
+      if (made?.id) rememberCadet({ id: made.id, name: made.name });
+      onDone(made);
       // stay busy: the screen is about to leave, and a second Begin must not make a second cadet
     } catch {
       sending.current = false;
