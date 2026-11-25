@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { PLANET_NAMES } from "@/worlds/space/lines";
-import { ghost, glass, lime } from "./ui";
+import { Icon, RocketGlyph } from "@/components/kit/Icon";
+import { ghost, glass, lime, padKey } from "./ui";
 import { XRay } from "./XRay";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
@@ -99,42 +100,42 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       {/* the multiplication: big, centred, both axes named */}
       {w && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-14 md:px-0">
-          <div ref={plateRef} className={`${glass} px-5 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="whitespace-nowrap font-mono text-[11px] tracking-[0.14em] text-lime-200/80 md:tracking-[0.3em]">{ui.planetName.toUpperCase()} · {ui.mode === "academy" ? "TRICK FILM" : `${ui.mode === "practice" ? "PRACTICE" : "WAVE"} ${Math.min(w.index + 1, w.of)}/${w.of}`}</p>
-            <p className="mt-0.5 font-mono text-5xl font-semibold tabular-nums md:mt-1 md:text-7xl">
-              {fmt(ra)}<span className="mx-3 text-lime-300">×</span>{fmt(rb)}
+          <div ref={plateRef} className={`${glass} max-w-full px-4 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
+            <p className="type-label-sm tracking-[0.08em] text-balance text-ink-2 md:whitespace-nowrap md:tracking-[0.16em]">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
+            <p className="mt-1 type-display type-number text-5xl md:mt-2 md:text-7xl">
+              {fmt(ra)}<span className="mx-3 text-ink-3">×</span>{fmt(rb)}
             </p>
-            <p className="mt-1 text-sm text-white/75">
-              <b className="text-white">{fmt(ra)}</b> {plural(ra, "squad", "squads")} · <b className="text-white">{fmt(rb)}</b> {noun} each{w.flipped ? " · flipped" : ""}
+            <p className="mt-1.5 type-body-sm text-ink-2">
+              <b className="font-semibold text-approach">{fmt(ra)}</b> {plural(ra, "squad", "squads")} · <b className="font-semibold text-approach">{fmt(rb)}</b> {noun} each{w.flipped ? " · flipped" : ""}
             </p>
           </div>
           {/* the outcome chip sits in a row under the plate that the stage keeps clear of the fleet */}
           {/* Show Me How: the Card Name banner, with its WHY the first time */}
           {ui.lesson && !o && (
-            <div role="status" className="flex max-w-[92vw] flex-col items-center rounded-2xl bg-sky-300 px-5 py-1 text-center text-[#06202b] shadow-lg">
-              <span className="font-mono text-sm font-bold tracking-[0.12em] md:text-base">⚡ {ui.lesson.card.toUpperCase()}</span>
-              {ui.lesson.why && <span className="text-xs font-medium md:text-sm">why? {ui.lesson.why}</span>}
+            <div role="status" className="flex max-w-[92vw] flex-col items-center rounded-chip border border-sky bg-void px-5 py-1.5 text-center text-sky">
+              <span className="flex items-center gap-2 type-label"><Icon name="trick" size={18} />{ui.lesson.card}</span>
+              {ui.lesson.why && <span className="type-body-sm text-ink-2">why? {ui.lesson.why}</span>}
             </div>
           )}
           {ui.unlock && (
-            <div role="status" className="rounded-full border border-amber-300/70 bg-[#1a1406]/85 px-4 py-1 font-mono text-xs tracking-[0.14em] text-amber-200 shadow-lg">
-              TRICK CARD UNLOCKED · {ui.unlock.cards.join(" + ").toUpperCase()} · ON YOUR BELT
+            <div role="status" className="flex items-center gap-2 rounded-pill border border-gold bg-void px-4 py-1.5 type-label-sm text-gold">
+              <Icon name="trick" size={18} />Trick card unlocked · {ui.unlock.cards.join(" + ")} · on your belt
             </div>
           )}
           {o && (
-            <div role="status" className={`rounded-full px-5 py-1 font-mono font-semibold tabular-nums shadow-lg transition ${o.last ? "text-sm opacity-75" : "text-lg"} ${o.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : o.kind === "under" ? "bg-[#ff8f70] text-[#1a0d0d]" : "bg-[#ffb05c] text-[#1a120d]"}`}>
-              {o.last ? "Last shot: " : ""}{o.kind === "exact" ? `✓ Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
+            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number transition ${o.last ? "border-line-2 text-[15px] text-ink-2" : `text-lg ${o.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}`}>
+              {o.kind === "exact" && <Icon name="check" size={20} />}{o.last ? "Last shot: " : ""}{o.kind === "exact" ? `Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
             </div>
           )}
         </div>
       )}
 
-      <div className="pointer-events-none absolute right-16 top-3.5 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {ui.orbs} orbs</div>
+      <div className="pointer-events-none absolute right-16 top-3 z-10 hidden h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px] md:flex"><Icon name="orb" size={20} className="text-gold" />{ui.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
       {menu && <div className="absolute left-3 top-3 z-20">{menu}</div>}
       {dev && (
-        <div className="pointer-events-none absolute left-3 top-16 z-10 font-mono text-[11px] text-white/60">
-          <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
-          <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "—"}</p>
+        <div className="pointer-events-none absolute left-3 top-16 z-10 hidden type-body-sm type-number text-ink-3 [:root:has([data-xray][data-open])_&]:left-[356px] [:root:has([data-xray][data-open])_&]:block">
+          <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
+          <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
         </div>
       )}
 
@@ -145,8 +146,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
             <Toolbar aria-label="Tactical Belt" className="-mx-1 mb-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {ui.belt.map((t) => (
                 <ToolbarButton key={t.id} aria-label={`Power-Up ${t.card}`} aria-pressed={t.active} onClick={() => arena?.powerUp(t.id)} disabled={!ui.canFire || !!ui.lesson}
-                  className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40 ${t.active ? "bg-amber-300 text-[#1a1406]" : t.fits ? "border border-amber-300/60 bg-amber-300/10 text-amber-100 hover:bg-amber-300/25" : "border border-white/10 text-white/45"}`}>
-                  ⚡ {t.card}
+                  className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 type-name text-[15px] md:min-h-9 md:text-[14px] transition data-disabled:border-line-1 data-disabled:bg-transparent data-disabled:text-ink-3 ${t.active ? "border-gold bg-raised text-gold" : t.fits ? "border-line-3 text-approach hover:border-gold" : "border-line-1 text-ink-3 hover:border-line-2"}`}>
+                  <Icon name="trick" size={16} />{t.card}
                 </ToolbarButton>
               ))}
             </Toolbar>
@@ -156,68 +157,68 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
               <div className="grid grid-cols-2 gap-1.5">
                 {ui.sectors.map((s) => (
                   <Button key={s.i} aria-label={`Sector ${s.label}`} onClick={() => { arena?.selectSector(s.i); setEntry(""); }} disabled={s.value !== null}
-                    className={`rounded-lg px-2 py-1.5 font-mono text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-lime-300 ${s.value !== null ? "bg-amber-300/90 text-[#1a1406]" : s.active ? "bg-lime-300 text-[#0d0e1a]" : "border border-white/15 text-white/80"}`}>
+                    className={`min-h-11 rounded-chip border px-2 type-name type-number text-[15px] ${s.value !== null ? "border-gold text-gold" : s.active ? "border-approach bg-raised text-approach" : "border-line-2 text-ink-2"}`}>
                     {s.label}{s.value !== null ? ` = ${fmt(s.value)}` : ""}
                   </Button>
                 ))}
               </div>
-              {ui.lockTotal !== null && <p className="mt-1.5 text-center font-mono text-xs text-amber-200">Plasma lock: {ui.sectors.map((s) => fmt(s.value ?? 0)).join(" + ")} = {fmt(ui.lockTotal)}</p>}
+              {ui.lockTotal !== null && <p className="mt-1.5 text-center type-body-sm type-number text-gold">Plasma lock: {ui.sectors.map((s) => fmt(s.value ?? 0)).join(" + ")} = {fmt(ui.lockTotal)}</p>}
             </div>
           )}
           {ui.lesson && (
-            <div className="mb-1.5 rounded-lg bg-sky-300/15 px-3 py-1.5 text-center md:mb-2" aria-live="polite">
-              <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-sky-200">{ui.lesson.fallback ? "SAFETY NET" : "SHOW ME HOW"} · {ui.lesson.card.toUpperCase()}</p>
+            <div className="mb-1.5 rounded-chip border border-sky px-3 py-1.5 text-center md:mb-2" aria-live="polite">
+              <p className="type-label-sm text-sky">{ui.lesson.fallback ? "Safety net" : "Show Me How"} · {ui.lesson.card}</p>
               {ui.lesson.equation
-                ? <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums text-sky-50 md:text-3xl">{ui.lesson.equation}</p>
-                : <p className="mt-0.5 text-xs text-sky-100/70">Watch, or fire any time</p>}
-              {ui.lesson.prompt && <p className="mt-0.5 text-xs text-sky-100/80">We Do: load it and fire!</p>}
+                ? <p className="mt-0.5 type-number text-2xl font-medium text-approach md:text-3xl">{ui.lesson.equation}</p>
+                : <p className="mt-0.5 type-body-sm text-ink-2">Watch, or fire any time</p>}
+              {ui.lesson.prompt && <p className="mt-0.5 type-body-sm text-ink-2">We Do: load it and fire!</p>}
             </div>
           )}
-          <div className="mb-1.5 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1 md:mb-2 md:py-2">
-            <span className="text-[11px] uppercase tracking-wider text-white/50">{sectorActive ? `Sector ${sectorActive.label}` : "Plasma balls"}</span>
-            <output aria-live="polite" aria-label="Plasma balls loaded" className="font-mono text-3xl tabular-nums text-lime-200 md:text-4xl">{entry || "0"}</output>
+          <div className="mb-1.5 flex items-center justify-between gap-3 rounded-chip border border-line-1 bg-void px-4 py-1 md:mb-2 md:py-2">
+            <span className="flex items-center gap-2 type-label-sm text-ink-3"><Icon name="plasma" size={18} />{sectorActive ? `Sector ${sectorActive.label}` : "Plasma balls"}</span>
+            <output aria-live="polite" aria-label="Plasma balls loaded" className="type-number text-[32px] font-medium leading-tight text-approach md:text-[40px]">{entry || "0"}</output>
           </div>
           <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
             {KEYS.map((k) => (
               <Button key={k} aria-label={k === "⌫" ? "Delete" : k === "Fire" ? (sectorActive ? "Lock sector" : "Fire") : k} disabled={k === "Fire" && (entry === "" || (!sectorActive && !ui.canFire))}
-                className={k === "Fire" ? `${lime} py-1.5 text-lg font-semibold md:py-3` : `${ghost} bg-white/[.04] py-1.5 text-lg md:py-3`} onClick={() => press(k)}>
-                {k === "Fire" && sectorActive ? "Lock" : k}
+                className={k === "Fire" ? `${lime} min-h-11 px-2 text-[15px] md:min-h-12` : `${padKey} min-h-11 md:min-h-12`} onClick={() => press(k)}>
+                {k === "Fire" && sectorActive ? "Lock" : k === "⌫" ? <Icon name="delete" size={22} /> : k}
               </Button>
             ))}
           </div>
           {ui.radar && (
             <div className="mt-2" role="group" aria-label="Targeting Radar">
-              <p className="mb-1 text-center font-mono text-[10px] tracking-[0.25em] text-sky-200/80">TARGETING RADAR</p>
+              <p className="mb-1 text-center type-label-sm text-sky">Targeting radar</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {ui.radar.map((v) => (
                   <Button key={v} aria-label={`Radar ${v}`} disabled={!ui.canFire} onClick={() => { setEntry(""); void arena?.radar(v); }}
-                    className="rounded-lg border border-sky-300/50 bg-sky-300/10 py-2 font-mono text-sm tabular-nums text-sky-100 outline-none hover:bg-sky-300/25 focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40">{fmt(v)}</Button>
+                    className="min-h-11 rounded-chip border border-sky/60 type-name type-number text-[15px] text-sky transition hover:border-sky data-disabled:border-line-1 data-disabled:text-ink-3">{fmt(v)}</Button>
                 ))}
               </div>
             </div>
           )}
           <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson}
-            className={`mt-1.5 w-full rounded-xl py-1.5 text-sm md:mt-2 md:py-2 font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40 ${ui.invite ? "bg-sky-300 text-[#06202b]" : "border border-sky-300/30 text-sky-100/85 hover:border-sky-300/70"}`}>
+            className={`mw-btn mt-1.5 min-h-11 w-full border text-[15px] md:mt-2 data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2 hover:border-sky hover:text-sky"}`}>
             Show Me How
           </Button>
-          {!ui.canFire && !ui.lesson && <p className="mt-1 hidden text-center text-xs text-white/45 md:block">Stand by…</p>}
+          {!ui.canFire && !ui.lesson && <p className="mt-1 hidden text-center type-body-sm text-ink-3 md:block">Stand by…</p>}
         </div>
       )}
 
       {launch && !ui.started && !ui.done && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-fit flex-col items-center gap-3 p-6 text-center`}>
-          <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{ui.planetName.toUpperCase()}{ui.mode === "practice" ? " · PRACTICE" : ""}</p>
-          <p className="text-white/80">Squadrons on the scanner, cadet.</p>
-          <Button className={`${lime} px-7 py-3 text-base`} onClick={() => arena?.start()}>🚀 Launch (sound on)</Button>
+          <p className="type-display text-4xl">{ui.planetName}{ui.mode === "practice" ? " · practice" : ""}</p>
+          <p className="type-child text-ink-2">Squadrons on the scanner, cadet.</p>
+          <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => arena?.start()}>Launch (sound on)<RocketGlyph size={34} /></Button>
         </div>
       )}
 
       {ui.offer && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,420px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="font-mono text-xs tracking-[0.3em] text-amber-300">CAPTAIN · ACE TELEMETRY</p>
-          <p className="text-xl">Hyper-Jump straight to <b>{ui.offer.name}</b>?</p>
+          <p className="type-label-sm text-gold">Captain · ace telemetry</p>
+          <p className="type-child text-[22px]">Hyper-Jump straight to <b className="font-semibold">{ui.offer.name}</b>?</p>
           <div className="flex gap-3">
-            <Button className={`${lime} px-5 py-3 text-base`} onClick={() => { const to = arena?.acceptJump(); if (to) onFly?.(to); }}>⚡ Hyper-Jump</Button>
+            <Button className={`${lime} px-5 py-3 text-base`} onClick={() => { const to = arena?.acceptJump(); if (to) onFly?.(to); }}><Icon name="jump" size={20} />Hyper-Jump</Button>
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => arena?.declineJump()}>Keep flying here</Button>
           </div>
         </div>
@@ -225,11 +226,11 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
 
       {ui.done && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,440px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{ui.planetName.toUpperCase()}</p>
-          <p className="text-3xl font-semibold tracking-wide">{ui.done.title}</p>
-          <p className="text-white/75">{ui.done.sub} · ✦ {ui.orbs} orbs</p>
+          <p className="type-label-sm text-ink-2">{ui.planetName}</p>
+          <p className="type-display text-4xl">{ui.done.title}</p>
+          <p className="flex items-center gap-2 type-child text-ink-2">{ui.done.sub} · <Icon name="orb" size={20} className="text-gold" />{ui.orbs} orbs</p>
           {doneActions ? <div className="flex flex-wrap justify-center gap-3">{doneActions(ui.done)}</div>
-            : ui.done.next && <Button className={`${lime} px-6 py-3 text-base`} onClick={() => onFly?.(ui.done!.next!)}>🚀 Fly to {PLANET_NAMES[ui.done.next]}</Button>}
+            : ui.done.next && <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => onFly?.(ui.done!.next!)}>Fly to {PLANET_NAMES[ui.done.next]}<RocketGlyph size={34} /></Button>}
         </div>
       )}
     </>

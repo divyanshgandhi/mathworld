@@ -8,6 +8,7 @@ import { WHY } from "@/rig/showme";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { BattleHud } from "./battle/BattleHud";
 import { ghost, glass, lime } from "./battle/ui";
+import { Icon } from "./kit/Icon";
 import { useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
 
@@ -56,30 +57,30 @@ export function AcademyScreen() {
   const wanted = want ? filmOf(want) : null;
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-[#030612] text-white">
+    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
       <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
-        <Button aria-label="Resting Bay" onClick={() => router.push("/bay")} className={`${ghost} grid size-10 place-items-center bg-black/45 p-0 text-lg`}>⌂</Button>
-        {film ? <Button aria-label="All Trick Cards" onClick={() => setFilm(null)} className={`${ghost} bg-black/45 px-3 py-2 text-sm`}>⚡ Cards</Button>
-          : <span className={`${glass} pointer-events-none px-4 py-2 font-mono text-xs tracking-[0.25em] text-lime-200`}>THE ACADEMY</span>}
+        <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
+        {film ? <Button aria-label="All Trick Cards" onClick={() => setFilm(null)} className={`${ghost} bg-void`}><Icon name="trick" size={18} />Cards</Button>
+          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">The Academy</span>}
       </div>
 
       {!film && state && (
         <div className="absolute inset-0 z-20 overflow-y-auto px-3 pb-6 pt-20">
           <div className={`${glass} mx-auto w-[min(96vw,760px)] p-4 md:p-6`}>
-            <p className="font-mono text-xs tracking-[0.3em] text-amber-300">TRICK FILMS</p>
-            <p className="mt-1 text-sm text-white/70">Nova shows each trick on a real fleet, then you fire the answer. New cards go on your battle belt.</p>
+            <h2 className="m-0 type-display text-[clamp(30px,5vw,44px)]">Trick films</h2>
+            <p className="mt-2 max-w-[56ch] type-body text-ink-2">Nova shows each trick on a real fleet, then you fire the answer. New cards go on your battle belt.</p>
             <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Trick Cards">
               {FILMS.map((f) => (
                 <li key={f.trick}>
                   <Button aria-label={`Watch ${f.card}`} onClick={() => watch(f)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 ${wanted?.trick === f.trick ? "border-lime-300 bg-lime-300/15" : seen(f.trick) ? "border-amber-300/50 bg-amber-300/10 hover:bg-amber-300/20" : "border-white/10 bg-white/[.03] hover:border-white/30"}`}>
-                    <span className={`grid size-10 shrink-0 place-items-center rounded-lg text-lg ${seen(f.trick) ? "bg-amber-200 text-[#1a1406]" : "bg-white/10"}`}>⚡</span>
+                    className={`mw-tile flex w-full items-center gap-3 px-3 py-2.5 text-left ${wanted?.trick === f.trick ? "border-gold bg-raised" : ""}`}>
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-full border ${seen(f.trick) ? "border-gold text-gold" : "border-line-2 text-ink-3"}`}><Icon name="trick" size={20} /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold">{f.card}{!seen(f.trick) && <span className="ml-2 rounded-full bg-sky-300/20 px-1.5 py-0.5 font-mono text-[10px] text-sky-200">NEW</span>}</span>
-                      <span className="block truncate text-xs text-white/60">{f.a} × {f.b} · {WHY[f.trick]}</span>
+                      <span className="block type-name text-[17px]">{f.card}{!seen(f.trick) && <span className="ml-2 rounded-pill border border-sky px-2 py-0.5 type-label-sm text-sky">New</span>}</span>
+                      <span className="block truncate type-body-sm text-ink-2">{f.a} × {f.b} · {WHY[f.trick]}</span>
                     </span>
-                    <span className="font-mono text-xs text-lime-200">▶</span>
+                    <Icon name="play" size={20} className="text-ink-2" />
                   </Button>
                 </li>
               ))}

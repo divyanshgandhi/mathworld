@@ -8,18 +8,18 @@ import { ghost, glass, lime } from "@/components/battle/ui";
 export function AdminLogin({ denied }: { denied: boolean }) {
   return (
     <form method="post" action="/api/admin/session" className={`${glass} m-auto flex w-[min(92vw,400px)] flex-col gap-4 p-6`}>
-      <p className="font-mono text-xs tracking-[0.3em] text-lime-300">MATH WORLD · ADMIN</p>
+      <p className="type-label-sm text-ink-2">Math World · admin</p>
       <Field name="key">
-        <FieldLabel className="text-sm text-white/70">Passphrase</FieldLabel>
+        <FieldLabel className="type-name text-[16px] text-ink-2">Passphrase</FieldLabel>
         <PasswordInput name="key" required>
           <div className="mt-1 flex gap-2">
-            <PasswordInputControl autoFocus className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-base outline-none focus:border-lime-300" />
+            <PasswordInputControl autoFocus className="mw-input min-w-0 flex-1 text-base" />
             <PasswordInputToggle aria-label="Show passphrase" className={`${ghost} px-3`}>{(s: { visible: boolean }) => (s.visible ? "Hide" : "Show")}</PasswordInputToggle>
           </div>
         </PasswordInput>
-        <FieldDescription className="mt-1 text-xs text-white/45">Set by MW_ADMIN_KEY on the server.</FieldDescription>
+        <FieldDescription className="mt-1 text-xs text-ink-3">Set by MW_ADMIN_KEY on the server.</FieldDescription>
       </Field>
-      {denied && <p role="alert" className="text-sm text-[#ffb3a0]">That passphrase did not match.</p>}
+      {denied && <p role="alert" className="type-body-sm text-ember">That passphrase did not match.</p>}
       <Button type="submit" className={`${lime} py-3 text-base`}>Open the dashboard</Button>
     </form>
   );

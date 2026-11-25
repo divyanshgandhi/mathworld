@@ -31,9 +31,9 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
   const access = checkAccess(adminSecret(), { query: key, cookie: (await cookies()).get(ADMIN_COOKIE)?.value });
   if (access === "off") {
     return (
-      <div className="m-auto max-w-md p-6 text-center text-white/70">
-        <p className="font-mono text-xs tracking-[0.3em] text-lime-300">MATH WORLD · ADMIN</p>
-        <p className="mt-3">The dashboard is off. Set <code className="text-white">MW_ADMIN_KEY</code> (at least {MIN_KEY} characters) in the server environment to turn it on.</p>
+      <div className="m-auto max-w-md p-6 text-center text-ink-2">
+        <p className="type-label-sm text-ink-2">Math World · admin</p>
+        <p className="mt-3">The dashboard is off. Set <code className="font-code text-approach">MW_ADMIN_KEY</code> (at least {MIN_KEY} characters) in the server environment to turn it on.</p>
       </div>
     );
   }
@@ -47,21 +47,21 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-5 md:p-8">
       <header className="flex items-center justify-between">
         <div>
-          <p className="font-mono text-xs tracking-[0.3em] text-lime-300">MATH WORLD · ADMIN</p>
-          <h1 className="mt-1 text-xl font-semibold">Cadets · {cadets.length}</h1>
+          <p className="type-label-sm text-ink-2">Math World · admin</p>
+          <h1 className="mt-1 type-name text-2xl">Cadets · {cadets.length}</h1>
         </div>
         <SignOut />
       </header>
       <PlayerTable cadets={cadets} linkFor={linkFor} selected={focus?.player.id ?? null} />
-      {focus ? <CadetDetail cadet={focus} now={now} /> : cadets.length > 0 && <p className="text-sm text-white/50">Pick a cadet for their mastery heatmap, transfer rate by trick and event timeline.</p>}
+      {focus ? <CadetDetail cadet={focus} now={now} /> : cadets.length > 0 && <p className="type-body-sm text-ink-3">Pick a cadet for their mastery heatmap, transfer rate by trick and event timeline.</p>}
     </main>
   );
 }
 
 export default function AdminPage(props: PageProps<"/admin">) {
   return (
-    <div className="min-h-dvh bg-[#030612] text-white">
-      <Suspense fallback={<p className="p-8 font-mono text-xs tracking-[0.3em] text-white/40">LOADING TELEMETRY…</p>}>
+    <div className="min-h-dvh bg-void text-approach">
+      <Suspense fallback={<p className="p-8 type-label-sm text-ink-3">Loading telemetry…</p>}>
         <Admin searchParams={props.searchParams} />
       </Suspense>
     </div>

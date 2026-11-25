@@ -6,6 +6,7 @@ import type { PlayerState } from "@/director/fold";
 import { DECK_SIZE, flashcardDeck, FLASHCARD_ORBS } from "@/director/hub";
 import { seeded } from "@/engine/util";
 import { ghost, glass, Keypad, lime } from "../battle/ui";
+import { Icon } from "../kit/Icon";
 
 /**
  * Quick Flashcards (SPEC §2.4): five low-pressure cards from recently learned or shaky facts.
@@ -33,23 +34,23 @@ export function Flashcards({ state, emit, onClose }: { state: PlayerState; emit:
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Quick Flashcards" className="absolute inset-0 z-30 grid place-items-center bg-black/55 p-3">
+    <div role="dialog" aria-modal="true" aria-label="Quick Flashcards" className="absolute inset-0 z-30 grid place-items-center bg-scrim p-3">
       <div className={`${glass} flex w-[min(96vw,620px)] flex-col gap-4 p-5 md:flex-row md:items-stretch`}>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-          <p className="font-mono text-xs tracking-[0.3em] text-sky-300">QUICK FLASHCARDS · {Math.min(i + 1, DECK_SIZE)}/{deck.length}</p>
+          <p className="type-label-sm text-ink-2">Quick flashcards · {Math.min(i + 1, DECK_SIZE)} of {deck.length}</p>
           {!done && card && (
-            <div className={`grid min-h-40 w-full place-items-center rounded-2xl border-2 px-6 py-6 transition ${result ? (result.ok ? "border-lime-300 bg-lime-300/15" : "border-sky-300 bg-sky-300/10") : "border-white/15 bg-white/[.04]"}`}>
-              <p className="font-mono text-6xl font-semibold tabular-nums md:text-7xl" aria-live="polite">{card.a}<span className="mx-3 text-lime-300">×</span>{card.b}</p>
-              {result && <p className="mt-2 font-mono text-xl" role="status">{result.ok ? "✓ Instant!" : `It's ${result.answer}. Next one!`}</p>}
+            <div className={`grid min-h-40 w-full place-items-center rounded-panel border px-6 py-6 transition ${result ? (result.ok ? "border-gold" : "border-sky") : "border-line-2"}`}>
+              <p className="type-display type-number text-6xl md:text-7xl" aria-live="polite">{card.a}<span className="mx-3 text-ink-3">×</span>{card.b}</p>
+              {result && <p className={`mt-3 flex items-center gap-2 type-child ${result.ok ? "text-gold" : "text-sky"}`} role="status">{result.ok && <Icon name="check" size={20} />}{result.ok ? "Instant!" : `It's ${result.answer}. Next one!`}</p>}
             </div>
           )}
           {done && (
             <div className="flex flex-col items-center gap-2 py-6">
-              <p className="text-3xl font-semibold">Deck done</p>
-              <p className="text-white/70">{right}/{deck.length} right · +{right * FLASHCARD_ORBS} orbs</p>
+              <p className="type-display text-4xl">Deck done</p>
+              <p className="type-child text-ink-2">{right}/{deck.length} right · +{right * FLASHCARD_ORBS} orbs</p>
             </div>
           )}
-          <p className="text-xs text-white/45">No timer. Take your time.</p>
+          <p className="type-body-sm text-ink-3">No timer. Take your time.</p>
         </div>
         <div className="w-full md:w-[260px]">
           {!done ? <Keypad onFire={answer} disabled={!!result} label="Answer" fire="Go" /> : (

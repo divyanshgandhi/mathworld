@@ -5,18 +5,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { hyperJumpStatus, mapStops, type Stop } from "@/director/hub";
 import type { SolarMapScene } from "@/worlds/space/solarMap";
 import { PLANET_NAMES } from "@/worlds/space/lines";
-import { ghost, glass, lime } from "./battle/ui";
+import { glass, lime } from "./battle/ui";
+import { Icon, RocketGlyph } from "./kit/Icon";
 import { Anchor, useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
 
 export const STOP_NAMES: Record<Stop["id"], string> = { mercury: "Mercury", venus: "Venus", ...PLANET_NAMES };
 const STATUS: Record<Stop["status"], { label: string; tone: string }> = {
-  warmup: { label: "Warm-up", tone: "bg-sky-300/20 text-sky-100 border-sky-300/50" },
-  cleared: { label: "Cleared", tone: "bg-amber-300/20 text-amber-100 border-amber-300/60" },
-  ace: { label: "Ace cleared", tone: "bg-amber-300/20 text-amber-100 border-amber-300/60" },
-  frontier: { label: "Frontier", tone: "bg-lime-300 text-[#0d0e1a] border-lime-300" },
-  open: { label: "Open", tone: "bg-white/10 text-white/85 border-white/30" },
-  locked: { label: "Locked", tone: "bg-black/40 text-white/45 border-white/15" },
+  warmup: { label: "Warm-up", tone: "border-sky text-sky" },
+  cleared: { label: "Cleared", tone: "border-gold text-gold" },
+  ace: { label: "Ace cleared", tone: "border-gold bg-gold text-void" },
+  frontier: { label: "Frontier", tone: "border-approach text-approach" },
+  open: { label: "Open", tone: "border-line-2 text-ink-2" },
+  locked: { label: "Locked", tone: "border-line-1 text-ink-3" },
 };
 
 /**
@@ -68,25 +69,25 @@ export function SolarMap() {
   const cta = !stop ? "" : stop.status === "warmup" ? "Warm up" : stop.status === "cleared" || stop.status === "ace" ? "Replay" : stop.status === "locked" ? "Locked" : "Launch";
 
   return (
-    <div className="fixed inset-0 touch-none select-none overflow-hidden bg-[#02030a] text-white">
+    <div className="fixed inset-0 touch-none select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
       {scene && stops && state && (
         <>
           <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
-            <Button aria-label="Resting Bay" onClick={() => router.push("/bay")} className={`${ghost} grid size-10 place-items-center bg-black/45 p-0 text-lg`}>⌂</Button>
-            <span className={`${glass} pointer-events-none px-4 py-2 font-mono text-xs tracking-[0.25em] text-lime-200`}>SOLAR SYSTEM</span>
+            <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
+            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">Solar System</span>
           </div>
           <div className="pointer-events-none absolute right-16 top-3.5 z-10 flex flex-col items-end gap-1.5">
-            <span className="rounded-full bg-black/45 px-3 py-1.5 font-mono text-sm text-amber-200">✦ {state.orbs} orbs</span>
-            {jump && <span className={`rounded-full border px-3 py-1 font-mono text-[11px] ${jump.available ? "border-amber-300 bg-amber-300/20 text-amber-100" : "border-white/15 bg-black/45 text-white/70"}`}>⚡ {jump.label}</span>}
+            <span className="flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="hidden text-[15px] text-ink-2 sm:inline">orbs</span></span>
+            {jump && <span className={`flex items-center gap-1.5 rounded-pill border bg-void px-3 py-1 text-xs ${jump.available ? "border-gold text-gold" : "border-line-1 text-ink-2"}`}><Icon name="jump" size={16} />{jump.label}</span>}
           </div>
 
           {stops.map((s, k) => (
             <Anchor key={s.id} stage={stage} scene={scene} id={`stop:${s.id}`}>
               <Button aria-label={`${STOP_NAMES[s.id]}: ${STATUS[s.status].label}`} aria-pressed={k === i} onClick={() => setSel(k)}
-                className={`flex flex-col items-center gap-1 rounded-xl px-2 py-1 outline-none transition focus-visible:ring-2 focus-visible:ring-lime-300 ${k === i ? "scale-110" : "opacity-80 hover:opacity-100"}`}>
-                <span className={`whitespace-nowrap text-sm font-semibold drop-shadow ${s.status === "locked" ? "text-white/45" : "text-white"}`}>{s.status === "locked" ? "🔒 " : ""}{STOP_NAMES[s.id]}</span>
-                <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[10px] ${STATUS[s.status].tone}`}>{STATUS[s.status].label}</span>
+                className={`flex flex-col items-center gap-1 rounded-chip px-2 py-1 transition ${k === i ? "scale-110" : "opacity-80 hover:opacity-100"}`}>
+                <span className={`flex items-center gap-1 whitespace-nowrap type-name text-[16px] ${s.status === "locked" ? "text-ink-3" : "text-approach"}`}>{s.status === "locked" && <Icon name="lock" size={16} />}{STOP_NAMES[s.id]}</span>
+                <span className={`whitespace-nowrap rounded-pill border bg-void px-2 py-0.5 text-xs ${STATUS[s.status].tone}`}>{STATUS[s.status].label}</span>
               </Button>
             </Anchor>
           ))}
@@ -94,17 +95,17 @@ export function SolarMap() {
           {stop && (
             <div className={`${glass} absolute bottom-3 left-1/2 z-20 flex w-[min(94vw,520px)] -translate-x-1/2 items-center gap-4 p-4`} aria-live="polite">
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[11px] tracking-[0.25em] text-white/55">{stop.tier === null ? "INNER PLANET · WARM-UP" : `PLANET ${stop.tier} · ${STATUS[stop.status].label.toUpperCase()}`}</p>
-                <p className="truncate text-2xl font-semibold">{STOP_NAMES[stop.id]}</p>
-                <p className="text-sm text-white/70">{stop.status === "locked" ? `Clear ${STOP_NAMES[stops[i - 1]?.id ?? "earth"]} to open it` : stop.teaches}</p>
+                <p className="type-label-sm text-ink-2">{stop.tier === null ? "Inner planet · warm-up" : `Planet ${stop.tier} · ${STATUS[stop.status].label}`}</p>
+                <p className="mt-1 type-display text-[24px] leading-tight md:text-[30px]">{STOP_NAMES[stop.id]}</p>
+                <p className="mt-1 type-body-sm text-ink-2">{stop.status === "locked" ? `Clear ${STOP_NAMES[stops[i - 1]?.id ?? "earth"]} to open it` : stop.teaches}</p>
               </div>
-              <Button disabled={stop.status === "locked"} onClick={() => launch(stop)} className={`${lime} shrink-0 px-6 py-3 text-base`}>{stop.status === "locked" ? "🔒" : "🚀"} {cta}</Button>
+              <Button disabled={stop.status === "locked"} onClick={() => launch(stop)} className={`${lime} mw-md mw-has-glyph shrink-0`}>{stop.status === "locked" && <Icon name="lock" size={18} />}{cta}<RocketGlyph size={34} /></Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 bottom-56 z-10 md:bottom-44 flex justify-center">
             <div className="pointer-events-auto flex gap-2">
-              <Button aria-label="Previous planet" disabled={i === 0} onClick={() => setSel(Math.max(0, i - 1))} className={`${ghost} bg-black/45 px-3 py-1.5`}>◀</Button>
-              <Button aria-label="Next planet" disabled={i === stops.length - 1} onClick={() => setSel(Math.min(stops.length - 1, i + 1))} className={`${ghost} bg-black/45 px-3 py-1.5`}>▶</Button>
+              <Button aria-label="Previous planet" disabled={i === 0} onClick={() => setSel(Math.max(0, i - 1))} className="mw-btn mw-icon bg-void"><Icon name="back" size={20} /></Button>
+              <Button aria-label="Next planet" disabled={i === stops.length - 1} onClick={() => setSel(Math.min(stops.length - 1, i + 1))} className="mw-btn mw-icon bg-void"><Icon name="forward" size={20} /></Button>
             </div>
           </div>
         </>
