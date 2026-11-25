@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkName } from "@/components/hub/cadetName";
 
 /**
  * The event contract: every event a client may append, validated before it touches the log.
@@ -88,6 +89,7 @@ export function normalize(e: EventInput, now = Date.now()): EventInput {
 }
 
 export const NewPlayer = z.object({
-  name: z.string().trim().min(1).max(24),
+  // the sign-up's own rules (letters, numbers and spaces, up to 16), so the server never keeps a name the field would refuse
+  name: z.string().max(64).refine((n) => checkName(n).problem === null && Array.from(checkName(n).name).length === Array.from(n.trim().replace(/ {2,}/g, " ")).length).transform((n) => checkName(n).name),
   avatar: z.string().regex(/^[a-z0-9-]{1,32}$/).default("cadet-1"),
 });
