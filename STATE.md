@@ -22,6 +22,8 @@ _Updated 26 Nov 2026, after the review round's fix pass. `main` still holds the 
   - No console errors.
 - Not heard: sound. Not run: a real phone, Safari, reduced motion, the battle tour at phone sizes, and the mission-over card in a real campaign.
 
+- Shipping path, against a local Postgres 16: migrations (run twice), the production build, every route, sign-up with a Secure HttpOnly cookie, and one save stored once across a server restart (a unique index on the client's event id, migration `0002_events_client_id`). A hosted database is reached over TLS.
+
 ## Next, and open risks
 - **The owner's seven points:**
   1. Film pacing: *answered, mostly.* Every reply is in range and the waits are cut to 3 s. The 5 s Launch wait stays, and listener reactions are still off camera.
@@ -46,5 +48,4 @@ _Updated 26 Nov 2026, after the review round's fix pass. `main` still holds the 
 - **Still open from before:**
   - Offline answers pay once after reconnecting.
   - The bay with a times table open is an overload.
-  - The retry guard lives in server memory.
   - Learning events are client-trusted.
