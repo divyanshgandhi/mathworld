@@ -34,3 +34,15 @@ Removed (clip, manifest entry and bake line): `nova_l0_intro`, `captain_brief3`,
 - **The Resting Bay's lines** (`bay.cleared`, `bay.jumped`, `bay.all-clear`, `bay.mission-won`, `bay.nearly-gold`, `bay.back`): they carry a live name or planet, so they stay captions.
 - **Scan captions** ("1, 2, 3", then "6 squads."): built at run time, never baked.
 - **The Empty lesson's first line** ("Zero squads means empty space — not a single invader!", in `src/rig/tricks.ts`): no clip matches its words, so it plays live speech or a caption. It also says "invader", which the glossary retired; the fix belongs to the trick script's owner.
+
+## No longer played (the clips can go at the next bake)
+
+The wave 2 fix pass replaced these after the bake list was written. Their clips and line entries still exist; nothing plays them.
+
+| Id | Why |
+| --- | --- |
+| `nova_incoming_short` | Replaced by `nova_ships_incoming` (it said "squads" before any miss) |
+| `nova_err_under`, `nova_err_over` | Replaced by `nova_too_few` and `nova_too_many` |
+| `nova_err_wild` | The arena plays `nova_err_way_off` |
+| `captain_jump_*` | Replaced by `nova_jump_*` (Nova is the only voice in battle) |
+| `nova_bullseye`, `nova_perfect` | A right answer always gets `nova_dead_on` (one praise word) |
