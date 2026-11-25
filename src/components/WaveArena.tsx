@@ -54,7 +54,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       const [{ createStage }, { mountArena }, log] = await Promise.all([import("@/engine/stage"), import("@/worlds/space/arena"), history()]);
       if (gone || !box.current) return;
       // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere)
-      if (!dev && !canLaunch(fold(log), planet)) return router.replace("/map");
+      if (!dev && !canLaunch(fold(log), planet)) return location.replace(`/map?locked=${planet}`); // a hard replace: a soft one from this effect can stall on a blank screen
       const stage = createStage(box.current, { fill: true });
       const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
       const { audio } = await import("@/engine/audio");

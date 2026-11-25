@@ -51,7 +51,10 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   const stops = useMemo(() => (state ? journey(state) : null), [state]);
   const here = stops ? hereIndex(stops) : 0;
   const [picked, setPicked] = useState<number | null>(null);
-  const sel = picked ?? here;
+  // a locked planet opened by its address lands here (?locked=<planet>) with that planet picked, so its panel says what opens it
+  const [asked] = useState(() => (typeof location === "undefined" ? null : new URLSearchParams(location.search).get("locked")));
+  const askedAt = stops && asked ? stops.findIndex((s) => s.id === asked) : -1;
+  const sel = picked ?? (askedAt >= 0 ? askedAt : here);
   const wide = useWide();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const launching = useRef(false);
