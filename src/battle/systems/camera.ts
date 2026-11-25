@@ -36,7 +36,8 @@ export function measure(fv: FleetView) {
  * in on the fleet and Nova. `pad`: how far the visible axis labels reach left of and above the fleet.
  */
 export function frameBox(m: { w: number; h: number; bottom: number }, lessonOn: boolean, nova: { to: number; y: number }, pad = { left: 2.4, top: 1.0 }) {
-  let ymax = FLEET_Y + m.h / 2 + Math.max(0.35, pad.top), xmin = -m.w / 2 - Math.max(0.35, pad.left);
+  // the left margin holds the scan counts and the squad ticks that land beside each leader
+  let ymax = FLEET_Y + m.h / 2 + Math.max(0.35, pad.top), xmin = -m.w / 2 - Math.max(0.95, pad.left);
   const xmax = m.w / 2 + 0.35;
   const ymin = m.bottom - 0.35;
   if (lessonOn) { xmin = Math.min(xmin, nova.to - 1.5); ymax = Math.max(ymax, nova.y + 1.1); return { xmin, xmax, ymin, ymax }; }
