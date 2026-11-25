@@ -97,6 +97,8 @@ export const BATTLE_LINES = {
 export type LineId = keyof typeof BATTLE_LINES;
 
 export const EXACT_LINES: LineId[] = ["nova_dead_on", "nova_bullseye", "nova_perfect"];
+/** The one praise line for a right answer (the others stay baked for the Academy and older callers). */
+export const EXACT_LINE: LineId = "nova_dead_on";
 export const ERROR_LINE: Record<ErrorType, LineId> = {
   added_instead: "nova_err_added", off_by_one_group: "nova_err_group", off_by_one_unit: "nova_err_unit", place_value: "nova_err_place",
   undershoot_close: "nova_err_under", overshoot_close: "nova_err_over", wild_guess: "nova_err_wild",
@@ -109,5 +111,5 @@ export const jumpLine = (to: PlanetId) => `captain_jump_${to}` as LineId;
 export const unlockLine = (t: TrickId) => `unlock_${t}` as LineId;
 
 export const PLANET_NAMES: Record<PlanetId, string> = {
-  earth: "Earth · Cadet Bay", moon: "The Moon", mars: "Mars", "asteroid-belt": "Asteroid Belt", jupiter: "Jupiter", saturn: "Saturn", uranus: "Uranus", "deep-space": "Deep Space",
+  earth: "Earth", moon: "The Moon", mars: "Mars", "asteroid-belt": "Asteroid Belt", jupiter: "Jupiter", saturn: "Saturn", uranus: "Uranus", "deep-space": "Deep Space",
 };

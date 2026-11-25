@@ -21,11 +21,13 @@ export function createVoice(overlay: Overlay, teaching: () => boolean) {
     player,
     /**
      * One line. Never cuts off a line that is still being spoken: a reaction that arrives while she
-     * talks is dropped; `queue` waits instead. Resolves when the words stop plus a short breath.
+     * talks is dropped; `queue` waits instead; `interrupt` (the cadet's own press) cuts in. Resolves when the words stop plus a short breath.
      */
-    async say(id: string, { queue = false, speaker = "Nova" } = {}) {
+    async say(id: string, { queue = false, speaker = "Nova", interrupt = false } = {}) {
       if (teaching() && !queue) return;
       const now = performance.now();
+      // `interrupt`: the cadet's own action (a Power-Up) speaks over the line before it
+      if (interrupt) { audio.stopVoice(); voiceUntil = 0; }
       if (now < voiceUntil) { if (!queue) return; await wait(voiceUntil - now); }
       const text = lineText(id);
       if (!text) return;

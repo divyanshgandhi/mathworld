@@ -56,7 +56,6 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
   const [tries, setTries] = useState(0);
   const [outcome, setOutcome] = useState<{ kind: "exact" | "under" | "over"; value: number } | null>(null);
   const [score, setScore] = useState(0);
-  const [startOrbs] = useState(state.orbs);
   const shown = useRef(0);
   const stripRef = useRef<HTMLDivElement>(null), conRef = useRef<HTMLDivElement>(null), orbsRef = useRef<HTMLDivElement>(null), rootRef = useRef<HTMLDivElement>(null);
   const p = run[i];
@@ -128,7 +127,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
       <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${entry} plasma balls loaded`}</p>
 
       <BriefingCard open={!started} body={planet} name={NAME[planet]} teaches={PLANET_TEACHES[planet]} win="Five quick ones." onLaunch={() => void start()} />
-      <ClearCard open={done} body={planet} title="Warm-up done" orbs={state.orbs - startOrbs}
+      <ClearCard open={done} body={planet} title="Warm-up done" orbs={null}
         sub={`${score} of ${WARMUP_LENGTH} on the first try.`}
         actions={<>
           <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>

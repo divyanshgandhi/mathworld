@@ -51,7 +51,7 @@ export function ConsoleReview() {
       <BriefingCard open={card === "briefing"} body="moon" name="The Moon" teaches="Times 2, times 5 and times 10." win="Win 3 of 4 waves." onLaunch={() => setCard("none")} />
       {(card === "unlock" || card === "sector-unlock") && <UnlockCard open id={card === "unlock" ? "double-it" : "big-small-split"} name={card === "unlock" ? "Double It!" : "Sector-Lock"} sector={card === "sector-unlock"} onClose={() => setCard("none")} />}
       <OfferCard open={card === "offer"} title="Jupiter" name="Jupiter" body="jupiter" onJump={() => setCard("none")} onStay={() => setCard("none")} />
-      <ClearCard open={card === "clear"} body="moon" title="The Moon is clear" orbs={40} sub="Mars is open." actions={<>
+      <ClearCard open={card === "clear"} body="moon" title="The Moon is clear" orbs={{ amount: 20, lines: [{ label: "Planet cleared", amount: 20 }] }} sub="Mars is open." actions={<>
         <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => setCard("none")}>Fly to Mars</Button>
         <div className={css.cardRow}><Button icon="map">Star map</Button><Button icon="bay">Resting Bay</Button></div>
       </>} />

@@ -5,7 +5,7 @@ import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { seeded } from "@/engine/util";
 import { warmVoice } from "@/engine/voice";
-import { fold, orbsBetween, type LoggedEvent, type PlayerState } from "@/director/fold";
+import { fold, orbsBetween, type LoggedEvent, type OrbEntry, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, type Wave } from "@/director/next";
 import { band } from "@/rig/adaptive";
 import { classifyError } from "@/rig/errors";
@@ -40,7 +40,7 @@ import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
 import { attachTelemetry } from "@/battle/telemetry";
 import { createVoice } from "@/battle/voice";
-import { ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, unlockLine } from "./lines";
+import { ERROR_LINE, EXACT_LINE, PLANET_NAMES, unlockLine } from "./lines";
 
 /** On-screen height (px) the axis label pills keep, so their words read at about 16 px. */
 const AXIS_PX = 26;
@@ -48,6 +48,8 @@ const AXIS_PX = 26;
 const ROCKET_SHARE = 0.44, ROCKET_MODEL_H = 2.1, ROCKET_Z = 1.8;
 /** The last kill's hit-stop (s) and the miss beats: survivors gather, the bracket lands, the fleet comes back. */
 const HIT_STOP = 0.065, GATHER = 0.45, RESTORE_AT = 1.65, READY_AFTER = 0.35;
+/** Two presses of Power-Ups closer than this are one press (a double tap on a touch screen). */
+const POWERUP_DEBOUNCE_MS = 400;
 
 /**
  * The battle (SPEC §1, §3, §4): one wave at a time from the director, a Base-10 fleet laid out
@@ -83,7 +85,8 @@ export interface ArenaUi {
   /** Trick Cards just unlocked onto the belt (shown for a moment). */
   unlock: { cards: string[] } | null;
   offer: { to: PlanetId; name: string } | null;
-  done: { title: string; sub: string; next: PlanetId | null } | null;
+  /** The end card. `orbs`: what this card is paying for (a planet clear, or a practice run), with its lines. */
+  done: { title: string; sub: string; next: PlanetId | null; orbs?: { amount: number; lines: { label: string; amount: number }[] } | null } | null;
   orbs: number;
   /** fire → ready again, in ms, for every shot so far (the 5–10 s rule, checked in the browser). */
   shots: number[];
@@ -267,8 +270,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
    * Orbs are the fold's, never the battle's (decision 4): the counter is set to the folded total, and the
    * reward is what the log written since `from` earned by the rules table (first try, streak, new Gold…).
    */
+  let runEarned = 0, lastEntries: OrbEntry[] = [];
   const settleOrbs = (from: number) => {
-    const earned = orbsBetween(log.slice(0, from), log).earned;
+    const { earned, entries } = orbsBetween(log.slice(0, from), log);
+    runEarned += earned;
+    lastEntries = entries.filter((e) => e.amount > 0);
     setUi({ orbs: state().orbs });
     return earned;
   };
@@ -302,7 +308,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         wave = null;
         dispatch({ type: "offer" });
         setUi({ offer: { to, name: PLANET_NAMES[to] }, wave: null, canFire: canAim(bs) });
-        void say(jumpLine(to), { speaker: "Captain", queue: true });
+        void say(`nova_jump_${to}`, { queue: true });
         return;
       }
       const hk = housekeeping(s);
@@ -381,12 +387,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       const orbs = settleOrbs(from);
       if (orbs) bus.emit("orb_burst", { amount: orbs, reason: "planet_cleared" });
       const next = PLANETS_BY_TIER[Math.min(tier + 1, PLANETS_BY_TIER.length - 1)];
-      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${planet === "earth" ? "Cadet Bay" : PLANET_NAMES[planet]} clear`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next } });
+      // the card says what clearing the planet paid, line by line (each wave's orbs were shown with its shot)
+      const lines = lastEntries.map((e) => ({ label: e.reason, amount: e.amount }));
+      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${PLANET_NAMES[planet]} clear`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next, orbs: orbs ? { amount: orbs, lines } : null } });
       bus.emit("battle_done", { kind });
       await say(opts.lines?.clear ?? theme.clear, { queue: true });
     } else {
       const frontier = PLANETS_BY_TIER[s.tier];
-      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: "PRACTICE COMPLETE", sub: `${PLANET_NAMES[planet]} · ${PRACTICE_WAVES} waves`, next: frontier } });
+      // a practice run is this visit's five waves (it starts again on a reload), so its total is this run's
+      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: "PRACTICE COMPLETE", sub: `${PLANET_NAMES[planet]} · ${PRACTICE_WAVES} waves`, next: frontier, orbs: runEarned ? { amount: runEarned, lines: [{ label: `${PRACTICE_WAVES} practice waves`, amount: runEarned }] } : null } });
       bus.emit("battle_done", { kind });
       await say("nova_practice_done", { queue: true });
     }
@@ -480,7 +489,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       setUi({ outcome: { kind: "exact", value: p, orbs }, radar: null, invite: false, sectors: null, lockTotal: null });
       dispatch({ type: "cleared" });
       bus.emit("wave_cleared", { a: w.a, b: w.b, attempts: bs.attempts, firstTry: bs.attempts === 1, streak: bs.streak });
-      void say(unlocked.length ? unlockLine(unlocked[unlocked.length - 1]) : EXACT_LINES[(state().waves + bs.attempts) % EXACT_LINES.length]);
+      // one word of praise for a right answer, the same every time (docs/teaching.md, step 12a)
+      void say(unlocked.length ? unlockLine(unlocked[unlocked.length - 1]) : EXACT_LINE);
       await sched.after(0.8);
       if (mode === "academy") return academyDone(w);
       if (mode === "practice") practiceK++;
@@ -512,7 +522,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     }
     setUi({ radar: null, invite: route.invite });
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite_v2" : errorType === "wild_guess" ? "nova_err_way_off" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
+    const line = say(route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help") : missLine(errorType, over), { queue: route.mash });
     const back = sched.after(RESTORE_AT + READY_AFTER);
     climb(line, back);
     await sched.after(RESTORE_AT);
@@ -522,6 +532,14 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     await sched.after(READY_AFTER);
     if (wave !== w) return;
     ready();
+  }
+
+  /** Nova's reaction to a miss she has no hint for yet: the kind of mistake, in the glossary's words. */
+  function missLine(errorType: ReturnType<typeof classifyError>, over: boolean): string {
+    if (errorType === "wild_guess") return "nova_err_way_off";
+    if (errorType === "undershoot_close" || (!errorType && !over)) return "nova_too_few";
+    if (errorType === "overshoot_close" || (!errorType && over)) return "nova_too_many";
+    return ERROR_LINE[errorType!];
   }
 
   /** The colours a ship breaks into: its squad tone and its dark parts. */
@@ -550,15 +568,21 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
 
   // ---- Power-Ups, Show Me How ----
+  let powerUpAt = -Infinity;
   function powerUp(t: TrickId) {
     if (!wave || !canAim(bs)) return;
+    // a double tap is one press: the second would undo the first (Flip It! turns back) before anyone sees it
+    const now = performance.now();
+    if (now - powerUpAt < POWERUP_DEBOUNCE_MS) return;
+    powerUpAt = now;
     if (sector.on && t === "big-small-split") return; // already cracking sectors: keep the locks made so far
     const pu = POWERUPS[t], fits = pu.fits(wave.a, wave.b);
     bus.emit("powerup_applied", { id: t, a: wave.a, b: wave.b, fits });
-    if (!fits) { void say("nova_misfit"); return; }
+    // the cadet's own press: its line replaces whatever Nova was saying, so the caption always names the Power-Up in use
+    if (!fits) { void say("nova_misfit", { interrupt: true }); return; }
     if (t !== "flip-it") active = t;
     applyPowerUp(t);
-    void say(pu.line({ a: wave.a, b: wave.b, sectorLock: wave.sectorLock, fv }));
+    void say(pu.line({ a: wave.a, b: wave.b, sectorLock: wave.sectorLock, fv }), { interrupt: true });
     setUi({ belt: beltFor(state(), wave) });
   }
 
@@ -722,6 +746,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     showMeHow: () => void showMeHow(),
     /** Dev: the lesson plan this fleet would get now. */
     plan: () => (wave ? planShowMeHow(wave.a, wave.b, state().seenTricks) : null),
+    /** Dev: how the camera frames the fleet right now (free area and rocket band in px, the fleet and its box in units). */
+    frame: () => ({ free: cam.free, safe: cam.safe, band: cam.band, ppu: cam.pxPerUnit(), m: measure(fv), pad: fv.visiblePad(), scale: fv.scale }),
     /** Dev: play the planet-clear beat in the world (the gold ring) without clearing the planet. */
     devClearRing: () => { if (opts.dev) backdrop.clearRing(); },
     /** Dev: where Show Me How's lines came from (baked clip, live Phonon, captions only). */
@@ -739,6 +765,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       cannon.setCharge(n);
       if (canAim(bs) || !wave) charge.set(n);
       if (n !== null) scan.skip();
+      // typing again: the last shot's line ("2 ships got away") has done its job
+      if (n !== null && ui.outcome?.last) setUi({ outcome: null });
       bus.emit("charge", { n });
     },
     acceptJump() {

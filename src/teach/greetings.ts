@@ -18,5 +18,5 @@ export const GREETINGS: Record<GreetScreen, GreetLine> = {
   hangar: line("hangar", "Spend your orbs here to change how your rocket looks.", "Hangar (/hangar)"),
   academy: line("academy", "Pick a trick. I will show it on real ships.", "Academy (/academy)"),
   flashcards: line("flashcards", "Type the answer. There is no timer, so take your time.", "Flashcards (over the Resting Bay)"),
-  battle: line("battle", "Welcome to Cadet Bay! Let's clear these ships.", "The first battle (Cadet Bay, end of /intro)"),
+  battle: line("battle", "Let's clear these ships, cadet!", "The first battle (Cadet Bay, end of /intro)"),
 };

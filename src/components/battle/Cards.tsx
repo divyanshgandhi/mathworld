@@ -76,13 +76,17 @@ export function OfferCard({ open, title, name, body, onJump, onStay }: { open: b
 
 /** A planet cleared: the planet in a gold ring, "<planet> is clear", the orbs earned, one way on. */
 export function ClearCard({ open, body, title, sub, orbs, actions }: {
-  open: boolean; body: BodyId | null; title: string; sub?: string; orbs: number | null; actions: ReactNode;
+  open: boolean; body: BodyId | null; title: string; sub?: string;
+  /** What this card pays for (a planet clear, a practice run), never a running total: the lines add up to `amount`. */
+  orbs: { amount: number; lines: { label: string; amount: number }[] } | null;
+  actions: ReactNode;
 }) {
   return (
     <Card open={open} title={title} label={title}
       art={body && <span className={`${css.planetRing} mb-2 mt-2`}><PlanetSprite id={body} size={128} alt="" /></span>}
       actions={actions}>
-      {orbs !== null && orbs > 0 && <p className={css.orbsLine}><Icon name="orb" size={24} />+{orbs}<small>orbs</small></p>}
+      {orbs && orbs.amount > 0 && <p className={css.orbsLine}><Icon name="orb" size={24} />+{orbs.amount}<small>orbs</small></p>}
+      {orbs && orbs.amount > 0 && <p className={css.cardText}>{orbs.lines.map((l, i) => <span key={l.label}>{i ? " · " : ""}{l.label}{orbs.lines.length > 1 ? <> <b>+{l.amount}</b></> : null}</span>)}</p>}
       {sub && <p className={css.cardText}>{sub}</p>}
     </Card>
   );

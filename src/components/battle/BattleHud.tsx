@@ -11,7 +11,7 @@ import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { BODY_NAME } from "@/worlds/space/bodies";
 import { Button } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
-import { BriefingCard, ClearCard, OfferCard, PLANET_TEACHES, UnlockCard } from "./Cards";
+import { BriefingCard, ClearCard, OfferCard, PLANET_TEACHES } from "./Cards";
 import { Console, EmptySlot, fmtN, Slot, useEntry } from "./Console";
 import { useConsoleLayout, useReducedMotion, type ConsoleLayout } from "./layout";
 import { MissionStrip, useOrbReward } from "./MissionStrip";
@@ -25,6 +25,8 @@ import { css } from "./cockpit";
 const BONUS = new Set(["recharge", "probe", "transfer"]);
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 const TRICK_BY_CARD = Object.fromEntries(Object.entries(CARD).map(([id, name]) => [name, id as TrickId])) as Record<string, TrickId>;
+/** After a card or the menu closes, presses on the console wait this long (a double tap's second tap is not an answer). */
+const SETTLE_MS = 350;
 /** At most this many Power-Ups on the console: the ones that fit this fleet. */
 const SLOTS = 3;
 /** A planet by its own name, never the mission's ("Earth", not "Cadet Bay"); "the Moon" in the middle of a sentence. */
@@ -114,25 +116,22 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const sectorActive = ui?.sectors?.find((s) => s.active) ?? null;
 
   // ---- cards ----
-  const [unlocks, setUnlocks] = useState<{ id: TrickId; name: string; sector: boolean }[]>([]);
-  const [prevUnlock, setPrevUnlock] = useState<ArenaUi["unlock"]>(null);
-  if ((ui?.unlock ?? null) !== prevUnlock) {
-    setPrevUnlock(ui?.unlock ?? null);
-    const add = (ui?.unlock?.cards ?? []).map((name) => TRICK_BY_CARD[name]).filter(Boolean)
-      .map((id) => ({ id, name: id === "big-small-split" && w?.sectorLock ? "Sector-Lock" : CARD[id], sector: id === "big-small-split" && !!w?.sectorLock }));
-    if (add.length) setUnlocks((u) => [...u, ...add.filter((a) => !u.some((x) => x.id === a.id))]);
-  }
-  const unlock = unlocks[0] ?? null;
+  // a Power-Up just landed on the belt: no card (nothing needs interrupting). Nova's caption names it
+  // ("Flip It is on your belt now!") and its slot pulses for as long as the arena keeps `unlock` up
+  const fresh = new Set((ui?.unlock?.cards ?? []).map((name) => TRICK_BY_CARD[name]).filter(Boolean));
   const [jumping, setJumping] = useState<string | null>(null);
   const briefing = !!ui && launch && !ui.started && !ui.done;
-  // one card at a time: a New Power-Up card is read first, then the offer or the clear card
-  const offer = !!ui?.offer && !jumping && !unlock;
-  const done = !!ui?.done && !unlock;
-  const cardOpen = briefing || !!unlock || offer || done || !!jumping;
-  // a card to read holds the game still (the next fleet waits for "Got it")
-  useEffect(() => { if (unlock) hold.on("card"); else hold.off("card"); }, [unlock]);
+  const offer = !!ui?.offer && !jumping;
+  const done = !!ui?.done;
+  const cardOpen = briefing || offer || done || !!jumping;
   // the keyboard works without a click: the game root has focus whenever no card is up
   useEffect(() => { if (!cardOpen && !paused) rootRef.current?.closest<HTMLElement>("[data-cockpit]")?.focus({ preventScroll: true }); }, [cardOpen, paused]);
+  // a card or the menu just closed: the second tap of a double tap lands on the console under it, so for a
+  // moment the console ignores presses (a stray digit on Fire, or a Power-Up switched on, by accident)
+  const closedAt = useRef(-Infinity);
+  const covered = cardOpen || paused;
+  useEffect(() => { if (!covered) closedAt.current = performance.now(); }, [covered]);
+  const settled = useCallback(() => performance.now() - closedAt.current > SETTLE_MS, []);
 
   // ---- the number ----
   const live = !!ui?.canFire && !!w && !cardOpen && !paused;
@@ -160,8 +159,6 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const centre = useCockpitSafe(layout, stripRef, conRef, apply);
 
   // ---- orbs: earned this battle, and the flight to the counter ----
-  const [firstOrbs, setFirstOrbs] = useState<number | null>(null);
-  if (ui && firstOrbs === null) setFirstOrbs(ui.orbs);
   const shownOrbs = useOrbReward(ui?.orbs ?? 0, orbsRef, centre, { reduced, still: cardOpen });
 
   // ---- mission progress ----
@@ -231,7 +228,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
     <>
       {shown.map((t) => (
         <Slot key={t.id} label={t.card} glyph={<PowerUpGlyph id={t.id} lock={t.card === "Sector-Lock"} />} pressed={t.active}
-          disabled={!live || !!lesson} pulse={!reduced && h?.powerUp === t.id && !t.active} onPress={() => arena?.powerUp(t.id)} />
+          disabled={!live || !!lesson} pulse={!reduced && (fresh.has(t.id) || (h?.powerUp === t.id && !t.active))} onPress={() => { if (settled()) arena?.powerUp(t.id); }} />
       ))}
       {Array.from({ length: SLOTS - shown.length }, (_, i) => <EmptySlot key={`e${i}`} />)}
     </>
@@ -258,19 +255,18 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
           <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
         </div>
       )}
-      <Console layout={layout} consoleRef={conRef} entry={entry} live={live} fireWord={sectorActive ? "Lock" : "Fire"} onKey={press}
+      <Console layout={layout} consoleRef={conRef} entry={entry} live={live} fireWord={sectorActive ? "Lock" : "Fire"} onKey={(k) => { if (settled()) press(k); }}
         slots={slots} label={sectorActive ? `Console, sector ${sectorActive.label}` : "Console"}
-        help={ui.mode === "academy" ? null : { onPress: () => arena?.showMeHow(), disabled: !live || !!lesson, invite: ui.invite }} />
+        help={ui.mode === "academy" ? null : { onPress: () => { if (settled()) arena?.showMeHow(); }, disabled: !live || !!lesson, invite: ui.invite }} />
       <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${fmtN(Number(entry))} plasma balls loaded`}</p>
 
       <BriefingCard open={briefing} body={ui.planet} name={planetTitle} teaches={PLANET_TEACHES[ui.planet] ?? ""} win={winLine} onLaunch={() => arena?.start()} />
-      {unlock && <UnlockCard open id={unlock.id} name={unlock.name} sector={unlock.sector} onClose={() => setUnlocks((u) => u.slice(1))} />}
       <OfferCard open={offer} title={ui.offer ? planetName(ui.offer.to) : ""} name={ui.offer ? planetName(ui.offer.to, true) : ""} body={ui.offer?.to ?? null}
         onJump={() => { const name = ui.offer ? planetName(ui.offer.to, true) : null, to = arena?.acceptJump(); if (to) { setJumping(name); onFly?.(to); } }}
         onStay={() => arena?.declineJump()} />
-      <ClearCard open={done && !jumping} body={ui.planet} title={clearTitle} orbs={ui.orbs - (firstOrbs ?? ui.orbs)}
+      <ClearCard open={done && !jumping} body={ui.planet} title={clearTitle} orbs={d?.orbs ?? null}
         sub={d?.sub && !/clear$/i.test(d.title) ? d.sub : d?.next && d.next !== ui.planet ? `${planetName(d.next)} is open.` : undefined}
-        actions={d && (doneActions ? <div className="flex flex-wrap justify-center gap-3">{doneActions(d)}</div> : <>
+        actions={d && (doneActions ? doneActions(d) : <>
           {d.next && <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => onFly?.(d.next!)}>Fly to {nextName}</Button>}
           <div className={css.cardRow}>
             <Button variant="secondary" size="md" icon="map" onClick={() => leave("/map")}>Star map</Button>

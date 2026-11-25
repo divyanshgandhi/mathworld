@@ -11,6 +11,7 @@ import { classifyError } from "@/rig/errors";
 import { PLANETS_BY_TIER } from "@/rig/pools";
 import { CARD, powerUpFits } from "@/rig/tricks";
 import { BATTLE_LINES, POWERUP_LINE } from "@/worlds/space/lines";
+import { COMBAT_LINES } from "@/battle/lines";
 
 const run = (actions: BattleAction[], s: BattleState = initialBattle()) => actions.reduce(reduce, s);
 const aiming = (a: number, b: number) => run([{ type: "start" }, { type: "wave", a, b }, { type: "ready" }]);
@@ -275,10 +276,34 @@ describe("planet themes", () => {
       const t = PLANET_THEMES[p];
       expect(t.id).toBe(p);
       expect(t.mood).toBe("battle");
-      expect((BATTLE_LINES as Record<string, string>)[t.briefing]).toBeTruthy();
+      const all = { ...BATTLE_LINES, ...COMBAT_LINES } as Record<string, string>;
+      expect(all[t.briefing]).toBeTruthy();
+      // the first wave's line names no structure (decision 2): "squads" comes only from the hint ladder
+      expect(all[t.briefing]).not.toMatch(/squad/i);
       expect((BATTLE_LINES as Record<string, string>)[t.clear]).toBeTruthy();
     }
     expect(PLANET_THEMES.earth.intro).toBe("nova_greet_battle");
-    expect(PLANET_THEMES.earth.introClear).toBe("nova_l0_clear");
+    expect(PLANET_THEMES.earth.introClear).toBe("nova_earth_clear");
+  });
+  it("no battle line Nova says live uses a retired word", () => {
+    for (const t of Object.values(COMBAT_LINES)) expect(t).not.toMatch(/\b(load|sneaky|squadrons?|radar|telemetry|ace)\b/i);
+  });
+});
+
+describe("Earth's first waves", () => {
+  it("a new cadet meets no empty fleet until two Earth fleets are cleared", async () => {
+    const { initialState } = await import("@/director/fold");
+    const { nextWave } = await import("@/director/next");
+    const { factKey } = await import("@/rig/pools");
+    for (let seed = 1; seed < 60; seed++) {
+      const s = initialState();
+      const solve = (a: number, b: number) => { s.history.push({ a, b, key: factKey(a, b), factTier: 0, tier: 0, role: "tutorial", outcome: "fast", transfer: false, trick: "empty-mirror", afterLesson: false }); s.waves++; };
+      const w1 = nextWave(s, seed);
+      expect(w1.a).toBe(1);
+      solve(w1.a, w1.b);
+      const w2 = nextWave(s, seed);
+      expect(w2.a * w2.b).toBeGreaterThan(0);
+      expect(factKey(w2.a, w2.b)).not.toBe(factKey(w1.a, w1.b));
+    }
   });
 });

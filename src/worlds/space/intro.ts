@@ -893,10 +893,12 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       skipping += dt;
       const D = 0.28;
       if (skipping < D) { fadeColor = COLOR.void; fade = Math.max(fade, smooth(skipping / D)); }
-      else if (director.current?.name !== "arrive" || fade > 0.001) {
+      else {
         if (director.running && director.current?.name !== "arrive") { reset(); director.index = director.find("arrive"); director.t = ARRIVAL.end - 0.01; setUi({ chapter: "hangar" }); setEnv("space"); overlay.card("", ""); }
         lastFrame();
         fadeColor = COLOR.void; fade = 1 - smooth((skipping - D) / D);
+        // the finish depends on the skip's own clock only: a frame that lands with the fade already near zero
+        // must still end the film (with variable frame times the old fade test could stop here for good)
         if (skipping >= D * 2) { fade = 0; skipping = -1; director.go(steps.length); }
       }
     } else director.update(dt);

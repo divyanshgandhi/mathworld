@@ -1,6 +1,6 @@
 import type { EventInput } from "@/db/events";
 import { seeded, type Rng } from "@/engine/util";
-import { GOLD_STREAK_FOR_JUMP, M0 } from "@/rig/adaptive";
+import { GOLD_STREAK_FOR_JUMP, isSolved, M0 } from "@/rig/adaptive";
 import { drawFrom, ENUMERABLE_TIERS, factKey, factsOf, MAX_TIER, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
 import { placeParts, selectTrick, type TrickId } from "@/rig/tricks";
 import type { PlayerState, WaveRole } from "./fold";
@@ -115,7 +115,14 @@ export function nextWave(s: PlayerState, seed: number): Wave {
   // the tutorial never serves the fleet just played again (after a Show Me How it is the weakest)
   // a brand-new cadet's very first fleet is one squad of three to five ships: something to count, never empty
   if (tier === 0 && s.waves === 0) return make({ a: 1, b: 3 + Math.floor(rng() * 3) }, "tutorial");
-  if (tier === 0) return make(orient(weakest(s, 0, mix(seed, s.waves), new Set(s.history.slice(-1).map((w) => w.key))), rng, 0), "tutorial");
+  if (tier === 0) {
+    // zero is its own new idea: an empty fleet comes only once two Earth fleets have been cleared (until
+    // then every fleet is a × 1 or 1 × b, something to count), so "squads" and "zero" never arrive together
+    const solved = s.history.filter((w) => w.tier === 0 && isSolved(w.outcome)).length;
+    const skip = new Set(s.history.slice(-1).map((w) => w.key));
+    if (solved < 2) for (const f of factsOf(0)) if (f.a === 0 || f.b === 0) skip.add(factKey(f.a, f.b));
+    return make(orient(weakest(s, 0, mix(seed, s.waves), skip), rng, 0), "tutorial");
+  }
 
   const goal = target(s, tier, seed);
   switch (s.mission.waves) {

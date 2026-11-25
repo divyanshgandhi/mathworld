@@ -233,8 +233,9 @@ export function IntroFilm() {
         <BattleHud arena={bayArena} ui={bayUi} drone launch={false} menu={<PauseMenu places={false} />}
           doneActions={(d) => (
             <>
-              <Button variant="primary" onClick={() => void flushed().then(() => router.push("/bay"))}>Enter the Resting Bay</Button>
-              {d.next && <Button variant="secondary" onClick={() => void flushed().then(() => router.push(`/play/${d.next}`))}>Fly to {planetName(d.next, true)}</Button>}
+              {/* the same order as every later clear: fly on is the one primary; home is the second way */}
+              {d.next && <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => void flushed().then(() => router.push(`/play/${d.next}`))}>Fly to {planetName(d.next, true)}</Button>}
+              <Button variant={d.next ? "secondary" : "primary"} size="md" icon="bay" className="w-full" onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
             </>
           )} />
       )}
