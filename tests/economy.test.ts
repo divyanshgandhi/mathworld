@@ -264,3 +264,16 @@ describe("the Star map words (TEACHES)", () => {
     for (const t of Object.values(TEACHES)) expect(t).not.toMatch(/·|digit|armada/i);
   });
 });
+
+describe("answers that cannot have been played", () => {
+  it("a burst of forged right answers (one request, one server time) pays for one shot only", () => {
+    const t = 20 * DAY, burst = [[2, 3], [2, 4], [2, 6], [2, 7], [2, 8], [2, 9]].map(([a, b]): LoggedEvent => {
+      const e = right(a, b, { role: "practice", ms: 200 });
+      return { type: e.type, payload: { ...e.payload, loggedAt: t } } as unknown as LoggedEvent; // as the server returns them: its own time, one for the whole request
+    });
+    expect(fold(burst).orbs).toBe(5);
+    // the same answers a second apart, as a real battle gives them, pay as usual (6 × 5, plus 5 for five in a row)
+    const played = [[2, 3], [2, 4], [2, 6], [2, 7], [2, 8], [2, 9]].map(([a, b], i) => right(a, b, { role: "practice", ms: 9000, at: t + i * 4000 }));
+    expect(fold(played).orbs).toBe(35);
+  });
+});

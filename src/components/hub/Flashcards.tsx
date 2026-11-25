@@ -141,7 +141,7 @@ export function Flashcards({ state, emit, onClose, table = null, facts, title: n
               {result && !result.ok ? (
                 <Miss result={result} />
               ) : (
-                <p className="m-0 flex items-baseline justify-center gap-[0.3em] type-display type-number text-[clamp(56px,13vw,136px)] leading-none" aria-label={result ? `${card.a} times ${card.b} is ${card.a * card.b}. Right.` : `${card.a} times ${card.b}`}>
+                <p className="mw-cards-eq m-0 flex items-baseline justify-center gap-[0.3em] type-display type-number leading-none" aria-label={result ? `${card.a} times ${card.b} is ${card.a * card.b}. Right.` : `${card.a} times ${card.b}`}>
                   <span>{card.a}</span><span className="text-ink-3">×</span><span>{card.b}</span><span className="text-ink-3">=</span>
                   <span className={`mw-cards-slot ${result?.ok ? "text-gold" : ""}`} data-empty={!entry && !result ? "" : undefined}>
                     {result?.ok ? card.a * card.b : entry || "?"}
@@ -170,8 +170,8 @@ function Miss({ result }: { result: Result }) {
   // dots shrink to fit a big fact, never below a size a child can count
   const dot = Math.max(10, Math.min(26, Math.floor(300 / Math.max(a, b, 1)) - 6));
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <p className="m-0 type-display type-number text-[clamp(44px,8vw,88px)] leading-none">
+    <div className="mw-miss flex flex-col items-center gap-6 text-center">
+      <p className="mw-miss-eq m-0 type-display type-number leading-none">
         {a} <span className="text-ink-3">×</span> {b} <span className="text-ink-3">=</span> <span className="text-gold">{total}</span>
       </p>
       {total > 0 ? (
@@ -179,7 +179,7 @@ function Miss({ result }: { result: Result }) {
           className="mw-dots"
           role="img"
           aria-label={`${a} rows of ${b} dots: ${total} dots`}
-          style={{ "--dot": `${dot}px`, gridTemplateColumns: b > 5 ? `repeat(5, var(--dot)) calc(var(--dot) * 0.4) repeat(${b - 5}, var(--dot))` : `repeat(${b}, var(--dot))` } as CSSProperties}
+          style={{ "--dot-want": `${dot}px`, "--rows": a, gridTemplateColumns: b > 5 ? `repeat(5, var(--dot)) calc(var(--dot) * 0.4) repeat(${b - 5}, var(--dot))` : `repeat(${b}, var(--dot))` } as CSSProperties}
         >
           {/* a rows of b, with a small gap after every fifth dot so a row is easy to count */}
           {Array.from({ length: total }, (_, k) => { const c = k % b; return <i key={k} style={{ gridRow: Math.floor(k / b) + 1, gridColumn: c + 1 + (c >= 5 ? 1 : 0) }} />; })}
@@ -187,7 +187,7 @@ function Miss({ result }: { result: Result }) {
       ) : (
         <span className="mw-orbit size-24" aria-hidden />
       )}
-      <p className="m-0 max-w-[30ch] type-child text-ink-2">
+      <p className="mw-miss-words m-0 max-w-[30ch] type-child text-ink-2">
         {total > 0 ? <>{a} {a === 1 ? "row" : "rows"} of {b} make {total}.</> : <>{a === 0 ? `No rows of ${b}` : `${a} rows of none`} make 0.</>} You said {guess}.
       </p>
     </div>

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { PLANETS_BY_TIER } from "@/rig/pools";
+import { reach } from "./reach";
 import { TRICKS } from "@/db/events";
 import { normalize } from "@/db/events";
 import { seeded } from "@/engine/util";
@@ -66,13 +68,20 @@ describe("Solar System map", () => {
     expect(canLaunch(fold([]), "venus")).toBe(true);
   });
   it("marks cleared and Ace-cleared planets, and the Hyper-Jump streak", () => {
-    const tutorial = [[0, 5], [1, 7], [1, 3]].map(([a, b]) => shot(a, b, a * b, 9000, 1, "earth", "tutorial"));
-    const s = fold([...tutorial, { type: "planet_cleared", payload: { planetId: "earth" } }, { type: "hyper_jump_taken", payload: { fromPlanet: "moon", toPlanet: "asteroid-belt" } }]);
+    // played, not forged: a strong cadet clears planets until the director offers a Hyper-Jump, and takes it
+    const log = reach(0, { jump: true }), jump = log.at(-1)!;
+    expect(jump.type).toBe("hyper_jump_taken");
+    const { fromPlanet, toPlanet } = (jump as Extract<LoggedEvent, { type: "hyper_jump_taken" }>).payload;
+    const s = fold(log), from = (PLANETS_BY_TIER as readonly string[]).indexOf(fromPlanet), to = (PLANETS_BY_TIER as readonly string[]).indexOf(toPlanet);
+    expect(s.tier).toBe(to);
     expect(fold([{ type: "planet_cleared", payload: { planetId: "earth" } }]).cleared).toEqual([]); // a clear with no passed mission is ignored
+    expect(fold([{ type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "mars" } }]).tier).toBe(0); // so is a jump nobody offered
     const st = Object.fromEntries(mapStops(s).map((x) => [x.id, x.status]));
-    expect(st).toMatchObject({ earth: "cleared", moon: "ace", mars: "ace", "asteroid-belt": "frontier", jupiter: "locked" });
-    expect(canLaunch(s, "mars")).toBe(true);
-    expect(hyperJumpStatus(s)).toMatchObject({ available: false, streak: 0, need: 3, to: "saturn" });
+    for (let t = 0; t < from; t++) expect(st[PLANETS_BY_TIER[t]]).toBe("cleared");
+    for (let t = from; t < to; t++) expect(st[PLANETS_BY_TIER[t]]).toBe("ace");
+    expect(st[toPlanet]).toBe("frontier");
+    expect(canLaunch(s, PLANETS_BY_TIER[to - 1])).toBe(true);
+    expect(hyperJumpStatus(s)).toMatchObject({ available: false, streak: 0, need: 3 });
   });
 });
 
