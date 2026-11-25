@@ -66,7 +66,7 @@ A jump ahead needs a clean record: a Gold run, a Gold answer on a probe from the
 
 ## Telemetry and testing
 
-- **`/admin`** is not linked from the game. Set `MW_ADMIN_KEY` (10 characters or more) on the server, open `/admin` and enter it. With no key set, `/admin` is off. It shows each cadet's mastery, planet progress, rates by trick, the transfer rate, the orb ledger and day-2 return.
+- **`/admin`** is not linked from the game. Set `MW_ADMIN_KEY` (6 characters or more) on the server, open `/admin` and enter it. With no key set, `/admin` is off. It shows each cadet's mastery, planet progress, rates by trick, the transfer rate, the orb ledger and day-2 return.
 - **`docs/test-protocol.md`** is how to run 3 to 5 children and one adult silently, what to watch, and how to read `/admin` before and after.
 
 ## Deploy (Vercel and Supabase)
@@ -74,7 +74,7 @@ A jump ahead needs a clean record: a Gold run, a Gold answer on a probe from the
 1. **Vercel:** import the repository. It is detected as Next.js. `vercel.json` installs with Bun and runs `scripts/migrate.mjs` before `next build`, so every deploy migrates the database first.
 2. **Database:** in the Vercel project open **Storage**, add **Supabase**, and connect it to the project. Vercel then sets `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING`, and the app reads them. Keep the database in the same region as the functions.
    To use a Supabase project of your own, set `DATABASE_URL` to its transaction pooler URL (port 6543) and `MIGRATION_DATABASE_URL` to its session pooler URL (port 5432).
-3. **Admin:** add `MW_ADMIN_KEY` (10 characters or more) to turn on `/admin`.
+3. **Admin:** add `MW_ADMIN_KEY` (6 characters or more) to turn on `/admin`.
 4. **Redeploy**, then smoke-test:
    ```bash
    curl -c jar -X POST -H 'content-type: application/json' -d '{"name":"Test"}' https://<app>/api/player

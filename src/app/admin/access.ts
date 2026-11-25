@@ -1,12 +1,12 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 /**
- * /admin access. The passphrase lives only in the environment (`MW_ADMIN_KEY`, at least 10
+ * /admin access. The passphrase lives only in the environment (`MW_ADMIN_KEY`, at least 6
  * characters); with none set, /admin is off. It can be given once as `?key=` or through the
  * passphrase form, which stores a hash of it (never the key itself) in an httpOnly cookie.
  */
 export const ADMIN_COOKIE = "mw_admin";
-export const MIN_KEY = 10;
+export const MIN_KEY = 6;
 
 export const tokenFor = (key: string) => createHash("sha256").update(`mathworld-admin:${key}`).digest("hex");
 
