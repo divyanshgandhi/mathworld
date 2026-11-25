@@ -212,17 +212,20 @@ describe("the daily patrol (src/director/hub.ts)", () => {
     const done = (d: number, facts = [{ a: 3, b: 8 }]): LoggedEvent => ({ type: "patrol_completed", payload: { day: d, facts } });
     expect(fold([done(day)]).orbs).toBe(0); // nothing was answered: a forged patrol mints nothing
     expect(fold([right(3, 8, { at: t0 }), done(day)]).ledger.map((e) => e.rule)).toEqual(["first_try"]); // a battle answer is not a patrol
-    const log = [card(3, 8, t0, 24), card(3, 8, t0 + 1), done(day)];
+    const met = right(3, 8, { at: t0 - 10 * DAY }); // met in battle long ago: due for review today
+    expect(fold([card(3, 8, t0, 24), card(3, 8, t0 + 1), done(day)]).orbs).toBe(0); // cards for a fact never due are not a patrol
+    const log = [met, card(3, 8, t0, 24), card(3, 8, t0 + 1), done(day)];
     let s = fold(log);
-    expect(s.orbs).toBe(15);
+    const base = fold([met]).orbs;
+    expect(s.orbs - base).toBe(15);
     expect(s.ledger.at(-1)).toMatchObject({ reason: "Daily patrol", amount: 15 });
     expect(patrolDone(s, day)).toBe(true);
     expect(patrolDone(s, day + 1)).toBe(false);
     s = fold([...log, card(3, 8, t0 + 2), done(day)]); // a second patrol the same day
-    expect(s.orbs).toBe(15);
-    s = fold([...log, card(3, 8, t0 + DAY), done(day + 1), card(3, 8, t0 + DAY + 5), done(day - 3)]); // tomorrow pays; going back does not
-    expect(s.orbs).toBe(30);
-    expect(s.patrol).toEqual({ lastDay: day + 1, done: 2 });
+    expect(s.orbs - base).toBe(15);
+    s = fold([...log, card(3, 8, t0 + 10 * DAY), done(day + 10), card(3, 8, t0 + 20 * DAY), done(day - 3)]); // a later day pays; going back does not
+    expect(s.orbs - base).toBe(30);
+    expect(s.patrol).toEqual({ lastDay: day + 10, done: 2 });
   });
 
   it("keeps a patrol's day within a day of the server's clock", () => {
