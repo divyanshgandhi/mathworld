@@ -85,11 +85,21 @@ const inside = (a: Box, v: Box) => a.x >= v.x && a.y >= v.y && a.x + a.w <= v.x 
 export function placeCaption(anchor: Box, size: { w: number; h: number }, view: Box, avoid: Box[] = [], prefer: Side[] = ["above", "below", "left", "right"], gap = 14, soft: Box[] = []): { box: Box; side: Side } {
   // first keep clear of everything; then, if nothing fits, only of the hard boxes (controls), so a
   // tight phone covers the question plate or a corner of the fleet before it covers a button
+  // a caption kept clear of everything but pushed far from what it points at no longer points at it:
+  // past `reach` px away, the soft boxes give way instead
   if (soft.length) {
     const all = tryPlace(anchor, size, view, [...avoid, ...soft], prefer, gap);
-    if (all) return all;
+    if (all && distance(all.box, anchor) <= reach(view)) return all;
   }
   return tryPlace(anchor, size, view, avoid, prefer, gap) ?? mostRoom(anchor, size, view, gap);
+}
+
+/** How far a caption may sit from its anchor and still read as pointing at it. */
+const reach = (view: Box) => Math.max(96, Math.min(view.w, view.h) * 0.2);
+/** The gap between two boxes (0 if they touch or overlap). */
+function distance(a: Box, b: Box) {
+  const dx = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w)), dy = Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h));
+  return Math.hypot(dx, dy);
 }
 
 function at(anchor: Box, size: { w: number; h: number }, view: Box, side: Side, gap: number): Box {
@@ -110,6 +120,13 @@ function tryPlace(anchor: Box, size: { w: number; h: number }, view: Box, avoid:
     for (let i = 0; i < 4; i++) {
       const hit = avoid.filter((a) => overlaps(box, a));
       if (!hit.length) return box;
+      // above or below: first try sliding along beside what is in the way, still over the anchor
+      if (side === "above" || side === "below") {
+        const lo = Math.min(...hit.map((a) => a.x)), hi = Math.max(...hit.map((a) => a.x + a.w));
+        const beside = [{ ...box, x: lo - gap - size.w }, { ...box, x: hi + gap }]
+          .filter((b) => inside(b, view) && b.x < anchor.x + anchor.w && b.x + b.w > anchor.x && !avoid.some((a) => overlaps(b, a)));
+        if (beside.length) return beside.sort((p, q) => Math.abs(p.x + p.w / 2 - (anchor.x + anchor.w / 2)) - Math.abs(q.x + q.w / 2 - (anchor.x + anchor.w / 2)))[0];
+      }
       if (side === "above") box = { ...box, y: Math.min(...hit.map((a) => a.y)) - gap - size.h };
       if (side === "below") box = { ...box, y: Math.max(...hit.map((a) => a.y + a.h)) + gap };
       if (side === "left") box = { ...box, x: Math.min(...hit.map((a) => a.x)) - gap - size.w };
