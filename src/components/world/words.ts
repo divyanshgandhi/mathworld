@@ -48,6 +48,12 @@ export const STATE_WORDS = {
 /** The panel's one action for a stop. */
 export const ACTION_WORDS = { launch: "Launch", practise: "Practise", warmup: "Warm up" } as const;
 
+/** A locked stop's card line: the one planet to clear next. "Clear the Moon first." */
+export const clearFirstLine = (id: StopId) => {
+  const n = STOP_WORDS[id].inSentence;
+  return `Clear ${n} first.`;
+};
+
 export const lockedLine = (prev: StopId, id: StopId) => `Clear ${STOP_WORDS[prev].inSentence} to open ${STOP_WORDS[id].inSentence}.`;
 
 /** The Hyper-Jump, said plainly. `more` perfect shots still to go (0: it is ready). */

@@ -1,183 +1,311 @@
 "use client";
 import { Button as UiButton } from "@ui-sdk/react/button";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { MOTION } from "@/design/tokens";
 import type { PlayerState } from "@/director/fold";
-import { HomeLink, Icon, masterySummary, PillLink, Pips, RocketGlyph, TopBar } from "./kit";
+import { HomeLink, Icon, IconButton, masterySummary, PillLink, Pips, RocketGlyph, TopBar } from "./kit";
 import { useCadet } from "./hub/useCadet";
 import { FieldManual } from "./teach/FieldManual";
 import { Greeting } from "./teach/Greeting";
-import { hereIndex, hyperJump, journey, stopMarks, type JourneyStop } from "./world/journey";
+import { buttonOf, cardLine, chipOf, hyperJump, journey, openingPage, stopMarks, type JourneyStop } from "./world/journey";
+import { ARROW, DOTS_H, mapLayout, type MapLayout } from "./world/mapLayout";
 import { PlanetSprite } from "./world/PlanetSprite";
 import { preloadSprites } from "./world/spriteStore";
 import { Starfield } from "./world/Starfield";
-import { ACTION_WORDS, STATE_WORDS, STOP_WORDS, type StopId } from "./world/words";
+import { STATE_WORDS, STOP_WORDS } from "./world/words";
 
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** Exponential ease-out, the house curve, for the one scripted move (an arrow, a key or a dot). */
+const easeOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
+/** Pages this close to the one in view draw their planet; the rest hold its place with a hairline circle. */
+const NEAR = 2;
 
-/** Each planet's sprite size on the wide map, roughly true to the bodies (Saturn's includes its rings). */
-const SIZE: Record<StopId, number> = {
-  mercury: 44, venus: 54, earth: 62, moon: 42, mars: 52, "asteroid-belt": 66, jupiter: 90, saturn: 108, uranus: 72, "deep-space": 70,
-};
-const narrowSize = (id: StopId) => Math.round(Math.min(84, Math.max(38, SIZE[id] * 0.78)));
-const SUN = { wide: 240, narrow: 200 };
+const labelOf = (s: JourneyStop) => `${STOP_WORDS[s.id].name}, ${chipOf(s).text.toLowerCase()}`;
 
-/** Wide enough for the whole journey on one gentle arc; anything smaller gets a vertical path. */
-const WIDE = "(min-width: 1100px) and (min-height: 600px)";
-function useWide() {
-  return useSyncExternalStore(
-    (fn) => { const m = matchMedia(WIDE); m.addEventListener("change", fn); return () => m.removeEventListener("change", fn); },
-    () => matchMedia(WIDE).matches,
-    () => true,
-  );
+/** Read where the map was asked to open: `?at=` (a reload) or `?locked=` (a locked planet's address). */
+function askedFor() {
+  if (typeof location === "undefined") return {};
+  const q = new URLSearchParams(location.search);
+  return { at: q.get("at"), locked: q.get("locked") };
 }
 
-const stateOf = (s: JourneyStop) => (s.here ? "here" : s.locked ? "locked" : s.cleared ? "cleared" : s.warmup ? "warmup" : "open");
-const labelOf = (s: JourneyStop) => `${STOP_WORDS[s.id].name}. ${STOP_WORDS[s.id].teaches}. ${STATE_WORDS[stateOf(s)]}${s.cleared && s.here ? `, ${STATE_WORDS.cleared}` : ""}.`;
-/** How bright a stop's planet is: the cadet's own planet is the brightest thing on the path. */
-const spriteFilter = (s: JourneyStop): CSSProperties["filter"] => (s.locked ? "brightness(0.42) saturate(0)" : s.here ? undefined : "brightness(0.8)");
-
 /**
- * The Star map (/map): where you choose where to launch. The whole journey on one screen, on a dashed
- * hairline path out from the Sun: the two warm-ups, then Earth to Deep Space. Each stop shows its planet,
- * its name and what it teaches; cleared stops wear a gold ring and a check, the cadet's planet has the
- * rocket, locked ones are dim silhouettes with a lock. Choosing a stop opens its panel in place, with one
- * action. Arrow keys move along the path, Enter launches. Wide screens get an arc; phones a vertical path
- * that opens scrolled to the cadet.
+ * The Star map (/map): a pager, one planet a page, opening on the cadet's own planet. The planet is the
+ * hero, its neighbours peek in dim at the edges on a dashed path, and its card says where it stands, what
+ * it teaches and its one action. Move by scrolling or swiping sideways (it snaps a page at a time), the
+ * arrows at the sides, the arrow keys, or the ten journey dots under the page.
  */
 export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
   const router = useRouter();
   const { state, emit } = useCadet();
   const [help, setHelp] = useState(false);
   const stops = useMemo(() => (state ? journey(state) : null), [state]);
-  const here = stops ? hereIndex(stops) : 0;
-  const [picked, setPicked] = useState<number | null>(null);
-  // a locked planet opened by its address lands here (?locked=<planet>) with that planet picked, so its panel says what opens it
-  const [asked] = useState(() => (typeof location === "undefined" ? null : new URLSearchParams(location.search).get("locked")));
-  const askedAt = stops && asked ? stops.findIndex((s) => s.id === asked) : -1;
-  const sel = picked ?? (askedAt >= 0 ? askedAt : here);
-  const wide = useWide();
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const [asked] = useState(askedFor);
+  const [at, setAt] = useState<number | null>(null);
+  const page = at ?? (stops ? openingPage(stops, asked) : 0);
+
+  const scroller = useRef<HTMLDivElement>(null);
+  const cards = useRef<(HTMLElement | null)[]>([]);
+  const prevBtn = useRef<HTMLButtonElement>(null), nextBtn = useRef<HTMLButtonElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [cardH, setCardH] = useState(300);
+  const atRef = useRef(page);
+  // the page in view, for handlers and effects (kept in step before anything below reads it)
+  useLayoutEffect(() => { atRef.current = page; }, [page]);
+  const tween = useRef<{ raf: number; timer: number } | null>(null);
   const launching = useRef(false);
 
   useEffect(() => { void import("@/engine/audio").then(({ audio }) => audio.mood("space")); }, []);
-  // every sprite this screen shows, the cadet's planet first
-  useEffect(() => {
-    if (!stops) return;
-    const order = [stops[here], ...stops.filter((_, i) => i !== here)];
-    void preloadSprites([...order.map((s) => ({ id: s.id, size: wide ? SIZE[s.id] : narrowSize(s.id) })), { id: "sun", size: wide ? SUN.wide : SUN.narrow }]);
-    router.prefetch(`/play/${stops[here].id}`);
-  }, [stops, here, wide, router]);
 
-  const launch = useCallback((i: number) => {
-    const s = stops?.[i];
-    if (!s) return;
-    setPicked(i);
-    if (!s.action || launching.current) return; // a locked stop never launches: its panel says what opens it
+  // the pager's size: one observer; a resize or a rotation keeps the same page in view
+  const ready = !!stops;
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const read = () => setBox((b) => (b.w === el.clientWidth && b.h === el.clientHeight ? b : { w: el.clientWidth, h: el.clientHeight }));
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    read();
+    return () => ro.disconnect();
+  }, [ready]);
+  // open on the page at once (no ride past the others), and stay on it through a resize
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !box.w || tween.current) return;
+    el.scrollLeft = atRef.current * box.w;
+  }, [box.w, ready]);
+
+  // the tallest card decides how much room the planet has above it on a phone, so the button is always in view
+  useLayoutEffect(() => {
+    if (!ready) return;
+    const read = () => { const h = Math.max(0, ...cards.current.map((c) => c?.offsetHeight ?? 0)); if (h) setCardH((o) => (Math.abs(o - h) < 2 ? o : h)); };
+    const ro = new ResizeObserver(read);
+    cards.current.forEach((c) => c && ro.observe(c));
+    read();
+    return () => ro.disconnect();
+  }, [ready, box.w]);
+
+  const L = useMemo(() => (box.w ? mapLayout(box.w, box.h, cardH) : null), [box.w, box.h, cardH]);
+
+  // the planets this screen shows, the one in view first, then its neighbours, then the rest
+  useEffect(() => {
+    if (!stops || !L) return;
+    const order = stops.map((_, i) => i).sort((a, b) => Math.abs(a - page) - Math.abs(b - page));
+    void preloadSprites([
+      ...order.slice(0, 3).flatMap((i) => [{ id: stops[i].id, size: L.hero }, { id: stops[i].id, size: L.peek }]),
+      { id: "sun" as const, size: sunSize(L) },
+      ...order.slice(3).flatMap((i) => [{ id: stops[i].id, size: L.hero }, { id: stops[i].id, size: L.peek }]),
+    ]);
+  }, [stops, L, page]);
+  useEffect(() => { if (stops) router.prefetch(`/play/${stops[page].id}`); }, [stops, page, router]);
+
+  // the address follows the page (replace, never push: Back leaves the map, it does not walk the planets)
+  useEffect(() => {
+    if (!stops || at === null) return;
+    const t = window.setTimeout(() => {
+      const u = new URL(location.href);
+      u.searchParams.set("at", stops[at].id);
+      u.searchParams.delete("locked");
+      if (u.href !== location.href) history.replaceState(history.state, "", u.href);
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [stops, at]);
+
+  const settle = useCallback(() => {
+    const el = scroller.current, t = tween.current;
+    if (t) { cancelAnimationFrame(t.raf); clearTimeout(t.timer); tween.current = null; }
+    if (el) { el.scrollLeft = atRef.current * el.clientWidth; el.style.scrollSnapType = ""; }
+  }, []);
+
+  /** Go to a page: at most MOTION.route ms, none under reduced motion. */
+  const go = useCallback((i: number) => {
+    const el = scroller.current;
+    if (!stops || !el) return;
+    const k = Math.max(0, Math.min(stops.length - 1, i));
+    // an arrow that is about to vanish (the first or last page) hands focus to the other one
+    const f = document.activeElement;
+    if ((k === 0 && f === prevBtn.current) || (k === stops.length - 1 && f === nextBtn.current)) (k === 0 ? nextBtn : prevBtn).current?.focus({ preventScroll: true });
+    if (tween.current) settle();
+    atRef.current = k;
+    setAt(k);
+    const from = el.scrollLeft, to = k * el.clientWidth;
+    if (reduced() || Math.abs(to - from) < 1) { el.scrollLeft = to; return; }
+    el.style.scrollSnapType = "none";
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const p = Math.min(1, (now - t0) / MOTION.route);
+      el.scrollLeft = from + (to - from) * easeOut(p);
+      if (p < 1 && tween.current) tween.current.raf = requestAnimationFrame(frame);
+      else settle();
+    };
+    // a hidden tab runs no frames: the timer lands the page anyway
+    tween.current = { raf: requestAnimationFrame(frame), timer: window.setTimeout(settle, MOTION.route + 60) };
+  }, [stops, settle]);
+
+  // a scroll or swipe by hand: the page nearest the middle is the page
+  const onScroll = useCallback(() => {
+    const el = scroller.current;
+    if (!el || tween.current || !el.clientWidth) return;
+    const k = Math.round(el.scrollLeft / el.clientWidth);
+    if (k !== atRef.current && stops && k >= 0 && k < stops.length) { atRef.current = k; setAt(k); }
+  }, [stops]);
+
+  const launch = useCallback(() => {
+    const s = stops?.[atRef.current];
+    if (!s?.action || launching.current) return;
     launching.current = true;
     router.push(`/play/${s.id}`);
   }, [stops, router]);
 
-  const move = useCallback((i: number) => {
-    if (!stops) return;
-    const k = Math.max(0, Math.min(stops.length - 1, i));
-    setPicked(k);
-    buttons.current[k]?.focus({ preventScroll: wide });
-    if (!wide) buttons.current[k]?.scrollIntoView({ block: "nearest" });
-  }, [stops, wide]);
-
-  // arrow keys walk the path from anywhere on the screen; Enter on the page itself launches the chosen stop
+  // the arrow keys move a page from anywhere on the screen; Enter on the page itself takes the page's one action
   useEffect(() => {
     if (!stops) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector("dialog[open], [role=dialog]")) return;
-      const t = e.target as HTMLElement | null, onStop = !!t?.closest("[data-stop]"), free = !t || t === document.body || onStop;
-      if (!free) return;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(sel + 1); }
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(sel - 1); }
-      else if (e.key === "Home") { e.preventDefault(); move(0); }
-      else if (e.key === "End") { e.preventDefault(); move(stops.length - 1); }
-      else if (e.key === "Enter" && !onStop && !e.repeat) { e.preventDefault(); launch(sel); }
+      const t = e.target as HTMLElement | null;
+      if (t && t !== document.body && !t.closest("[data-pager]") && !t.closest("[data-map-control]")) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); go(atRef.current + 1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); go(atRef.current - 1); }
+      else if (e.key === "Home") { e.preventDefault(); go(0); }
+      else if (e.key === "End") { e.preventDefault(); go(stops.length - 1); }
+      else if (e.key === "Enter" && !e.repeat && (!t || t === document.body || t === scroller.current)) { e.preventDefault(); launch(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [stops, sel, move, launch]);
+  }, [stops, go, launch]);
+
+  useEffect(() => () => { const t = tween.current; if (t) { cancelAnimationFrame(t.raf); clearTimeout(t.timer); } }, []);
 
   if (!state || !stops) return <div className="fixed inset-0 bg-void" />;
-
-  const stopProps = (s: JourneyStop, i: number) => ({
-    "data-stop": s.id,
-    ref: (el: HTMLButtonElement | null) => { buttons.current[i] = el; },
-    "aria-label": labelOf(s),
-    "aria-pressed": i === sel,
-    "aria-current": s.here ? ("location" as const) : undefined,
-    onClick: () => setPicked(i),
-    onFocus: () => setPicked(i),
-    // Enter on a stop launches it (Space still just chooses it); holding Enter never launches twice
-    onKeyDown: (e: ReactKeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); if (!e.repeat) launch(i); } },
-  });
+  const last = stops.length - 1;
 
   return (
-    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-void text-approach">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-void text-approach">
       <Starfield />
-      <TopBar className="sticky top-0 z-20 bg-void" left={<HomeLink />} title="Star map" orbs={state.orbs} onHelp={onHelp ?? (() => setHelp(true))} />
-      {wide
-        ? <WideMap stops={stops} sel={sel} state={state} stopProps={stopProps} />
-        : <NarrowMap stops={stops} sel={sel} state={state} stopProps={stopProps} />}
+      <TopBar className="relative z-20 shrink-0" left={<HomeLink />} title="Star map" orbs={state.orbs} onHelp={onHelp ?? (() => setHelp(true))} />
+      <main className="relative z-10 min-h-0 flex-1">
+        <div
+          ref={scroller}
+          data-pager
+          tabIndex={-1}
+          onScroll={onScroll}
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="The journey, one planet at a time"
+          className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {stops.map((s, i) => (
+            <Page key={s.id} s={s} i={i} n={stops.length} state={state} L={L} current={i === page} near={Math.abs(i - page) <= NEAR}
+              prev={stops[i - 1] ?? null} next={stops[i + 1] ?? null}
+              cardRef={(el) => { cards.current[i] = el; }} />
+          ))}
+        </div>
+        {L && (
+          <>
+            {page > 0 && (
+              <IconButton ref={prevBtn} data-map-control data-guide="map-prev" icon="back" label={`Back to ${STOP_WORDS[stops[page - 1].id].inSentence}`}
+                className="absolute z-20 bg-void" style={{ left: L.arrowLeftX, top: L.arrowY - ARROW / 2, width: ARROW, height: ARROW }} onClick={() => go(page - 1)} />
+            )}
+            {page < last && (
+              <IconButton ref={nextBtn} data-map-control data-guide="map-next" icon="forward" label={`On to ${STOP_WORDS[stops[page + 1].id].inSentence}`}
+                className="absolute z-20 bg-void" style={{ left: L.arrowRightX, top: L.arrowY - ARROW / 2, width: ARROW, height: ARROW }} onClick={() => go(page + 1)} />
+            )}
+            <JourneyDots stops={stops} page={page} L={L} onPick={go} />
+          </>
+        )}
+      </main>
       <Greeting screen="map" seen={{ seen: state.seen, emit }} />
       <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/map" />
     </div>
   );
 }
 
-type StopProps = (s: JourneyStop, i: number) => Record<string, unknown>;
+const sunSize = (L: MapLayout) => Math.max(96, Math.floor((L.hero * 1.1) / 8) * 8);
 
-/* ---------- the parts every layout shares ---------- */
+/* ---------- one page: the planet, its neighbours on the path, its card ---------- */
 
-/** A 22 px badge on the ring's lower right (the check of a cleared stop, the lock of a locked one). */
-const badge = (ring: number): CSSProperties => ({ left: "50%", top: "50%", transform: `translate(${ring * 0.354 - 11}px, ${ring * 0.354 - 11}px)` });
-
-/** A stop's planet with its state marks: the gold ring and check, the rocket, the lock. */
-function StopPlanet({ s, size, rocket = "above" }: { s: JourneyStop; size: number; rocket?: "above" | "none" }) {
-  const ring = size + 14;
+function Page({ s, i, n, state, L, current, near, prev, next, cardRef }: {
+  s: JourneyStop; i: number; n: number; state: PlayerState; L: MapLayout | null; current: boolean; near: boolean;
+  prev: JourneyStop | null; next: JourneyStop | null; cardRef: (el: HTMLElement | null) => void;
+}) {
+  const w = STOP_WORDS[s.id];
   return (
-    <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <PlanetSprite id={s.id} size={size} alt="" style={{ filter: spriteFilter(s) }} />
-      {s.cleared && (
+    <section
+      className="relative h-full w-full shrink-0 snap-center snap-always"
+      role="group"
+      aria-roledescription="slide"
+      aria-label={`${i + 1} of ${n}: ${w.name}`}
+      aria-hidden={!current || undefined}
+      inert={!current}
+    >
+      {L && (
         <>
-          <span aria-hidden className="pointer-events-none absolute rounded-full border-[1.5px] border-gold" style={{ width: ring, height: ring }} />
-          <span aria-hidden className="absolute grid size-[22px] place-items-center rounded-full border border-gold bg-void text-gold" style={badge(ring)}>
-            <Icon name="check" size={14} />
-          </span>
+          {/* the path: a dashed hairline through the neighbours and the planet */}
+          <span aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-dashed border-line-2" style={{ top: L.heroCy }} />
+          {i === 0
+            ? <Peek id="sun" size={sunSize(L)} cx={L.peekLeftCx - sunSize(L) * 0.3} cy={L.heroCy} near={near} sun />
+            : prev && <Peek id={prev.id} size={L.peek} cx={L.peekLeftCx} cy={L.heroCy} near={near} />}
+          {next && <Peek id={next.id} size={L.peek} cx={L.peekRightCx} cy={L.heroCy} near={near} />}
+          <Hero s={s} L={L} near={near} current={current} />
+          <Card s={s} state={state} L={L} current={current} cardRef={cardRef} />
         </>
       )}
-      {s.locked && (
-        <span aria-hidden className="absolute grid size-[22px] place-items-center rounded-full border border-line-3 bg-void text-ink-1" style={badge(ring)}>
-          <Icon name="lock" size={13} />
+    </section>
+  );
+}
+
+function Peek({ id, size, cx, cy, near, sun = false }: { id: JourneyStop["id"] | "sun"; size: number; cx: number; cy: number; near: boolean; sun?: boolean }) {
+  return (
+    <span aria-hidden className={`pointer-events-none absolute ${sun ? "" : "opacity-45"}`} style={{ left: cx - size / 2, top: cy - size / 2, width: size, height: size }}>
+      {near ? <PlanetSprite id={id} size={size} alt="" /> : null}
+    </span>
+  );
+}
+
+/** The page's planet, large, with its marks: the gold ring and check when cleared, the lock when locked, the rocket when it is the cadet's. */
+function Hero({ s, L, near, current }: { s: JourneyStop; L: MapLayout; near: boolean; current: boolean }) {
+  const size = L.hero, ring = size + 18, badge = Math.max(28, Math.round(size * 0.12));
+  const off = ring * 0.354 - badge / 2;
+  return (
+    <span data-guide={current ? "map-planet" : undefined} className="absolute grid place-items-center"
+      style={{ left: L.heroCx - size / 2, top: L.heroCy - size / 2, width: size, height: size }}>
+      {near
+        ? <PlanetSprite id={s.id} size={size} alt={STOP_WORDS[s.id].name} style={s.locked ? { filter: "brightness(0.42) saturate(0)" } : undefined} />
+        : <span aria-hidden className="rounded-full border border-line-1" style={{ width: size * 0.8, height: size * 0.8 }} />}
+      {s.cleared && <span aria-hidden className="pointer-events-none absolute rounded-full border-[1.5px] border-gold" style={{ width: ring, height: ring }} />}
+      {(s.cleared || s.locked) && (
+        <span aria-hidden className={`absolute grid place-items-center rounded-full border bg-void ${s.cleared ? "border-gold text-gold" : "border-line-3 text-ink-1"}`}
+          style={{ width: badge, height: badge, left: "50%", top: "50%", transform: `translate(${off - badge / 2}px, ${off - badge / 2}px)` }}>
+          <Icon name={s.cleared ? "check" : "lock"} size={Math.round(badge * 0.6)} />
         </span>
       )}
-      {s.here && rocket === "above" && (
-        <span aria-hidden className="absolute left-1/2 -translate-x-1/2" style={{ bottom: size + 8 }}><RocketGlyph size={40} /></span>
+      {s.here && (
+        <span aria-hidden className="absolute" style={{ left: "50%", top: "50%", transform: `translate(${-off - 22}px, ${-off - 22}px)` }}><RocketGlyph size={44} /></span>
       )}
     </span>
   );
 }
 
-/** The chosen stop's panel: name, what it teaches, the cadet's marks, and its one action. */
-function StopPanel({ s, state, compact = false, className = "", style }: { s: JourneyStop; state: PlayerState; compact?: boolean; className?: string; style?: CSSProperties }) {
-  const w = STOP_WORDS[s.id], rows = stopMarks(state, s.id), jump = s.here ? hyperJump(state) : null;
-  const status = stateOf(s);
+/** The card: as wide as its words, everything on one left edge. Chip, name, one line, the table rows, one button. */
+function Card({ s, state, L, current, cardRef }: { s: JourneyStop; state: PlayerState; L: MapLayout; current: boolean; cardRef: (el: HTMLElement | null) => void }) {
+  const w = STOP_WORDS[s.id], chip = chipOf(s), rows = s.locked ? [] : stopMarks(state, s.id), jump = s.here ? hyperJump(state) : null, btn = buttonOf(s);
+  const tight = L.short;
+  const pos: CSSProperties = L.mode === "side"
+    ? { left: L.cardLeft, top: L.cardCy, transform: "translateY(-50%)", maxWidth: L.cardMaxW }
+    : { left: "50%", top: L.cardTop, transform: "translateX(-50%)", maxWidth: L.cardMaxW };
   return (
-    <section aria-label={w.name} className={`rounded-panel border border-line-1 bg-panel p-5 md:p-6 ${className}`} style={style}>
-      <div className={compact ? "sr-only" : "flex flex-wrap items-center gap-x-4 gap-y-1"}>
-        <h2 className="m-0 type-display text-[clamp(30px,3.2vw,42px)] leading-none">{w.name}</h2>
-        <span className="flex items-center gap-1.5 type-body-sm text-ink-2">
-          {status === "here" ? <Icon name="rocket" size={18} /> : status === "cleared" ? <Icon name="check" size={18} className="text-gold" /> : status === "locked" ? <Icon name="lock" size={18} /> : null}
-          {STATE_WORDS[status]}{s.here && s.cleared ? `, ${STATE_WORDS.cleared.toLowerCase()}` : ""}
-        </span>
-      </div>
-      <p className={`m-0 max-w-[40ch] type-child text-ink-1 ${compact ? "" : "mt-3"}`} aria-live="polite">{s.locked ? s.lockedBy : w.long}</p>
-      {!s.locked && rows.length > 0 && (
-        <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0">
+    <section ref={cardRef} data-guide={current ? "map-card" : undefined} aria-label={w.name}
+      className={`absolute flex w-max flex-col items-start rounded-panel border border-line-1 bg-panel ${tight ? "gap-2 p-4" : "gap-3 p-5"}`}
+      style={{ ...pos, minWidth: Math.min(320, L.cardMaxW) }}>
+      <span className="inline-flex h-8 items-center gap-1.5 rounded-pill border border-line-2 px-3 type-name text-[17px] leading-none text-ink-1">
+        {chip.icon && <Icon name={chip.icon} size={18} className={chip.icon === "lock" ? "text-ink-2" : "text-gold"} />}
+        {chip.text}{s.here && s.cleared ? `, ${STATE_WORDS.cleared.toLowerCase()}` : ""}
+      </span>
+      <h2 className={`m-0 type-display text-balance ${tight ? "text-[28px]" : "text-[clamp(30px,3vw,40px)]"}`}>{w.name}</h2>
+      <p className="m-0 type-child text-ink-1" aria-live={current ? "polite" : undefined}>{cardLine(s)}</p>
+      {rows.length > 0 && (
+        <ul className={`m-0 flex list-none flex-col p-0 ${tight ? "gap-1" : "gap-2"}`}>
           {rows.map((r) => (
             <li key={r.label} className="flex items-center gap-3">
               <span className="w-10 type-number text-[17px] text-ink-2" aria-hidden>{r.label}</span>
@@ -187,147 +315,43 @@ function StopPanel({ s, state, compact = false, className = "", style }: { s: Jo
         </ul>
       )}
       {jump && (
-        <p className={`m-0 mt-4 flex items-start gap-2 type-body ${jump.ready ? "text-gold" : "text-ink-2"}`}>
+        <p className={`m-0 flex max-w-[34ch] items-start gap-2 type-body ${jump.ready ? "text-gold" : "text-ink-2"}`}>
           <Icon name="jump" size={20} className="mt-0.5 shrink-0" />{jump.text}
         </p>
       )}
-      {s.action && (
-        <PillLink href={`/play/${s.id}`} variant="primary" size="md" className="mt-5 w-full justify-between sm:w-auto" aria-label={`${ACTION_WORDS[s.action]}: ${w.name}`}>
-          {ACTION_WORDS[s.action]}
+      {btn && (
+        <PillLink href={`/play/${s.id}`} variant={btn.primary ? "primary" : "secondary"} size="md" data-guide={current ? "map-launch" : undefined}
+          className={tight ? "mt-1" : "mt-2"} aria-label={`${btn.text}: ${w.name}`}>
+          {btn.text}
         </PillLink>
       )}
     </section>
   );
 }
 
-/* ---------- wide: one gentle arc across the screen ---------- */
+/* ---------- the ten dots of the whole journey ---------- */
 
-const ARC = { base: 210, lift: 66, top: 0, height: 360 };
-/** Points through the stops as a smooth curve (Catmull-Rom as cubic Béziers). */
-function curve(pts: [number, number][]) {
-  if (pts.length < 2) return "";
-  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;
-    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-    d += `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-  }
-  return d;
+/** The dot of one stop: the cadet's planet a gold ring, a cleared one filled with a check, a locked one a small lock. */
+function Dot({ s }: { s: JourneyStop }) {
+  if (s.here) return <span className="block size-[14px] rounded-full border-2 border-gold" />;
+  if (s.locked) return <Icon name="lock" size={14} className="text-ink-3" />;
+  if (s.cleared) return <span className="grid size-[16px] place-items-center rounded-full bg-gold text-void"><Icon name="check" size={11} /></span>;
+  return <span className="block size-[10px] rounded-full border border-line-3" />;
 }
 
-function WideMap({ stops, sel, state, stopProps }: { stops: JourneyStop[]; sel: number; state: PlayerState; stopProps: StopProps }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(0);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    setW(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
-  const n = stops.length, here = hereIndex(stops);
-  const pos = (i: number): [number, number] => { const t = i / (n - 1); return [w * (0.125 + 0.79 * t), ARC.base - ARC.lift * Math.sin(Math.PI * t)]; };
-  const sun: [number, number] = [w * 0.005, ARC.base + 34];
-  const pts = stops.map((_, i) => pos(i));
-  const col = w ? (w * 0.79) / (n - 1) - 6 : 0;
-  const panelW = Math.min(540, w - 48), [sx] = w ? pos(sel) : [0];
-  const panelLeft = Math.max(24, Math.min(w - panelW - 24, sx - panelW * 0.3));
-
+function JourneyDots({ stops, page, L, onPick }: { stops: JourneyStop[]; page: number; L: MapLayout; onPick: (i: number) => void }) {
+  // 44 px a dot where the page has room; a small phone gets the widest dots that fit in one row
+  const each = L.dotEach, W = stops.length * each;
   return (
-    <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-76px)] max-w-[1600px] flex-col justify-center pb-8">
-      <div ref={box} className="relative" style={{ height: ARC.height + 300 }}>
-        {w > 0 && (
-          <>
-            <div className="pointer-events-none absolute" style={{ left: sun[0] - SUN.wide / 2, top: sun[1] - SUN.wide / 2 }}>
-              <PlanetSprite id="sun" size={SUN.wide} alt="" />
-            </div>
-            <svg aria-hidden className="pointer-events-none absolute inset-0" width={w} height={ARC.height}>
-              <path d={curve([sun, ...pts.slice(0, here + 1)])} className="fill-none stroke-line-3" strokeWidth={1} strokeDasharray="2 6" strokeLinecap="round" />
-              <path d={curve(pts.slice(here))} className="fill-none stroke-line-2" strokeWidth={1} strokeDasharray="2 6" strokeLinecap="round" />
-            </svg>
-            <ol className="m-0 list-none p-0" aria-label="The journey, from the Sun outward">
-              {stops.map((s, i) => {
-                const [x, y] = pts[i], size = SIZE[s.id], chosen = i === sel;
-                return (
-                  <li key={s.id} className="contents">
-                    <UiButton {...stopProps(s, i)}
-                      className="group absolute flex flex-col items-center gap-3 rounded-chip pb-2 outline-offset-4"
-                      style={{ left: x - col / 2, top: y - size / 2 - 6, width: col, paddingTop: 6 }}>
-                      <StopPlanet s={s} size={size} />
-                      <span className="flex flex-col items-center gap-0.5 text-center">
-                        <span className={`type-name text-[18px] leading-tight ${s.locked ? "text-ink-3" : chosen ? "text-approach" : "text-ink-1"} ${chosen ? "underline decoration-gold decoration-1 underline-offset-[6px]" : "group-hover:underline group-hover:decoration-line-3 group-hover:decoration-1 group-hover:underline-offset-[6px]"}`}>{STOP_WORDS[s.id].name}</span>
-                        <span className={`type-body text-[17px] leading-snug ${s.locked ? "text-ink-3" : "text-ink-2"}`}>{STOP_WORDS[s.id].teaches}</span>
-                      </span>
-                    </UiButton>
-                    {chosen && (
-                      <StopPanel s={s} state={state} className="absolute" style={{ left: panelLeft, top: ARC.height + 8, width: panelW }} />
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </>
-        )}
-      </div>
-    </main>
-  );
-}
-
-/* ---------- narrow: a vertical path that opens scrolled to the cadet ---------- */
-
-function NarrowMap({ stops, sel, state, stopProps }: { stops: JourneyStop[]; sel: number; state: PlayerState; stopProps: StopProps }) {
-  const list = useRef<HTMLOListElement>(null);
-  const here = hereIndex(stops);
-  const [travelled, setTravelled] = useState(0);
-  // open on the cadet's planet, and measure how far down the path the rocket is
-  useLayoutEffect(() => {
-    const el = list.current?.querySelector<HTMLElement>(`[data-stop="${stops[here].id}"]`);
-    if (!el || !list.current) return;
-    // the cadet's stop and its panel (with Launch) in view: centred when they fit, else from the top
-    const group = el.closest("li") ?? el;
-    group.scrollIntoView({ block: group.offsetHeight + 96 > innerHeight ? "start" : "center" });
-    const top = list.current.getBoundingClientRect().top, r = el.getBoundingClientRect();
-    setTravelled(r.top - top + 48);
-  }, [stops, here]);
-
-  return (
-    <main className="relative z-10 mx-auto w-full max-w-[640px] px-4 pb-10">
-      <div className="pointer-events-none relative h-[110px] overflow-hidden" aria-hidden>
-        <div className="absolute" style={{ left: 48 - SUN.narrow / 2, top: -SUN.narrow / 2 - 10 }}><PlanetSprite id="sun" size={SUN.narrow} alt="" /></div>
-      </div>
-      <div className="relative">
-        {/* the path: travelled from the Sun to the rocket, then the way ahead */}
-        <span aria-hidden className="absolute left-[47px] top-[-60px] border-l border-dashed border-line-3" style={{ height: travelled + 60 }} />
-        <span aria-hidden className="absolute bottom-6 left-[47px] border-l border-dashed border-line-2" style={{ top: travelled }} />
-        <ol ref={list} className="relative m-0 flex list-none flex-col gap-1 p-0" aria-label="The journey, from the Sun outward">
-          {stops.map((s, i) => {
-            const size = narrowSize(s.id), chosen = i === sel, st = stateOf(s);
-            return (
-              <li key={s.id} className="flex scroll-mt-[72px] flex-col">
-                <UiButton {...stopProps(s, i)} className={`grid min-h-[96px] grid-cols-[96px_1fr] items-center gap-3 rounded-chip py-3 pr-3 text-left transition-colors ${chosen ? "bg-raised" : "hover:bg-raised"}`}>
-                  <span className="grid place-items-center">
-                    <span className="relative">
-                      <StopPlanet s={s} size={size} rocket="none" />
-                      {s.here && <span aria-hidden className="absolute -right-5 -top-5"><RocketGlyph size={34} /></span>}
-                    </span>
-                  </span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className={`type-name text-[19px] leading-tight ${s.locked ? "text-ink-3" : "text-approach"}`}>{STOP_WORDS[s.id].name}</span>
-                    <span className={`type-body text-[17px] leading-snug ${s.locked ? "text-ink-3" : "text-ink-2"}`}>{STOP_WORDS[s.id].teaches}</span>
-                    {(st === "here" || st === "cleared" || st === "locked") && (
-                      <span className={`mt-1 flex items-center gap-1.5 type-body-sm ${st === "cleared" ? "text-gold" : "text-ink-2"}`}>
-                        <Icon name={st === "here" ? "rocket" : st === "cleared" ? "check" : "lock"} size={16} />{STATE_WORDS[st]}
-                      </span>
-                    )}
-                  </span>
-                </UiButton>
-                {chosen && <StopPanel s={s} state={state} compact className="mb-3 mt-1" />}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </main>
+    <nav aria-label="The whole journey" data-guide="map-dots" data-map-control className="absolute z-20 flex items-center"
+      style={{ left: Math.max(4, L.dotsCx - W / 2), top: L.dotsTop, height: DOTS_H }}>
+      {stops.map((s, i) => (
+        <UiButton key={s.id} aria-label={labelOf(s)} aria-current={i === page ? "page" : undefined} onClick={() => onPick(i)}
+          style={{ width: each }} className="relative grid h-11 place-items-center rounded-full outline-offset-0">
+          <Dot s={s} />
+          {i === page && <span aria-hidden className="pointer-events-none absolute bottom-0.5 left-1/2 h-[2px] w-4 -translate-x-1/2 rounded-full bg-approach" />}
+        </UiButton>
+      ))}
+    </nav>
   );
 }
