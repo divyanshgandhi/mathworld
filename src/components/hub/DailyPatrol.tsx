@@ -12,7 +12,7 @@ import { Button } from "../kit/Button";
 import { Icon } from "../kit/Icon";
 import { RestingBayScreen } from "../RestingBayScreen";
 import { Flashcards, type CardResult } from "./Flashcards";
-import { patrolPaid, patrolReport, patrolSlotState, type PatrolSlotState } from "./patrolSlot";
+import { patrolPaid, patrolReport, patrolSlotState, patrolUnreviewed, type PatrolSlotState } from "./patrolSlot";
 
 export { patrolPaid, patrolReport, patrolSlotState, type PatrolSlotState };
 
@@ -48,12 +48,23 @@ export function DailyPatrol({ state, emit, now }: { state: PlayerState; log?: Lo
   const clock = useClock();
   const slot = patrolSlotState(state, clock, now ?? clock);
 
+  /** The patrol's right answers as emitted (latency kept), so a failed save can re-send exactly the lost ones. */
+  const answers = useRef(new Map<string, EventInput>());
+  const say = useCallback((e: EventInput) => {
+    if (e.type === "flashcard_answered" && e.payload.guess === e.payload.a * e.payload.b) answers.current.set(`${e.payload.a}x${e.payload.b}`, e);
+    emit(e);
+  }, [emit]);
+  /** The server's log, or null when it cannot be read. */
+  const serverLog = async () => {
+    const r = await fetch("/api/events").catch(() => null);
+    const j = r?.ok ? ((await r.json().catch(() => null)) as { events: LoggedEvent[] } | null) : null;
+    return j ? j.events.map(({ type, payload }) => ({ type, payload }) as LoggedEvent) : null;
+  };
   /** Ask the server what it paid for this day. */
   const check = useCallback(async () => {
     await flushed();
-    const r = await fetch("/api/events").catch(() => null);
-    const j = r?.ok ? ((await r.json().catch(() => null)) as { events: LoggedEvent[] } | null) : null;
-    return j ? patrolPaid(j.events.map(({ type, payload }) => ({ type, payload }) as LoggedEvent), day.current) : null;
+    const log = await serverLog();
+    return log ? patrolPaid(log, day.current) : null;
   }, []);
 
   const finish = useCallback(async (results: CardResult[]) => {
@@ -71,21 +82,28 @@ export function DailyPatrol({ state, emit, now }: { state: PlayerState; log?: Lo
   const retry = async () => {
     if (save.kind !== "failed") return;
     setSave({ kind: "saving" });
-    let paid = await check();
-    if (paid === null) {
-      await fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "patrol_completed", payload: { day: day.current, facts: report.current } } satisfies EventInput) }).catch(() => null);
-      paid = await check();
+    let paid: number | null = null;
+    const log = await serverLog();
+    if (log) {
+      paid = patrolPaid(log, day.current);
+      if (paid === null) {
+        // re-send only the answers the server lost, then the report (a day already paid is never paid twice)
+        const lost = patrolUnreviewed(log, report.current).flatMap((f) => answers.current.get(`${f.a}x${f.b}`) ?? []);
+        const events: EventInput[] = [...lost, { type: "patrol_completed", payload: { day: day.current, facts: report.current } }];
+        await fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }).catch(() => null);
+        paid = await check();
+      }
     }
     setSave(paid === null ? { kind: "failed" } : { kind: "paid", orbs: paid });
   };
 
-  const close = () => { setFacts(null); setSave({ kind: "none" }); sent.current = false; };
+  const close = () => { setFacts(null); setSave({ kind: "none" }); sent.current = false; answers.current.clear(); };
 
   return (
     <>
       <PatrolSlot slot={slot} onStart={() => { if (slot.kind === "due" && !facts) setFacts(slot.facts); }} />
       {facts && (
-        <Flashcards state={state} emit={emit} onClose={close} facts={facts} title="Daily patrol" retryMisses progress="dots" greet={false}
+        <Flashcards state={state} emit={say} onClose={close} facts={facts} title="Daily patrol" retryMisses progress="dots" greet={false}
           onFinish={(r) => void finish(r)} end={() => <PatrolEnd save={save} onRetry={retry} onDone={close} />} />
       )}
     </>

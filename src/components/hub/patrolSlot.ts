@@ -35,3 +35,13 @@ export function patrolPaid(log: LoggedEvent[], day: number): number | null {
   return line ? line.amount : null;
 }
 
+
+/**
+ * The listed facts the server's log has NOT seen answered right on a card since the last paid patrol
+ * (lost in a failed save). A retry re-sends only those answers, so a saved answer is never doubled.
+ */
+export function patrolUnreviewed(log: LoggedEvent[], facts: Fact[]): Fact[] {
+  const last = fold(log).ledger.filter((e) => e.rule === "patrol").at(-1)?.event ?? -1, seen = new Set<string>();
+  log.forEach((e, k) => { if (k > last && e.type === "flashcard_answered" && e.payload.guess === e.payload.a * e.payload.b) seen.add(`${e.payload.a}x${e.payload.b}`); });
+  return facts.filter((f) => !seen.has(`${f.a}x${f.b}`));
+}

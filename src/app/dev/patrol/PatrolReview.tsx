@@ -25,8 +25,8 @@ export function PatrolReview() {
         <section className="flex flex-col gap-2"><h2 className="m-0 type-label text-ink-2">Nothing due (shows nothing)</h2><div className="min-h-6 rounded-panel border border-dashed border-line-1"><PatrolSlot slot={{ kind: "none" }} /></div></section>
         <section className="flex flex-col gap-3">
           <h2 className="m-0 type-label text-ink-2">This cadet, {shift} days from now (choosing facts only)</h2>
-          <div className="flex gap-2">
-            {[0, 1, 3, 8].map((d) => <Button key={d} size="sm" variant={d === shift ? "primary" : "secondary"} onClick={() => setShift(d)}>{d} days</Button>)}
+          <div className="flex flex-wrap gap-2">
+            {[0, 1, 3, 8].map((d) => <Button key={d} size="sm" variant={d === shift ? "primary" : "secondary"} onClick={() => setShift(d)}>{d} {d === 1 ? "day" : "days"}</Button>)}
           </div>
           {!state || !log ? <p className="m-0 type-body text-ink-3">Loading the cadet...</p> : (
             <>

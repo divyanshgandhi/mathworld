@@ -59,3 +59,15 @@ describe("the bay's patrol slot (src/components/hub/patrolSlot.ts)", () => {
     expect(patrolReport(deck, [{ a: deck[0].a, b: deck[0].b, guess: 1, ok: false }])).toEqual([]);
   });
 });
+
+describe("a failed save's retry (patrolUnreviewed)", () => {
+  it("re-sends only the answers the server lost since the last paid patrol", async () => {
+    const { patrolUnreviewed } = await import("@/components/hub/patrolSlot");
+    const at = t0 + PATROL_REST.practicing + H, facts = patrol(fold(played), at)!.map(({ a, b }) => ({ a, b }));
+    expect(patrolUnreviewed(played, facts)).toEqual(facts);
+    const some = [...played, card(facts[0].a, facts[0].b, at), card(facts[1].a, facts[1].b, at + 1, 0)];
+    expect(patrolUnreviewed(some, facts)).toEqual(facts.slice(1));
+    const paid = [...played, ...facts.map((f, k) => card(f.a, f.b, at + k)), done(patrolDay(at), facts, at + 9)];
+    expect(patrolUnreviewed(paid, facts)).toEqual(facts); // a paid patrol starts the count again
+  });
+});
