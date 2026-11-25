@@ -225,11 +225,13 @@ export function eachScan(l: Layout, b: number): ScanStep[] | null {
 }
 
 /**
- * How long each scan step takes: the whole scan fits in `max` seconds however many steps it has,
- * and the label settles after it. Soft scans (first sight of a fact) are quicker.
+ * How long each scan step takes: about 0.4 s a squad (or ship), faster above nine so the whole scan
+ * fits in `max` seconds (4 s), then one short beat (`settle`) before the total label lands.
+ * `soft` is accepted for old callers and changes nothing (the first-sight scan is retired).
  */
-export function scanTiming(steps: number, { soft = false, max = 2.5 } = {}) {
-  const settle = soft ? 0.3 : 0.45, budget = (soft ? Math.min(max, 1.4) : max) - settle;
-  const step = steps > 0 ? Math.min(soft ? 0.16 : 0.32, budget / steps) : 0;
+export function scanTiming(steps: number, { soft = false, max = 4 } = {}) {
+  void soft;
+  const settle = 0.35, budget = max - settle;
+  const step = steps > 0 ? Math.min(0.4, budget / steps) : 0;
   return { step, settle, total: steps * step + settle };
 }

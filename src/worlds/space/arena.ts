@@ -36,6 +36,7 @@ import { createFx } from "@/battle/systems/fx";
 import { createKillFx } from "@/battle/systems/kill";
 import { createMisses } from "@/battle/systems/misses";
 import { createScan } from "@/battle/systems/scan";
+import { COUNT_PX, LANE, textAspect } from "@/battle/lanes";
 import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
 import { attachTelemetry } from "@/battle/telemetry";
@@ -49,6 +50,10 @@ const AXIS_PX = 26;
 const ROCKET_SHARE = 0.44, ROCKET_MODEL_H = 2.1, ROCKET_Z = 1.8;
 /** The last kill's hit-stop (s) and the miss beats: survivors gather, the bracket lands, the fleet comes back. */
 const HIT_STOP = 0.065, GATHER = 0.45, RESTORE_AT = 1.65, READY_AFTER = 0.35;
+/** A scan never starts sooner than this after the strip's miss line (s). */
+const SCAN_AFTER_STRIP = 0.6;
+/** Nova's reactions that only say again what the strip and the world already show (dropped before a scan). */
+const REPEATS_STRIP = new Set<string>(["nova_too_few", "nova_too_many", "nova_err_way_off"]);
 /** Two presses of Power-Ups closer than this are one press (a double tap on a touch screen). */
 const POWERUP_DEBOUNCE_MS = 400;
 
@@ -231,38 +236,44 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
   function hintUi(): NonNullable<ArenaUi["hint"]> {
     const h = bs.hint;
-    return { level: h.level, squads: h.squads ? (h.level >= 1 ? "on" : "soft") : "off", each: h.each ? "on" : "off", powerUp: h.powerUp ? fittingPowerUp() : null };
+    return { level: h.level, squads: h.squads ? "on" : "off", each: h.each ? "on" : "off", powerUp: h.powerUp ? fittingPowerUp() : null };
   }
   /**
    * Show a rung. Its label settles at the end of a scan (squads: the bracket steps down the fleet; each:
    * along the first squad), and only then does the HUD hear about it (`ui.hint`), so nothing is spoiled
    * early. Show Me How reveals both labels at once (the lesson is the show).
    */
-  function showHint(step: HintStep) {
+  function showHint(step: HintStep, then?: () => void) {
     if (!wave) return;
     const before = hintUi();
     dispatch({ type: "hint", step });
     const h = hintUi(), wn = bs.waveNo;
-    bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: step.soft, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
-    const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); };
+    bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: false, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
+    const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); then?.(); };
     if (step.id === "show-me-how") { scan.skip(); return reveal(); }
     // what was already up stays up while the new label is scanned; the label being scanned waits for its scan
-    fv.showAxis(step.id === "squads" ? "off" : before.squads, step.id === "each" ? "off" : before.each);
+    // (the squads label stays, quiet, while the ships of a squad are counted)
+    fv.showAxis(step.id === "squads" ? "off" : before.squads === "on" ? "soft" : before.squads, step.id === "each" ? "off" : before.each);
     const [ra, rb] = fv.flipped ? [wave.b, wave.a] : [wave.a, wave.b];
-    scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal, { soft: step.soft });
+    scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal);
   }
+  /** The fleet as the cadet sees it (squads x each), for the ladder's 1 x n and empty rules. */
+  const seenShape = () => (wave ? (fv.flipped ? { a: wave.b, b: wave.a } : { a: wave.a, b: wave.b }) : undefined);
+  /** The rung this moment would show (null: none), without showing it. */
+  const pendingHint = () => (structure === "discover" && wave ? nextHint(hintState(bs), factBand(wave), seenShape()) : null);
   /**
-   * Climb the ladder if it has a rung for now. After a miss every scan waits for the full fleet to be
-   * back (`back`), and rung 1 also waits for Nova's reaction (`afterLine`), so voice and scan never overlap.
+   * Climb the ladder if it has a rung for now. Never before a miss or an ask (decision 1). After a miss
+   * the scan waits for the full fleet to be back (`back`) and for any line still being said (`afterLine`);
+   * `then` runs when the scan's label has landed (Nova's line goes there, so one voice at a time).
    */
-  function climb(afterLine?: Promise<unknown>, back?: Promise<unknown>) {
+  function climb(afterLine?: Promise<unknown> | null, back?: Promise<unknown>, then?: () => void) {
     if (structure !== "discover" || !wave) return;
-    const step = nextHint(hintState(bs), factBand(wave));
-    if (!step) return;
+    const step = pendingHint();
+    if (!step) return void then?.();
     const wait = [step.afterLine ? afterLine : null, back].filter(Boolean);
-    if (!wait.length) return showHint(step);
+    if (!wait.length) return showHint(step, then);
     const wn = bs.waveNo, missed = bs.attempts;
-    void Promise.all(wait).then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && !bs.lessonOn) showHint(step); });
+    void Promise.all(wait).then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && !bs.lessonOn) showHint(step, then); });
   }
 
   // ---- the director: which wave comes next ----
@@ -347,14 +358,21 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       await say(opts.lines.intro, { queue: true });
       if (guided) voice.hush(); // its caption goes now, so it never sits beside the guide's first line
     } else if (index === 0 && mode !== "academy" && !guided) void say(theme.briefing);
-    // an empty fleet is a strange picture the first time: Nova says what it shows (never the answer)
-    if ((w.a === 0 || w.b === 0) && mode !== "academy" && !guided && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
+    // nothing is drawn or said about the fleet before the first answer (review round, decision 1);
+    // an empty fleet gets its honest line after a miss instead
     // the fleet warps in squad by squad (the first structure cue); the keypad goes live as the last squad lands
     await sched.after(Math.max(0.3, fv.landed - stage.time - 0.15));
     if (disposed || bs.waveNo !== wn) return;
     ready();
-    if (!guided) climb(); // a fact never met: a soft, quick squad scan (not while the guide says "Count the ships.")
     if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });
+  }
+
+  /** Room for a scan's count lanes (left: two figures; top: one line), in world units at the fleet. */
+  let lastPpu = 0;
+  function lanePad(p: { left: number; top: number }) {
+    if (!(lastPpu > 0)) return p;
+    const h = COUNT_PX / lastPpu;
+    return { left: Math.max(p.left, LANE.gap + h * textAspect("00") + 0.1), top: Math.max(p.top, LANE.topGap + h + 0.1) };
   }
 
   function ready() {
@@ -522,10 +540,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       return void showMeHow({ auto: true, fallback: route.kind === "safety-net" });
     }
     setUi({ radar: null, invite: route.invite });
-    // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help") : missLine(errorType, over, n, w), { queue: route.mash });
-    const back = sched.after(RESTORE_AT + READY_AFTER);
-    climb(line, back);
+    // one voice at a time (decision 3): the strip says the miss now; a scan, if one is due, starts once the
+    // whole fleet is back (2 s on, so 0.6 s or more after the strip's line); Nova speaks after its label
+    // lands, or not at all when her line would only repeat the strip or the count
+    const id = route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help")
+      : w.a === 0 || w.b === 0 ? (w.a === 0 ? "nova_zero_squads" : "nova_zero_each") : missLine(errorType, over, n, w);
+    const back = sched.after(Math.max(RESTORE_AT + READY_AFTER, SCAN_AFTER_STRIP));
+    const rung = pendingHint();
+    if (route.mash || !rung || rung.showMeHow) climb(say(id, { queue: route.mash }), back); // the calming line waits its turn
+    else climb(null, back, REPEATS_STRIP.has(id) ? undefined : () => { if (wave === w && !bs.lessonOn) void say(id); });
     await sched.after(RESTORE_AT);
     if (wave !== w) return;
     restore();
@@ -681,7 +704,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     // a ship's cell stays at most ~120 px (less on a short screen), so 1 × 4 does not fill the sky with four giants
     const cellMax = Math.min(120, cam.free.fh * 0.2);
     // the room for the axis words is kept from the first frame (structure "discover" reveals them later)
-    const pad = structure === "discover" ? fv.wordsPad() : fv.visiblePad();
+    // and, with no words beside the fleet (a phone), the lanes a scan's one number needs (src/battle/lanes.ts)
+    const pad = structure === "discover" ? lanePad(fv.wordsPad()) : fv.visiblePad();
     cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift);
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
@@ -704,6 +728,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (ppuN > 0) charge.update(1 / ppuN, phone ? (cam.band < 100 ? 28 : 30) : 44);
     // axis labels ("7 squads", "8 in each squad") keep at least ~26 px on screen, on a phone too
     const ppu = cam.pxPerUnit();
+    lastPpu = ppu;
     if (ppu > 0) {
       const want = Math.min(2.2, Math.max(AXIS_H, AXIS_PX / ppu));
       if (Math.abs(want - fv.axisH) / fv.axisH > 0.04) fv.axisSize(fv.axisH + (want - fv.axisH) * Math.min(1, dt * 4));
