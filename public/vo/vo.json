@@ -92,17 +92,17 @@
   },
   "captain_brief1": {
     "voice": "Miles",
-    "text": "Welcome, cadets. You are going to be the protectors of Earth against enemies in space.",
-    "duration": 5.04,
-    "src": "/vo/captain_brief1.mp3",
-    "end": 4.493
+    "text": "Welcome, cadets. You will protect Earth from the ships that attack from space.",
+    "duration": 4.64,
+    "end": 4.097,
+    "src": "/vo/captain_brief1.mp3"
   },
   "captain_brief2": {
     "voice": "Miles",
-    "text": "You have a spaceship, your co-pilot, and plasma balls to clear every squadron. Remember, plasma cells are precious. Too few and invaders slip past. Too many and we burn extra fuel.",
-    "duration": 11.92,
-    "src": "/vo/captain_brief2.mp3",
-    "end": 11.226
+    "text": "You have a spaceship, your co-pilot, and plasma balls to clear every squad.",
+    "duration": 4.96,
+    "end": 4.242,
+    "src": "/vo/captain_brief2.mp3"
   },
   "nova_hi": {
     "voice": "Zoey",
@@ -113,17 +113,17 @@
   },
   "nova_l0_intro": {
     "voice": "Zoey",
-    "text": "Welcome to Cadet Bay! Drones fly in squadrons. Count every drone, load that many plasma balls, and fire!",
-    "duration": 7.28,
-    "src": "/vo/nova_l0_intro.mp3",
-    "end": 6.665
+    "text": "Welcome to Cadet Bay! Drones fly in squads. Count every drone, load that many plasma balls, and fire!",
+    "duration": 7.2,
+    "end": 6.597,
+    "src": "/vo/nova_l0_intro.mp3"
   },
   "nova_zero": {
     "voice": "Zoey",
-    "text": "Zero squads means empty space. Not a single invader!",
-    "duration": 4.08,
-    "src": "/vo/nova_zero.mp3",
-    "end": 3.477
+    "text": "Zero squads means empty space. Not a single ship!",
+    "duration": 3.92,
+    "end": 3.306,
+    "src": "/vo/nova_zero.mp3"
   },
   "nova_zero_ask": {
     "voice": "Zoey",
@@ -183,10 +183,10 @@
   },
   "nova_incoming": {
     "voice": "Zoey",
-    "text": "Squadrons incoming! One plasma ball for every drone.",
-    "duration": 4.16,
-    "src": "/vo/nova_incoming.mp3",
-    "end": 3.531
+    "text": "Squads incoming! One plasma ball for every drone.",
+    "duration": 3.92,
+    "end": 3.329,
+    "src": "/vo/nova_incoming.mp3"
   },
   "nova_wave_clear": {
     "voice": "Zoey",
@@ -253,9 +253,9 @@
   },
   "nova_incoming_short": {
     "voice": "Zoey",
-    "text": "Squadrons incoming!",
-    "duration": 2.08,
-    "end": 1.282,
+    "text": "Squads incoming!",
+    "duration": 1.84,
+    "end": 1.082,
     "src": "/vo/nova_incoming_short.mp3"
   },
   "nova_err_added": {
@@ -302,9 +302,9 @@
   },
   "nova_err_wild": {
     "voice": "Zoey",
-    "text": "Way off! Radar is up.",
-    "duration": 2.48,
-    "end": 1.862,
+    "text": "Way off! Count the squads first.",
+    "duration": 2.96,
+    "end": 2.343,
     "src": "/vo/nova_err_wild.mp3"
   },
   "nova_radar": {
@@ -316,16 +316,16 @@
   },
   "nova_invite": {
     "voice": "Zoey",
-    "text": "Sneaky squad! Try a Power-Up, the Radar, or Show Me How.",
-    "duration": 4.72,
-    "end": 4.074,
+    "text": "Sneaky squad! Try a Power-Up, or ask for Show Me How.",
+    "duration": 4.32,
+    "end": 3.718,
     "src": "/vo/nova_invite.mp3"
   },
   "nova_hold_fire": {
     "voice": "Zoey",
-    "text": "Hold fire, cadet! Take a breath, and try a Trick Power-Up.",
-    "duration": 4.4,
-    "end": 3.754,
+    "text": "Hold fire, cadet! Take a breath, and try a Power-Up.",
+    "duration": 4.24,
+    "end": 3.575,
     "src": "/vo/nova_hold_fire.mp3"
   },
   "nova_misfit": {
@@ -824,5 +824,33 @@
     "duration": 2.4,
     "end": 1.729,
     "src": "/vo/unlock_half-double.mp3"
+  },
+  "captain_brief3": {
+    "voice": "Miles",
+    "text": "Remember, plasma balls are precious.",
+    "duration": 2.96,
+    "end": 2.38,
+    "src": "/vo/captain_brief3.mp3"
+  },
+  "captain_brief4": {
+    "voice": "Miles",
+    "text": "Too few, and ships slip past. Too many, and we burn extra fuel.",
+    "duration": 4.96,
+    "end": 4.292,
+    "src": "/vo/captain_brief4.mp3"
+  },
+  "nova_zero_squads": {
+    "voice": "Zoey",
+    "text": "No squads at all! How many ships is that?",
+    "duration": 3.2,
+    "end": 2.501,
+    "src": "/vo/nova_zero_squads.mp3"
+  },
+  "nova_zero_each": {
+    "voice": "Zoey",
+    "text": "Every squad here is empty. Count the ships!",
+    "duration": 3.36,
+    "end": 2.829,
+    "src": "/vo/nova_zero_each.mp3"
   }
 }

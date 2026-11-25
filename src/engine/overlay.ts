@@ -21,6 +21,47 @@ const alpha = (c: string, a: number) => `rgba(${parseInt(c.slice(1, 3), 16)},${p
 /** Every speaker's name is quiet ink; Nova's is her own colour. A name reads without its colour. */
 const NAME_INK: Record<string, string> = { Nova: COLOR.sky };
 
+/** The least time a caption stays on screen, in seconds: 1.5 plus 0.3 for every word. */
+export const readingTime = (text: string) => 1.5 + 0.3 * text.trim().split(/\s+/).filter(Boolean).length;
+
+/**
+ * Break a spoken line into captions that each fit their plate. `fits(piece)` says whether a piece
+ * does (for the film: in two lines at the width of this screen). A break falls at the end of a
+ * sentence when the back half of the piece has one, else at a comma, else between two words, and
+ * a single word is never left over for the last caption.
+ */
+export function splitCaption(text: string, fits: (piece: string) => boolean): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean), out: string[] = [];
+  let i = 0;
+  while (i < words.length) {
+    let n = words.length - i;
+    while (n > 1 && !fits(words.slice(i, i + n).join(" "))) n--;
+    if (i + n < words.length) {
+      const stop = (re: RegExp) => { for (let k = n; k > Math.max(1, Math.floor(n * 0.45)); k--) if (re.test(words[i + k - 1])) return k; return 0; };
+      n = stop(/[.!?\u2026]["')]?$/) || stop(/[,;:]$/) || n;
+      // no natural stop: share the words out, so the last caption is never two or three stragglers
+      const rest = words.length - (i + n);
+      if (rest > 0 && rest < 4 && n > 5 && !/[.!?\u2026,;:]["')]?$/.test(words[i + n - 1])) n = Math.ceil((n + rest) / 2);
+      if (words.length - (i + n) === 1 && n > 2) n--;
+    }
+    out.push(words.slice(i, i + n).join(" "));
+    i += n;
+  }
+  return out;
+}
+
+/**
+ * When each caption of a spoken line goes up (seconds from the first word), and how long the line
+ * holds the screen in all. A caption gets its share of the speech and never less than its reading
+ * time, so a slow reader is never cut off; `hold` is at least the length of the speech.
+ */
+export function scheduleCaptions(pieces: string[], spoken: number) {
+  const total = pieces.reduce((n, c) => n + c.length, 0) || 1;
+  let t = 0;
+  const starts = pieces.map((c) => { const at = t; t += Math.max(readingTime(c), spoken * (c.length / total)); return at; });
+  return { starts, hold: Math.max(t, spoken) };
+}
+
 export interface Overlay {
   caption(speaker: string, text: string): void;
   /**

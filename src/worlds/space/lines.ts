@@ -3,6 +3,38 @@ import type { PlanetId } from "@/rig/pools";
 import type { TrickId } from "@/rig/tricks";
 
 /**
+ * The film's spoken lines, in story order: the words the captions show. scripts/bake-voices.py bakes
+ * each one under the same id and the same text (a test keeps the two in step), so a caption is right
+ * even when a clip has not loaded. Words follow docs/glossary.md: plasma balls, squads, ships.
+ */
+export const FILM_LINES = {
+  teacher_intro: "Okay class, you know how to add and take away. So, four plus four is... who is going to tell me?",
+  kid_eight: "Ooh! Eight! It is eight!",
+  teacher_yes: "Yes? Go ahead!",
+  teacher_eight_ok: "Eight! Spot on, lovely work.",
+  teacher_eight_close: "Ooh, super close! Four plus four is eight.",
+  teacher_q2: "And what is five minus three?",
+  kid_two: "Two! That one is two!",
+  teacher_two_ok: "Two! Brilliant.",
+  teacher_two_close: "Nice try! Five minus three is two.",
+  teacher_mult: "Wonderful. Today, we begin... multiplication.",
+  principal_sorry: "Pardon the interruption, everyone.",
+  principal_intro: "Class, this is the Captain of the Star Fleet.",
+  captain_danger: "There is grave danger in deep space. Earth needs its sharpest young minds. We are enrolling five cadets today.",
+  teacher_proud: "Five cadets... from my class? Captain, I know exactly who you need.",
+  captain_names: "Then call their names.",
+  teacher_names: "Please stand when I call your name. Maya... Leo... Aarav... Zoe...",
+  teacher_pick_generic: "And our fifth cadet is... you!",
+  captain_brief1: "Welcome, cadets. You will protect Earth from the ships that attack from space.",
+  captain_brief2: "You have a spaceship, your co-pilot, and plasma balls to clear every squad.",
+  captain_brief3: "Remember, plasma balls are precious.",
+  captain_brief4: "Too few, and ships slip past. Too many, and we burn extra fuel.",
+  captain_nova: "And every pilot needs a co-pilot. Meet yours.",
+  nova_hi: "Hey! I am Nova, your co-pilot! Together we will calibrate every shot dead on. Ready for launch?",
+} as const;
+export type FilmLineId = keyof typeof FILM_LINES;
+
+/**
  * Nova's in-battle lines: short on purpose, so a shot (fire → outcome → line → ready) stays well under
  * 10 seconds. Every line here is baked by scripts/bake-voices.py under the same id and text; until a
  * clip exists the caption still shows and the pause is paced on reading time.
@@ -11,19 +43,19 @@ export const BATTLE_LINES = {
   nova_dead_on: "Dead on!",
   nova_bullseye: "Bullseye, cadet!",
   nova_perfect: "Perfect shot!",
-  nova_incoming_short: "Squadrons incoming!",
+  nova_incoming_short: "Squads incoming!",
   nova_err_added: "Careful! That added them. We need whole squads.",
   nova_err_group: "So close! One squad off.",
   nova_err_unit: "Just a hair off!",
   nova_err_place: "Check your place value, cadet!",
   nova_err_under: "Too few! Load a few more.",
   nova_err_over: "Too many! Load a few less.",
-  nova_err_wild: "Way off! Radar is up.",
+  nova_err_wild: "Way off! Count the squads first.",
   nova_radar: "Radar is up. Pick a target!",
-  nova_invite: "Sneaky squad! Try a Power-Up, the Radar, or Show Me How.",
-  nova_hold_fire: "Hold fire, cadet! Take a breath, and try a Trick Power-Up.",
+  nova_invite: "Sneaky squad! Try a Power-Up, or ask for Show Me How.",
+  nova_hold_fire: "Hold fire, cadet! Take a breath, and try a Power-Up.",
   nova_misfit: "That trick doesn't fit this fleet. Try another one!",
-  // a zero fleet met for the first time: what the empty picture means, never the answer (caption until baked)
+  // a zero fleet met for the first time: what the empty picture means, never the answer
   nova_zero_squads: "No squads at all! How many ships is that?",
   nova_zero_each: "Every squad here is empty. Count the ships!",
   nova_sector_ok: "Sector locked!",

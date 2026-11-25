@@ -5,6 +5,32 @@ import { clamp, keyframes, type Rng } from "@/engine/util";
 
 /** Mix two colours (token strings or hex numbers): how the film derives its palette from the tokens. */
 export const mix = (a: string | number, b: string | number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+/** No tint: the colour of a material that shows its texture as painted, and the far end of a highlight. */
+export const PLAIN = new THREE.Color(1, 1, 1).getHex();
+/** No light of its own: the base colour of a part that is only ever self-lit (Nova's eyes). */
+const UNLIT = new THREE.Color(0, 0, 0).getHex();
+
+let blob: THREE.DataTexture | null = null;
+/**
+ * A soft shadow to lay on the floor under anything that stands on it, so nothing floats where the
+ * sun does not reach. `w` by `d` metres, lying flat; put it a few millimetres above the floor.
+ */
+export function contactShadow(w: number, d: number, strength = 0.4): THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> {
+  if (!blob) {
+    const n = 64, px = new Uint8Array(n * n * 4);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const r = Math.hypot(x - n / 2 + 0.5, y - n / 2 + 0.5) / (n / 2), a = Math.max(0, 1 - r);
+      px.set([255, 255, 255, Math.round(255 * a * a * (3 - 2 * a))], (y * n + x) * 4);
+    }
+    blob = new THREE.DataTexture(px, n, n);
+    blob.magFilter = blob.minFilter = THREE.LinearFilter;
+    blob.needsUpdate = true;
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: hex(COLOR.void), map: blob, transparent: true, opacity: strength, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = 1;
+  return m;
+}
 
 /**
  * The cast of the film: one build system, matte bodies, and faces that act (eyes, brows, mouth).
@@ -35,17 +61,27 @@ export const BUILD: Record<Role, Build> = {
 const LIMB = { kid: [0.44, 0.38, 0.31, 0.28, 0.37], adult: [0.42, 0.35, 0.29, 0.26, 0.32] } as const;
 
 /**
- * Skin and hair are the colours of people, which the UI tokens have no roles for, so they are
- * declared once here. Clothes take their colours from the tokens: gold for the cadet and the Star
- * Fleet, sky and blue and ember and cream for the class, ink for the grown-ups.
+ * Skin and hair are the colours of people, which the UI tokens have no roles for. They are still
+ * mixed from the tokens, so the cast sits in the same light as everything else: `WARM` (ember and
+ * gold, half each) is the root of every skin tone and of wood; a tone is that root taken toward the
+ * pale ink or toward the shadow blue. Clothes take their colours from the tokens directly: gold for
+ * the Star Fleet, sky and blue and ember and cream for the class, ink for the grown-ups.
  */
-export const SKIN = [0xf0c8a4, 0xd9a47c, 0xa9714d, 0x7b4f35, 0xf3d5bc, 0xc48e68];
-const HAIR = { black: 0x1f1c24, espresso: 0x3a2a22, brown: 0x6b4630, auburn: 0x8f4f2c, blond: 0xd3ab5e, grey: 0x9aa2b0 };
+export const WARM = mix(COLOR.ember, COLOR.gold, 0.5);
+const LIGHT = mix(WARM, COLOR.approach, 0.5), DEEP = mix(mix(WARM, COLOR.ember, 0.3), COLOR.shadow, 0.66);
+const pale = (t: number) => mix(WARM, COLOR.approach, t), tan = (t: number) => mix(LIGHT, DEEP, t);
+export const SKIN = [pale(0.62), tan(0.18), tan(0.5), tan(0.78), pale(0.72), tan(0.33)];
+const HAIR = {
+  black: mix(COLOR.void, COLOR.shadow, 0.75), espresso: mix(WARM, COLOR.void, 0.78), brown: mix(WARM, COLOR.shadow, 0.62), auburn: mix(COLOR.ember, COLOR.shadow, 0.5),
+  blond: mix(COLOR.gold, COLOR.horizon, 0.28), grey: mix(COLOR.approach, COLOR.horizon, 0.5),
+};
 const CLOTH = {
   gold: mix(COLOR.gold, COLOR.horizon, 0.14), ember: mix(COLOR.ember, COLOR.approach, 0.22), sky: hex(COLOR.sky), blue: hex(COLOR.disk),
   cream: mix(COLOR.approach, COLOR.gold, 0.12), slate: mix(COLOR.horizon, COLOR.sky, 0.32), sage: mix(COLOR.sky, COLOR.gold, 0.5), brick: mix(COLOR.ember, COLOR.shadow, 0.42),
   navy: mix(COLOR.shadow, COLOR.disk, 0.3), ink: mix(COLOR.shadow, COLOR.horizon, 0.5), white: hex(COLOR.approach),
 };
+/** A cadet colour from sign-up as cloth: the token colour, taken a little toward the horizon so it sits matte in the room. */
+export const cadetCloth = (c: string | number) => mix(c, COLOR.horizon, 0.14);
 const DARK = mix(COLOR.void, COLOR.shadow, 0.6);
 
 /**
@@ -105,6 +141,14 @@ export interface Rig {
   /** Progress of the sit-to-stand move (0 seated, 1 standing) and its target. */
   s: number; stand: number;
   walk: { pts: THREE.Vector3[]; t0: number; d: number; face?: THREE.Vector3 } | null;
+  /** The soft shadow under the feet: it stays on the floor while the body sits, stands and walks. */
+  shadow: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  /** The raised arm's speed (it swings up on a spring, a touch past its mark, and settles). */
+  rv: number;
+  /** A small glance the eyes make on their own, and the seconds until the next one. */
+  dart: { x: number; y: number; next: number; hold: number };
+  /** The yaw the head was last asked for: a big change of look starts with a blink. */
+  aim: number;
 }
 export interface Character { group: THREE.Group; rig: Rig; spec: Spec }
 
@@ -224,7 +268,7 @@ export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
   const er = H * (kid ? 0.2 : role === "captain" ? 0.135 : 0.15), ex = kid ? 0.4 : 0.36, ey = kid ? -0.08 : 0.04;
   /** The brows' resting slant: the Captain's are set, everyone else's are level. */
   const set = role === "captain" ? -0.3 : 0;
-  const white = matte(mix(COLOR.approach, 0xffffff, 0.5), 0.6), irisMat = matte(spec.eyes ?? mix(HAIR.espresso, COLOR.void, 0.45), 0.5), glint = new THREE.MeshBasicMaterial({ color: mix(COLOR.approach, COLOR.horizon, 0.08) });
+  const white = matte(mix(COLOR.approach, PLAIN, 0.5), 0.6), irisMat = matte(spec.eyes ?? mix(HAIR.espresso, COLOR.void, 0.45), 0.5), glint = new THREE.MeshBasicMaterial({ color: mix(COLOR.approach, COLOR.horizon, 0.08) });
   const eyes: THREE.Group[] = [], pupils: THREE.Mesh[] = [], arcs: THREE.Mesh[] = [], brows: THREE.Mesh[] = [];
   const lineMat = matte(mix(skinC, COLOR.void, 0.7), 0.9), browMat = matte(mix(spec.hair, COLOR.void, role === "principal" ? 0.5 : 0.2), 0.95);
   const browUp = kid ? 1.42 : role === "captain" ? 1.5 : 1.6, browY = hy + H * ey + er * browUp;
@@ -327,7 +371,10 @@ export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
   const rig: Rig = {
     body, hips, knees, shoulders, elbows, head, torso, prop, face, H, L, Ht, A, R, blink: 1 + rnd() * 3, ph: rnd() * 6,
     r: 0, raise: false, cheer: 0, v: 0, va: 0, ge: 0, talking: false, mime: false, look: null, mood: "neutral", seat: null, s: 0, stand: 0, walk: null,
+    shadow: contactShadow(R * 5.2, R * 4.4, 0.36), rv: 0, dart: { x: 0, y: 0, next: 0.6 + rnd() * 2.5, hold: 0 }, aim: 0,
   };
+  rig.shadow.position.y = 0.006;
+  g.add(rig.shadow);
   return { group: g, rig, spec };
 }
 
@@ -341,6 +388,24 @@ export function seat(c: Character, x: number, seatHeight: number, z: number, o: 
   u.seat = { x, hip, z, chair: o.chair ?? null, chairZ: o.chair?.position.z ?? 0, desk: o.desk ?? seatHeight + 0.26, edge: o.edge ?? 0.225 };
   u.s = u.stand = 0;
   c.group.position.set(x, hip - u.L, z);
+}
+
+/**
+ * Give one character their own top colour (the cadet's hoodie takes the colour picked at sign-up).
+ * The first call gives the character private copies of the materials that carry it, so nobody else
+ * in the room changes with them; the darker neckband and cuffs follow.
+ */
+export function recolour(c: Character, top: number) {
+  const from = c.spec.top, band = mix(from, COLOR.void, 0.22), own = (c.group.userData.own ??= new Map<THREE.Material, { m: THREE.MeshStandardMaterial; band: boolean }>()) as Map<THREE.Material, { m: THREE.MeshStandardMaterial; band: boolean }>;
+  if (!own.size) c.group.traverse((o) => {
+    const mesh = o as THREE.Mesh, mat = mesh.material as THREE.MeshStandardMaterial;
+    if (!mesh.isMesh || !mat?.color || mat.map) return;
+    const hexNow = mat.color.getHex(), isTop = hexNow === from, isBand = hexNow === band;
+    if (!isTop && !isBand) return;
+    if (!own.has(mat)) own.set(mat, { m: mat.clone(), band: isBand });
+    mesh.material = own.get(mat)!.m;
+  });
+  for (const { m, band: b } of own.values()) m.color.setHex(b ? mix(top, COLOR.void, 0.22) : top);
 }
 
 export const headPosition = (c: Character) => c.rig.head.localToWorld(new THREE.Vector3(0, c.rig.H * 0.95, 0));
@@ -410,7 +475,9 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   u.v += (level - u.v) * k(level > u.v ? 22 : 10);
   u.va += (level - u.va) * k(3.5);
   const voice = u.v;
-  u.torso.scale.set(1, 1 + Math.sin(T * 2.2 + u.ph) * 0.01, 1);
+  // breath: the chest rises and the shoulders ride up with it, slower when sitting still, quicker after a cheer
+  const breath = Math.sin(T * (2.0 + u.cheer * 1.6) + u.ph);
+  u.torso.scale.set(1 + breath * 0.006, 1 + breath * 0.014, 1 + breath * 0.012);
 
   // sitting ↔ standing: a timed move, not a blend, so it has anticipation and a settle
   const st = u.seat, up = u.A * 0.48, fore = u.A * 0.5, shY = u.Ht * 0.88;
@@ -441,6 +508,15 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
     gx = clamp((want - yaw) * 1.4 + (yaw - u.head.rotation.y) * 0.8, -1, 1);
     gy = clamp(-pitch * 0.8, -0.6, 0.6);
   }
+  // a big change of look starts with a blink, the way a real turn of the head does
+  if (Math.abs(yaw - u.aim) > 0.5 && u.blink > 0.12) u.blink = -0.001;
+  u.aim = yaw;
+  // and now and then the eyes make a small glance of their own, then come back
+  const dr = u.dart;
+  dr.next -= dt;
+  if (dr.next < 0) { dr.x = (rnd() - 0.5) * 0.9; dr.y = (rnd() - 0.5) * 0.5; dr.hold = 0.22 + rnd() * 0.3; dr.next = 1.6 + rnd() * 3.6; }
+  if ((dr.hold -= dt) < 0) dr.x = dr.y = 0;
+  if (!u.talking) { gx = clamp(gx + dr.x, -1, 1); gy = clamp(gy + dr.y, -1, 1); }
   u.head.rotation.y += (yaw - u.head.rotation.y) * k(5);
   u.head.rotation.x += (pitch * 0.6 - lean * 0.85 + (u.talking ? Math.sin(T * 5.5) * 0.035 : 0) - u.head.rotation.x) * k(8);
   u.head.rotation.z = Math.sin(T * 1.3 + u.ph) * 0.03 + (u.mood === "thinking" ? 0.12 : 0);
@@ -480,7 +556,10 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   f.line.position.y = f.mouthY + f.r * n.smile;
 
   // arms: hands on the desk edge when seated, hanging when standing, the right arm up when raising a hand
-  u.r += ((u.raise ? 1 : 0) - u.r) * k(7);
+  // the hand goes up on a spring: quick away, a touch past its mark, then it settles
+  const hs = Math.min(dt, 1 / 30);
+  u.rv += (((u.raise ? 1 : 0) - u.r) * 110 - u.rv * 13.5) * hs;
+  u.r = clamp(u.r + u.rv * hs, 0, 1.08);
   u.cheer += ((u.mood === "cheer" ? 1 : 0) - u.cheer) * k(6);
   // standing speakers talk with their hands: forearms lift and sway with the voice
   u.ge += ((u.talking && sit < 0.5 && !u.walk ? 1 : 0) - u.ge) * k(4);
@@ -489,11 +568,11 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   const ty = hy * Math.cos(lean) + hz * Math.sin(lean), tz = -hy * Math.sin(lean) + hz * Math.cos(lean);
   const arm = ik(up, fore, tz, ty - shY, false);
   u.shoulders.forEach((sh, i) => {
-    const side = i === 0 ? -1 : 1, lift = Math.max(side === 1 ? u.r : 0, u.cheer);
+    const side = i === 0 ? -1 : 1, lift = Math.max(side === 1 ? u.r : 0, u.cheer), dip = side === 1 && u.raise ? Math.max(0, 0.18 - u.r) : 0; // the shoulder drops a hair before the arm goes up
     const g1 = gest * (0.3 + 0.16 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + u.va * 0.4);
     const top = u.cheer > 0.02 ? Math.PI * 0.88 : Math.PI * 0.9; // a cheer is a tall V: hands above the head, not across the faces behind
     sh.rotation.x = (-arm.first - g1 * 0.35) * (1 - lift);
-    sh.rotation.z = side * (0.14 + splay + (top - 0.14 - splay) * lift) + (lift ? Math.sin(T * 9 + i) * 0.05 * lift : 0);
+    sh.rotation.z = side * (0.14 + splay - dip * 0.5 + (top - 0.14 - splay) * lift) + (lift ? Math.sin(T * 9 + i) * 0.05 * Math.min(1, lift) : 0);
     u.elbows[i].rotation.x = (-arm.bend - g1) * (1 - lift) - 0.22 * lift;
   });
 
@@ -513,6 +592,8 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
     u.shoulders[0].rotation.x -= sw * 0.32; u.shoulders[1].rotation.x += sw * 0.32; // the swing rides on the hanging pose
     if (kk >= 1 && Math.abs(Math.atan2(Math.sin(end - g.rotation.y), Math.cos(end - g.rotation.y))) < 0.01) { g.rotation.y = end; u.walk = null; }
   }
+  // the shadow lies on the floor whatever the body is doing, a little ahead of a seated child (under the knees)
+  u.shadow.position.set(0, 0.006 - g.position.y, st ? 0.12 * (1 - u.s) : 0);
 }
 
 /**
@@ -535,7 +616,7 @@ export function makeNova(M: Materials, opts: { glow?: boolean } = {}) {
   const visor = add(g, new THREE.SphereGeometry(0.25, 36, 22), visorMat, 0, 0.03, 0.13, nc);
   visor.scale.set(1.08, 0.68, 0.86);
   // eyes: soft upright lozenges, self-lit below any bloom threshold
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hex(COLOR.sky), emissiveIntensity: 0.85, roughness: 1 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: UNLIT, emissive: hex(COLOR.sky), emissiveIntensity: 0.85, roughness: 1 });
   const eyes: THREE.Mesh[] = [], arcs: THREE.Mesh[] = [];
   for (const s of [-1, 1]) {
     const e = add(g, new THREE.CapsuleGeometry(0.03, 0.05, 6, 14), eyeMat, s * 0.09, 0.045, 0.332, nc);
