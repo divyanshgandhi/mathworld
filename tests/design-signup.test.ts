@@ -32,3 +32,28 @@ describe("cadet names: 1 to 16 letters, numbers and spaces", () => {
     expect(checkName("Abcdefghijklmnop").name.length).toBeLessThanOrEqual(24);
   });
 });
+
+import { deckFor, arrayOf } from "@/components/hub/deck";
+import { initialState } from "@/director/fold";
+import { seeded } from "@/engine/util";
+import { DECK_SIZE } from "@/director/hub";
+
+describe("flashcards on one table", () => {
+  it("five cards, all from that table, no repeats, any order of the factors", () => {
+    const d = deckFor(initialState(), seeded(3), 7);
+    expect(d).toHaveLength(DECK_SIZE);
+    for (const f of d) expect(f.a === 7 || f.b === 7).toBe(true);
+    const keys = d.map((f) => `${Math.min(f.a, f.b)}x${Math.max(f.a, f.b)}`);
+    expect(new Set(keys).size).toBe(DECK_SIZE);
+  });
+  it("facts furthest from Gold come first", () => {
+    const s = initialState();
+    for (let n = 1; n <= 10; n++) if (n !== 4) s.facts[`${Math.min(3, n)}x${Math.max(3, n)}`] = { m: 0.95, seen: 9, fastWins: 5 };
+    const d = deckFor(s, seeded(5), 3);
+    expect(d.some((f) => f.a * f.b === 12)).toBe(true);
+  });
+  it("an array is a rows of b, and the count is the product", () => {
+    expect(arrayOf({ a: 3, b: 5 })).toEqual({ rows: 3, cols: 5, total: 15 });
+    expect(arrayOf({ a: 0, b: 7 }).total).toBe(0);
+  });
+});
