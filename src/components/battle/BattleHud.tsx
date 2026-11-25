@@ -203,11 +203,11 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
               <span className="flex min-w-0 items-center gap-1.5 truncate type-label-sm tracking-[0.04em] text-ink-3 md:gap-2 md:tracking-[0.12em]"><Icon name="plasma" size={18} className="shrink-0" />{sectorActive ? <span className="truncate"><span className="hidden md:inline">Sector </span>{sectorActive.label}</span> : "Plasma balls"}</span>
               <output aria-live="polite" aria-label="Plasma balls loaded" className="type-number text-[30px] font-medium leading-tight text-approach md:text-[40px]">{entry || "0"}</output>
             </div>
-            {/* phones: Show Me How rides beside the readout, so the dock is one row shorter */}
-            <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson} aria-label="Show Me How"
+            {/* phones: Show Me How rides beside the readout, so the dock is one row shorter (the Academy's film is one already) */}
+            {ui.mode !== "academy" && <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson} aria-label="Show Me How"
               className={`mw-btn min-h-11 shrink-0 border px-3 text-[15px] md:hidden data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2"}`}>
               <Icon name="help" size={20} />Show me
-            </Button>
+            </Button>}
           </div>
           <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
             {KEYS.map((k) => (
@@ -217,10 +217,10 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
               </Button>
             ))}
           </div>
-          <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson}
+          {ui.mode !== "academy" && <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson}
             className={`mw-btn mt-2 hidden min-h-11 w-full border text-[15px] md:flex data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2 hover:border-sky hover:text-sky"}`}>
             Show Me How
-          </Button>
+          </Button>}
           <p aria-hidden={ui.canFire || !!ui.lesson} className={`mt-1 hidden text-center type-body-sm text-ink-3 md:block ${ui.canFire || ui.lesson ? "invisible" : ""}`}>Stand by…</p>
         </div>
       )}

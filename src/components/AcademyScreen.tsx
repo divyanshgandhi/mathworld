@@ -61,24 +61,25 @@ export function AcademyScreen() {
       <div ref={box} className="absolute inset-0" />
       <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
         <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
-        {film ? <Button aria-label="All Trick Cards" onClick={() => setFilm(null)} className={`${ghost} bg-void`}><Icon name="trick" size={18} />Cards</Button>
-          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">The Academy</span>}
+        {film ? <Button aria-label="All tricks" onClick={() => setFilm(null)} className={`${ghost} bg-void`}><Icon name="trick" size={18} />All tricks</Button>
+          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-ink-2">Academy</span>}
       </div>
 
       {!film && state && (
         <div className="absolute inset-0 z-20 overflow-y-auto px-3 pb-6 pt-20">
           <div className={`${glass} mx-auto w-[min(96vw,760px)] p-4 md:p-6`}>
-            <h2 className="m-0 type-display text-[clamp(30px,5vw,44px)]">Trick films</h2>
-            <p className="mt-2 max-w-[56ch] type-body text-ink-2">Nova shows each trick on a real fleet, then you fire the answer. New cards go on your battle belt.</p>
-            <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Trick Cards">
+            <h2 className="m-0 type-display text-[clamp(30px,5vw,44px)]">Academy</h2>
+            <p className="mt-2 max-w-[56ch] type-body text-ink-2">Nova shows each trick on a real fleet, then you fire the answer. A trick you have watched goes on your battle belt as a Power-Up.</p>
+            <ul className="mt-4 flex flex-col divide-y divide-line-1" aria-label="Tricks">
               {FILMS.map((f) => (
                 <li key={f.trick}>
-                  <Button aria-label={`Watch ${f.card}`} onClick={() => watch(f)}
-                    className={`mw-tile flex w-full items-center gap-3 px-3 py-2.5 text-left ${wanted?.trick === f.trick ? "border-gold bg-raised" : ""}`}>
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-full border ${seen(f.trick) ? "border-gold text-gold" : "border-line-2 text-ink-3"}`}><Icon name="trick" size={20} /></span>
+                  <Button aria-label={`Watch ${f.card}${seen(f.trick) ? " (on your belt)" : ""}`} onClick={() => watch(f)}
+                    className={`flex w-full items-center gap-4 rounded-chip px-2 py-3.5 text-left transition hover:bg-raised ${wanted?.trick === f.trick ? "bg-raised" : ""}`}>
+                    {/* a watched trick wears a gold ring: it is on the battle belt */}
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-full border ${seen(f.trick) ? "border-gold text-gold" : "border-line-2 text-ink-2"}`}><Icon name="trick" size={20} /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block type-name text-[17px]">{f.card}{!seen(f.trick) && <span className="ml-2 rounded-pill border border-sky px-2 py-0.5 type-label-sm text-sky">New</span>}</span>
-                      <span className="block truncate type-body-sm text-ink-2">{f.a} × {f.b} · {WHY[f.trick]}</span>
+                      <span className="block type-name text-[18px]">{f.card}</span>
+                      <span className="mt-0.5 block type-body text-[17px] text-ink-2">{WHY[f.trick]} <span className="type-number whitespace-nowrap text-ink-3">({f.a} × {f.b})</span></span>
                     </span>
                     <Icon name="play" size={20} className="text-ink-2" />
                   </Button>
@@ -95,7 +96,7 @@ export function AcademyScreen() {
             <>
               <Button className={`${lime} px-5 py-3 text-base`} onClick={() => setFilm({ ...film, a: film.f.sister[0], b: film.f.sister[1], watch: false })}>Try {film.f.sister[0]} × {film.f.sister[1]}</Button>
               <Button className={`${ghost} px-4 py-3 text-base`} onClick={() => watch(film.f)}>Watch again</Button>
-              <Button className={`${ghost} px-4 py-3 text-base`} onClick={() => setFilm(null)}>All cards</Button>
+              <Button className={`${ghost} px-4 py-3 text-base`} onClick={() => setFilm(null)}>All tricks</Button>
             </>
           )} />
       )}
