@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import type { Bus } from "@/battle/bus";
+import { audio } from "@/engine/audio";
 import type { ArenaUi } from "@/worlds/space/arena";
 import { freeArea, GUIDE_START, guideShows, guideStep, placeCaption, COUNT_MS, type Box, type GuideAnchor, type GuideEvent, type Side } from "@/teach/guide";
 import { GUIDE_FIRST_SHOT } from "@/teach/keys";
@@ -60,6 +61,15 @@ function Guide({ ui, bus, mark, fleetRect, rocketRect, root }: { ui: ArenaUi | n
     return () => clearTimeout(t);
   }, [state.step, state.since]);
   useEffect(() => { if (state.step === "done") mark(); }, [state.step, mark]);
+  // each step says its line through the battle's sound engine: one voice at a time, so a new step's
+  // clip cuts the last one; muted it plays at zero volume; a step left before its clip loads stays quiet
+  useEffect(() => {
+    const line = guideShows(state.step);
+    if (!line) return;
+    let alive = true;
+    void audio.say(line.id, () => alive);
+    return () => { alive = false; };
+  }, [state.step, state.since]);
 
   const show = guideShows(state.step);
   if (!show) return null;

@@ -71,10 +71,10 @@
   },
   "captain_danger": {
     "voice": "Miles",
-    "text": "There is grave danger in deep space. Earth needs its sharpest young minds. We are enrolling five cadets today.",
-    "duration": 6.96,
-    "src": "/vo/captain_danger.mp3",
-    "end": 6.261
+    "text": "Deep space is in danger. Earth needs sharp young minds. Five cadets start today.",
+    "duration": 5.68,
+    "end": 5.021,
+    "src": "/vo/captain_danger.mp3"
   },
   "teacher_names": {
     "voice": "Hadley",
@@ -99,31 +99,17 @@
   },
   "captain_brief2": {
     "voice": "Miles",
-    "text": "You have a spaceship, your co-pilot, and plasma balls to clear every squad.",
-    "duration": 4.96,
-    "end": 4.242,
+    "text": "This is your rocket.",
+    "duration": 1.84,
+    "end": 0.957,
     "src": "/vo/captain_brief2.mp3"
   },
   "nova_hi": {
     "voice": "Zoey",
-    "text": "Hey! I am Nova, your co-pilot! Together we will calibrate every shot dead on. Ready for launch?",
-    "duration": 7.04,
-    "src": "/vo/nova_hi.mp3",
-    "end": 6.487
-  },
-  "nova_l0_intro": {
-    "voice": "Zoey",
-    "text": "Welcome to Cadet Bay! Drones fly in squads. Count every drone, load that many plasma balls, and fire!",
-    "duration": 7.2,
-    "end": 6.597,
-    "src": "/vo/nova_l0_intro.mp3"
-  },
-  "nova_zero": {
-    "voice": "Zoey",
-    "text": "Zero squads means empty space. Not a single ship!",
-    "duration": 3.92,
-    "end": 3.306,
-    "src": "/vo/nova_zero.mp3"
+    "text": "Hi! I am Nova, your co-pilot. Ready for launch?",
+    "duration": 4.4,
+    "end": 3.857,
+    "src": "/vo/nova_hi.mp3"
   },
   "nova_zero_ask": {
     "voice": "Zoey",
@@ -145,55 +131,6 @@
     "duration": 4.96,
     "src": "/vo/nova_mirror_repeat.mp3",
     "end": 4.36
-  },
-  "nova_exact": {
-    "voice": "Zoey",
-    "text": "Dead on! Perfect calibration, cadet!",
-    "duration": 3.44,
-    "src": "/vo/nova_exact.mp3",
-    "end": 2.712
-  },
-  "nova_over": {
-    "voice": "Zoey",
-    "text": "Too many! The extra plasma balls flew past into space.",
-    "duration": 4.48,
-    "src": "/vo/nova_over.mp3",
-    "end": 3.869
-  },
-  "nova_under": {
-    "voice": "Zoey",
-    "text": "Some drones slipped past! We need more plasma balls.",
-    "duration": 4.0,
-    "src": "/vo/nova_under.mp3",
-    "end": 3.443
-  },
-  "nova_retry": {
-    "voice": "Zoey",
-    "text": "Shields are back up. Try that shot again!",
-    "duration": 3.04,
-    "src": "/vo/nova_retry.mp3",
-    "end": 2.467
-  },
-  "nova_l0_clear": {
-    "voice": "Zoey",
-    "text": "Cadet Bay is clear! The Moon is open. Let's fly!",
-    "duration": 4.24,
-    "src": "/vo/nova_l0_clear.mp3",
-    "end": 3.607
-  },
-  "nova_incoming": {
-    "voice": "Zoey",
-    "text": "Squads incoming! One plasma ball for every drone.",
-    "duration": 3.92,
-    "end": 3.329,
-    "src": "/vo/nova_incoming.mp3"
-  },
-  "nova_wave_clear": {
-    "voice": "Zoey",
-    "text": "Wave cleared! Nice shooting, cadet.",
-    "duration": 3.28,
-    "src": "/vo/nova_wave_clear.mp3",
-    "end": 2.585
   },
   "teacher_yes": {
     "voice": "Hadley",
@@ -288,38 +225,24 @@
   },
   "nova_err_under": {
     "voice": "Zoey",
-    "text": "Too few! Load a few more.",
-    "duration": 2.72,
-    "end": 2.117,
+    "text": "Too few! Some got away. Try again.",
+    "duration": 3.68,
+    "end": 3.043,
     "src": "/vo/nova_err_under.mp3"
   },
   "nova_err_over": {
     "voice": "Zoey",
-    "text": "Too many! Load a few less.",
-    "duration": 2.72,
-    "end": 2.172,
+    "text": "Too many! Some flew past. Try again.",
+    "duration": 3.68,
+    "end": 3.062,
     "src": "/vo/nova_err_over.mp3"
   },
   "nova_err_wild": {
     "voice": "Zoey",
-    "text": "Way off! Count the squads first.",
-    "duration": 2.96,
-    "end": 2.343,
+    "text": "Way off! Count the squads again.",
+    "duration": 2.8,
+    "end": 2.224,
     "src": "/vo/nova_err_wild.mp3"
-  },
-  "nova_radar": {
-    "voice": "Zoey",
-    "text": "Radar is up. Pick a target!",
-    "duration": 2.64,
-    "end": 1.995,
-    "src": "/vo/nova_radar.mp3"
-  },
-  "nova_invite": {
-    "voice": "Zoey",
-    "text": "Sneaky squad! Try a Power-Up, or ask for Show Me How.",
-    "duration": 4.32,
-    "end": 3.718,
-    "src": "/vo/nova_invite.mp3"
   },
   "nova_hold_fire": {
     "voice": "Zoey",
@@ -825,20 +748,6 @@
     "end": 1.729,
     "src": "/vo/unlock_half-double.mp3"
   },
-  "captain_brief3": {
-    "voice": "Miles",
-    "text": "Remember, plasma balls are precious.",
-    "duration": 2.96,
-    "end": 2.38,
-    "src": "/vo/captain_brief3.mp3"
-  },
-  "captain_brief4": {
-    "voice": "Miles",
-    "text": "Too few, and ships slip past. Too many, and we burn extra fuel.",
-    "duration": 4.96,
-    "end": 4.292,
-    "src": "/vo/captain_brief4.mp3"
-  },
   "nova_zero_squads": {
     "voice": "Zoey",
     "text": "No squads at all! How many ships is that?",
@@ -852,5 +761,159 @@
     "duration": 3.36,
     "end": 2.829,
     "src": "/vo/nova_zero_each.mp3"
+  },
+  "nova_greet_battle": {
+    "voice": "Zoey",
+    "text": "Let's clear these ships, cadet!",
+    "duration": 2.32,
+    "end": 1.622,
+    "src": "/vo/nova_greet_battle.mp3"
+  },
+  "nova_greet_bay": {
+    "voice": "Zoey",
+    "text": "This is your Resting Bay. Press Launch to fly.",
+    "duration": 3.52,
+    "end": 2.874,
+    "src": "/vo/nova_greet_bay.mp3"
+  },
+  "nova_greet_map": {
+    "voice": "Zoey",
+    "text": "Tap a planet. Win there to open the next one.",
+    "duration": 3.36,
+    "end": 2.708,
+    "src": "/vo/nova_greet_map.mp3"
+  },
+  "nova_greet_hangar": {
+    "voice": "Zoey",
+    "text": "Spend your orbs here to change how your rocket looks.",
+    "duration": 3.2,
+    "end": 2.644,
+    "src": "/vo/nova_greet_hangar.mp3"
+  },
+  "nova_greet_academy": {
+    "voice": "Zoey",
+    "text": "Pick a trick. I will show it on real ships.",
+    "duration": 3.28,
+    "end": 2.702,
+    "src": "/vo/nova_greet_academy.mp3"
+  },
+  "nova_greet_flashcards": {
+    "voice": "Zoey",
+    "text": "Type the answer. There is no timer, so take your time.",
+    "duration": 4.24,
+    "end": 3.559,
+    "src": "/vo/nova_greet_flashcards.mp3"
+  },
+  "nova_guide_count": {
+    "voice": "Zoey",
+    "text": "Count the ships.",
+    "duration": 1.68,
+    "end": 0.994,
+    "src": "/vo/nova_guide_count.mp3"
+  },
+  "nova_guide_type": {
+    "voice": "Zoey",
+    "text": "Type how many.",
+    "duration": 1.76,
+    "end": 0.94,
+    "src": "/vo/nova_guide_type.mp3"
+  },
+  "nova_guide_fire": {
+    "voice": "Zoey",
+    "text": "Now press Fire.",
+    "duration": 1.76,
+    "end": 0.99,
+    "src": "/vo/nova_guide_fire.mp3"
+  },
+  "nova_err_way_off": {
+    "voice": "Zoey",
+    "text": "Way off! Count the squads with me.",
+    "duration": 2.88,
+    "end": 2.254,
+    "src": "/vo/nova_err_way_off.mp3"
+  },
+  "nova_invite_power": {
+    "voice": "Zoey",
+    "text": "Tricky one! Try a Power-Up, or tap Show me how.",
+    "duration": 3.84,
+    "end": 3.212,
+    "src": "/vo/nova_invite_power.mp3"
+  },
+  "nova_invite_help": {
+    "voice": "Zoey",
+    "text": "Stuck? Tap Show me how.",
+    "duration": 2.56,
+    "end": 1.923,
+    "src": "/vo/nova_invite_help.mp3"
+  },
+  "nova_ships_incoming": {
+    "voice": "Zoey",
+    "text": "Ships incoming!",
+    "duration": 1.76,
+    "end": 1.0,
+    "src": "/vo/nova_ships_incoming.mp3"
+  },
+  "nova_too_few": {
+    "voice": "Zoey",
+    "text": "Too few! Some got away.",
+    "duration": 2.64,
+    "end": 1.975,
+    "src": "/vo/nova_too_few.mp3"
+  },
+  "nova_too_many": {
+    "voice": "Zoey",
+    "text": "Too many! Some flew past.",
+    "duration": 2.72,
+    "end": 2.156,
+    "src": "/vo/nova_too_many.mp3"
+  },
+  "nova_earth_clear": {
+    "voice": "Zoey",
+    "text": "Earth is clear! The Moon is open.",
+    "duration": 2.96,
+    "end": 2.359,
+    "src": "/vo/nova_earth_clear.mp3"
+  },
+  "nova_jump_mars": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to Mars?",
+    "duration": 2.88,
+    "end": 2.366,
+    "src": "/vo/nova_jump_mars.mp3"
+  },
+  "nova_jump_asteroid-belt": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to the Asteroid Belt?",
+    "duration": 3.44,
+    "end": 2.715,
+    "src": "/vo/nova_jump_asteroid-belt.mp3"
+  },
+  "nova_jump_jupiter": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to Jupiter?",
+    "duration": 2.96,
+    "end": 2.361,
+    "src": "/vo/nova_jump_jupiter.mp3"
+  },
+  "nova_jump_saturn": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to Saturn?",
+    "duration": 2.88,
+    "end": 2.318,
+    "src": "/vo/nova_jump_saturn.mp3"
+  },
+  "nova_jump_uranus": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to Uranus?",
+    "duration": 3.12,
+    "end": 2.549,
+    "src": "/vo/nova_jump_uranus.mp3"
+  },
+  "nova_jump_deep-space": {
+    "voice": "Zoey",
+    "text": "You know these. Jump ahead to Deep Space?",
+    "duration": 3.2,
+    "end": 2.626,
+    "src": "/vo/nova_jump_deep-space.mp3"
   }
 }
