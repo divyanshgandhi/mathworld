@@ -5,6 +5,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { Materials } from "./materials";
+import { LOOKS } from "@/worlds/looks";
 
 /** Colour grade after tone mapping: saturation, tint and a soft vignette. */
 const GradeShader = {
@@ -37,7 +38,7 @@ export interface Stage {
 }
 
 /**
- * One canvas, one scene, one camera, clay-friendly lighting defaults and the bloom + grade post chain.
+ * One canvas, one scene, one camera, the space look's defaults and the bloom + grade post chain.
  * `fill` sizes the canvas to the container's box (a full-screen game); otherwise height = width × aspect.
  */
 export function createStage(container: HTMLElement, { aspect = 0.58, fill = false } = {}): Stage {
@@ -49,16 +50,22 @@ export function createStage(container: HTMLElement, { aspect = 0.58, fill = fals
   renderer.domElement.style.display = "block";
   container.prepend(renderer.domElement);
 
+  // every stage starts in the space look (src/worlds/looks.ts); a scene switches look with applyLook
+  const start = LOOKS.space;
+  renderer.toneMappingExposure = start.exposure;
   const scene = new THREE.Scene();
+  scene.background = new THREE.Color(start.background);
   const camera = new THREE.PerspectiveCamera(48, 1.7, 0.05, 3000);
   scene.add(camera);
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.5, 1.0);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), start.bloom.strength, start.bloom.radius, start.bloom.threshold);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const gradePass = new ShaderPass(GradeShader);
+  gradePass.uniforms.sat.value = start.sat;
+  gradePass.uniforms.vig.value = start.vignette;
   composer.addPass(gradePass);
 
   const size = () => {

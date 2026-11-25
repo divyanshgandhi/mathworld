@@ -1,26 +1,52 @@
 import * as THREE from "three";
+import { COLOR, hex } from "@/design/tokens";
+
+/** Two token colours mixed (`t` = 0 is `a`), as a three.js hex number. */
+function mixHex(a: string, b: string, t: number): number {
+  const x = hex(a), y = hex(b), ch = (n: number, s: number) => (n >> s) & 255;
+  const m = (s: number) => Math.round(ch(x, s) + (ch(y, s) - ch(x, s)) * t);
+  return (m(16) << 16) | (m(8) << 8) | m(0);
+}
 
 /**
- * The Math World material base: soft clay for everything solid, toon shading and outlines
- * where a thing must read at a glance, and a neon glow (emissive above 1, caught by bloom)
- * for lights, eyes, screens and shots.
+ * The Math World material base, in the Void and Gold language (OVERHAUL.md): matte clay for everything
+ * solid, toon bands where a thing must read at a glance, and a light ink hairline on small heroes.
+ *
+ * PALETTE derives from src/design/tokens.ts. The keys are the old ones (so every scene still compiles);
+ * the values are remapped into the new language:
+ *   ink → void, ink2 → panel, clay → approach, cream → approach warmed by gold, coral → ember,
+ *   lilac → sky, sky → sky, slate → horizon lifted toward sky, dark → shadow,
+ *   invader → disk (the enemy is a cool, deep blue; the ships track owns its final colour),
+ *   lime (the old brand accent) → gold, cyan (the old neon) → sky, gold → gold, shot → gold lifted toward white.
  */
 export const PALETTE = {
-  ink: 0x0d0e1a,
-  ink2: 0x10153a,
-  clay: 0xf3eee6,
-  cream: 0xf2e6cf,
-  coral: 0xff8f70,
-  lilac: 0xb79cff,
-  sky: 0x9fe8ff,
-  slate: 0x55597a,
-  dark: 0x2b2d42,
-  invader: 0x7ddc3e, // the green toon enemy
-  lime: 0xb6f23a,    // brand accent
-  cyan: 0x3dfcff,    // neon glow
-  gold: 0xffc94d,
-  shot: 0xfff04d,
+  ink: hex(COLOR.void),
+  ink2: hex(COLOR.panel),
+  clay: hex(COLOR.approach),
+  cream: mixHex(COLOR.approach, COLOR.gold, 0.22),
+  coral: hex(COLOR.ember),
+  lilac: hex(COLOR.sky),
+  sky: hex(COLOR.sky),
+  slate: mixHex(COLOR.horizon, COLOR.sky, 0.3),
+  dark: hex(COLOR.shadow),
+  invader: hex(COLOR.disk),
+  lime: hex(COLOR.gold),
+  cyan: hex(COLOR.sky),
+  gold: hex(COLOR.gold),
+  shot: mixHex(COLOR.gold, COLOR.approach, 0.45),
 } as const;
+
+/**
+ * The ink outline: an inverted hull pushed out along its normals in screen space, so the line is the same
+ * width on screen (OUTLINE.width CSS px) whatever the object's size or distance. The background is the void,
+ * so the line is light: approach at reduced strength, never above the bloom threshold.
+ *
+ * How a mesh opts in: call `outline(mesh, stage.mats)` once after building it. Use it only on small heroes
+ * (the rocket, drones, Nova), never on planets or sets. It reads best on smooth, closed meshes (lathes,
+ * spheres, capsules); a hard-edged box shows gaps at its corners, so give boxes a small bevel or skip them.
+ * Change the width for a whole scene with `mats.outline.uniforms.width.value` (CSS px).
+ */
+export const OUTLINE = { width: 1.25, color: COLOR.approach, strength: 0.42 } as const;
 
 export type ClayOpts = THREE.MeshStandardMaterialParameters;
 
@@ -35,8 +61,17 @@ export class Materials {
     this.gradient.minFilter = this.gradient.magFilter = THREE.NearestFilter;
     this.gradient.needsUpdate = true;
     this.outline = new THREE.ShaderMaterial({
-      uniforms: { t: { value: 0.035 }, c: { value: new THREE.Color(0x140d30) } },
-      vertexShader: "uniform float t;void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position+normal*t,1.0);}",
+      uniforms: {
+        width: { value: OUTLINE.width },
+        px: { value: OUTLINE.width },
+        res: { value: new THREE.Vector2(1280, 720) },
+        c: { value: new THREE.Color(OUTLINE.color).multiplyScalar(OUTLINE.strength) },
+      },
+      // clip-space offset: the normal's screen direction, scaled to `px` device pixels at any depth
+      vertexShader:
+        "uniform float px;uniform vec2 res;void main(){vec4 c=projectionMatrix*modelViewMatrix*vec4(position,1.0);" +
+        "vec3 n=normalize(normalMatrix*normal);vec2 d=(projectionMatrix*vec4(n,0.0)).xy*res;float l=length(d);" +
+        "if(l>1e-5){c.xy+=d/l*px*2.0/res*c.w;}gl_Position=c;}",
       fragmentShader: "uniform vec3 c;void main(){gl_FragColor=vec4(c,1.0);}",
       side: THREE.BackSide,
     });
@@ -67,7 +102,10 @@ export class Materials {
     return this.cache.get(k) as THREE.MeshPhysicalMaterial;
   }
 
-  /** Neon glow: emissive above 1 so the bloom pass picks it up. */
+  /**
+   * Self-light. Keep `intensity` under 1 so nothing but the Sun and the Launch moment blooms (OVERHAUL.md);
+   * above 1 the bloom pass picks it up.
+   */
   glow(color: number, intensity = 2.2, o: ClayOpts = {}): THREE.MeshStandardMaterial {
     return this.clay(color, { emissive: color, emissiveIntensity: intensity, ...o });
   }
@@ -107,9 +145,18 @@ export function add(
   return m;
 }
 
-/** Adds an inverted-hull outline to a mesh (the toon ink line). */
+const drawSize = new THREE.Vector2();
+/** Adds the ink hairline to a mesh (see OUTLINE for when to use it). Returns the outline mesh. */
 export function outline(mesh: THREE.Mesh, mats: Materials) {
   const o = new THREE.Mesh(mesh.geometry, mats.outline);
+  o.castShadow = o.receiveShadow = false;
+  // keep the line's width in screen pixels: read the drawing-buffer size and pixel ratio just before drawing
+  o.onBeforeRender = (renderer) => {
+    const u = mats.outline.uniforms;
+    renderer.getDrawingBufferSize(drawSize);
+    (u.res.value as THREE.Vector2).copy(drawSize);
+    u.px.value = u.width.value * renderer.getPixelRatio();
+  };
   mesh.add(o);
   return o;
 }
