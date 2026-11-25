@@ -369,10 +369,10 @@
 .mwc-console[data-layout="pad"] .mwc-help { gap: 8px; padding: 0 12px 0 6px; }
 
 /*
- * A short phone held upright (under 700 px tall): the keypad folds into two rows of five, so the fleet gets
+ * A phone held upright (under 900 px tall): the keypad folds into two rows of five, so the fleet gets
  * the height back. Fire stands two rows tall at the thumb's side; Power-Ups, Delete and Show me how sit under.
  */
-@media (max-height: 699px) {
+@media (max-height: 899px) {
   .mwc-console[data-layout="pad"] { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .mwc-console[data-layout="pad"] .mwc-grid {
     --key: 48px;
