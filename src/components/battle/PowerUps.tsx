@@ -36,7 +36,8 @@ const keep = (e: React.MouseEvent) => e.preventDefault();
 export function PowerUpsButton({ empty, disabled, orbit, reduced, onPress, buttonRef, open }: {
   empty: boolean; disabled: boolean; orbit: boolean; reduced: boolean; onPress: () => void; buttonRef?: Ref<HTMLButtonElement>; open: boolean;
 }) {
-  if (empty) return <span className={css.puButton} data-empty aria-hidden data-guide="powerups" />;
+  // an empty belt: a reserved space, no anchor, so a tour never spotlights nothing
+  if (empty) return <span className={css.puButton} data-empty aria-hidden />;
   return (
     <Button ref={buttonRef} className={css.puButton} onMouseDown={keep} data-guide="powerups" data-enter-fires aria-haspopup="dialog" aria-expanded={open}
       aria-keyshortcuts="P" title="Power-Ups (P)" disabled={disabled} data-hinted={orbit || undefined} onClick={onPress}>

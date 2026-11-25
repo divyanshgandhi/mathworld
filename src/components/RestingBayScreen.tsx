@@ -12,9 +12,6 @@ import { Button, Loading, masterySummary, MasteryKeyLegend, MasteryMark, NovaLin
 import { Flashcards } from "./hub/Flashcards";
 import { FieldManual } from "./teach/FieldManual";
 import { ScreenTour } from "./teach/Tour";
-import { GREETINGS } from "@/teach/greetings";
-import { greetKey } from "@/teach/keys";
-import { readMs } from "@/teach/words";
 import { useCadet } from "./hub/useCadet";
 import { PlanetSprite } from "./world/PlanetSprite";
 import "./hub/hub.css";
@@ -23,8 +20,6 @@ import "./hub/hub.css";
 const LEVEL: Record<Band, MasteryKey> = { gold: "gold", understood: "got", practicing: "learn", unseen: "new" };
 /** "The Moon" leads a label; mid-sentence it is "the Moon". */
 const inLine = (name: string) => name.replace(/^The /, "the ");
-/** The seen key for the bay's first-arrival line (shared with the teaching layer). */
-const GREET = greetKey("bay");
 
 /** A quiet field of stars on the void, drawn once per resize (no animation to compete with the page). */
 function Stars() {
@@ -97,9 +92,7 @@ function MissionPlanet({ planet }: { planet: PlanetId }) {
 }
 
 /** What Nova says when the cadet arrives: true to where they are. Plain words, one or two sentences. */
-function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boolean, planet: string, ps: Poster[]): string {
-  // the first arrival is the bay's greeting (the teaching layer's line): what this place is, and the one thing to do
-  if (first) return `Hi, ${name}! ${GREETINGS.bay.text}`;
+function novaLine(s: PlayerState, log: LoggedEvent[], name: string, planet: string, ps: Poster[]): string {
   const all = s.cleared.includes(MAX_TIER);
   const last = [...log].reverse().find((e) => e.type === "planet_cleared" || e.type === "hyper_jump_taken" || e.type === "attempt_submitted");
   if (last?.type === "planet_cleared" && !all) {
@@ -123,8 +116,7 @@ function novaLine(s: PlayerState, log: LoggedEvent[], name: string, first: boole
  *   "Practise the 7s", which starts flashcards on that table.
  * - Places to go (Star map, Hangar, Academy), and a quiet Switch cadet that asks first.
  * - Help opens the Field Manual (`onHelp` replaces it), with a quiet "Watch the film again".
- * - Nova's line is the bay's greeting on the first arrival (seen key `greet:bay`), so the bay never
- *   floats a second greeting over it.
+ * - The first arrival has no greeting: the bay's spotlight tour (`tour:bay`) shows the screen instead.
  */
 /** What the patrol slot is given when `patrol` is a function: the bay's own cadet, so a patrol shares its log. */
 export type BaySlotContext = { state: PlayerState; log: LoggedEvent[]; emit: ReturnType<typeof useCadet>["emit"] };
@@ -137,28 +129,8 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
   const [help, setHelp] = useState(false);
   const [deck, setDeck] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
-  // the first arrival is decided once, from the log as it loads (recording it must not change the line)
-  const [first, setFirst] = useState<boolean | null>(null);
-
   useEffect(() => { void import("@/engine/audio").then(({ audio }) => audio.mood("hangar")).catch(() => {}); }, []);
   useEffect(() => { for (const to of ["/map", "/hangar", "/academy"]) router.prefetch(to); }, [router]);
-  if (state && first === null) setFirst(!state.seen[GREET]);
-  const greeted = useRef(false);
-  useEffect(() => {
-    if (!first || greeted.current) return;
-    greeted.current = true;
-    emit({ type: "seen", payload: { key: GREET } });
-  }, [first, emit]);
-  // the first visit's line is the bay's greeting: like every greeting it goes on the first action or after its reading time
-  const [greetDone, setGreetDone] = useState(false);
-  useEffect(() => {
-    if (!first) return;
-    const go = () => setGreetDone(true), opts = { capture: true, passive: true } as const;
-    const t = setTimeout(go, readMs(GREETINGS.bay.text));
-    addEventListener("pointerdown", go, opts);
-    addEventListener("keydown", go, opts);
-    return () => { clearTimeout(t); removeEventListener("pointerdown", go, opts); removeEventListener("keydown", go, opts); };
-  }, [first]);
   // an opened table scrolls into view (only as far as it needs); Escape closes it
   useEffect(() => {
     if (open === null) return;
@@ -208,7 +180,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
             <div data-slot="daily-patrol" className="empty:hidden">{typeof patrol === "function" ? patrol({ state, log, emit }) : patrol}</div>
-            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, `\u2068${who}\u2069`, !!first, name, ps)}</NovaLine>
+            <NovaLine className="mw-bay-nova">{novaLine(state, log, `\u2068${who}\u2069`, name, ps)}</NovaLine>
           </div>
         </section>
 

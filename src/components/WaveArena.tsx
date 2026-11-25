@@ -77,9 +77,10 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     return () => { gone = true; cleanup(); };
   }, [cadet, planet, dev, force?.a, force?.b]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the battle tour: once, at the start of wave 2 of the cadet's first planet battle (no planet cleared yet),
-  // before any answer; it holds the game while it shows, so wave 2 waits for it
-  const firstBattle = useMemo(() => !!log && fold(log).cleared.length === 0, [log]);
+  // the battle tour: once, at the start of wave 2 of the cadet's first planet battle (nothing cleared past
+  // Earth, which the film's Cadet Bay battle clears), before any answer; it holds the game while it shows,
+  // so wave 2 waits for it
+  const firstBattle = useMemo(() => !!log && fold(log).cleared.every((t) => t === 0), [log]);
   const tourMoment = firstBattle && ui?.mode === "campaign" && ui.wave?.index === 1 && !ui.outcome && !ui.lesson && !ui.done;
 
   const fly = async (to: PlanetId) => { await flushed(); router.push(`/play/${to}${dev ? "?dev" : ""}`); };
