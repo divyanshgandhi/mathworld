@@ -10,8 +10,8 @@ import { factKey } from "@/rig/pools";
 import { planShowMeHow } from "@/rig/showme";
 import { warmupProblem, warmupRun, WARMUP_LENGTH } from "@/rig/warmup";
 
-const shot = (a: number, b: number, guess: number, ms = 1000, i = 1, planetId: "earth" | "moon" | "mars" = "moon"): LoggedEvent => ({
-  type: "attempt_submitted", payload: { a, b, planetId, guess, latencyMs: ms, errorType: null, attemptIndex: i, usedRadar: false, powerUpUsed: null, isTransferCheck: false, waveRole: "practice" },
+const shot = (a: number, b: number, guess: number, ms = 1000, i = 1, planetId: "earth" | "moon" | "mars" = "moon", waveRole: "practice" | "tutorial" = "practice"): LoggedEvent => ({
+  type: "attempt_submitted", payload: { a, b, planetId, guess, latencyMs: ms, errorType: null, attemptIndex: i, usedRadar: false, powerUpUsed: null, isTransferCheck: false, waveRole },
 });
 /** Orbs the honest way: first tries on different, careful (not Gold) facts. 7 first tries = 35 + 5 for the fifth in a row. */
 const FACTS = [[2, 3], [2, 4], [2, 6], [2, 7], [2, 8], [2, 9], [3, 3], [3, 4], [3, 6], [3, 7], [3, 8], [3, 9]] as const;
@@ -66,7 +66,7 @@ describe("Solar System map", () => {
     expect(canLaunch(fold([]), "venus")).toBe(true);
   });
   it("marks cleared and Ace-cleared planets, and the Hyper-Jump streak", () => {
-    const tutorial = [[0, 5], [1, 7], [1, 3]].map(([a, b]) => ({ ...shot(a, b, a * b, 9000, 1, "earth"), payload: { ...shot(a, b, a * b, 9000, 1, "earth").payload, waveRole: "tutorial" as const } }));
+    const tutorial = [[0, 5], [1, 7], [1, 3]].map(([a, b]) => shot(a, b, a * b, 9000, 1, "earth", "tutorial"));
     const s = fold([...tutorial, { type: "planet_cleared", payload: { planetId: "earth" } }, { type: "hyper_jump_taken", payload: { fromPlanet: "moon", toPlanet: "asteroid-belt" } }]);
     expect(fold([{ type: "planet_cleared", payload: { planetId: "earth" } }]).cleared).toEqual([]); // a clear with no passed mission is ignored
     const st = Object.fromEntries(mapStops(s).map((x) => [x.id, x.status]));
