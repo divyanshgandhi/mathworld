@@ -24,6 +24,8 @@ _Updated 26 Nov 2026, after the review round's fix pass. `main` still holds the 
 
 - Shipping path, against a local Postgres 16: migrations (run twice), the production build, every route, sign-up with a Secure HttpOnly cookie, and one save stored once across a server restart (a unique index on the client's event id, migration `0002_events_client_id`). A hosted database is reached over TLS.
 
+- Share card and README media: the tags were read from the served page (title, description, picture with size and alt text, large-card type); `/opengraph-image.png` and `/twitter-image.png` build as static files. Every picture is a real capture of this build at twice the screen's resolution, taken muted in a headless browser, which also played the first mission through at real speed with no console errors.
+
 ## Next, and open risks
 - **The owner's seven points:**
   1. Film pacing: *answered, mostly.* Every reply is in range and the waits are cut to 3 s. The 5 s Launch wait stays, and listener reactions are still off camera.
