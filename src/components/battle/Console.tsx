@@ -26,7 +26,11 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
   const now = useRef("");
   const cb = useRef({ maxDigits, live, onChange, onFire });
   useEffect(() => { cb.current = { maxDigits, live, onChange, onFire }; });
+  // Fire pressed while the fleet warps in or a shot plays out: it waits and goes once the keypad is live
+  // (a fast player's answer is never swallowed). Digits typed meanwhile wait on the button the same way.
+  const pending = useRef(false);
   const set = useCallback((v: string) => {
+    pending.current = false;
     if (v === now.current) return;
     now.current = v;
     setState(v);
@@ -34,11 +38,12 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
   }, []);
   const press = useCallback((k: string) => {
     const { live: ok, maxDigits: cap } = cb.current;
-    if (!ok) return;
     const v = now.current;
-    if (k === "del") return set(v.slice(0, -1));
+    if (k === "del") { pending.current = false; return set(v.slice(0, -1)); }
     if (k === "fire") {
       if (v === "") return;
+      if (!ok) { pending.current = true; return; }
+      pending.current = false;
       // a handler that refuses (returns false) keeps the number on the button
       if (cb.current.onFire(Number(v)) !== false) set("");
       return;
@@ -64,6 +69,7 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [press]);
+  useEffect(() => { if (live && pending.current) press("fire"); }, [live, press]);
   return { entry, press, set };
 }
 

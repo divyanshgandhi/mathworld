@@ -786,7 +786,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       setUi({ offer: null });
       return jump.payload.toPlanet as PlanetId;
     },
-    declineJump() { declinedAt = state().waves; setUi({ offer: null }); void startWave(); },
+    declineJump() { declinedAt = state().waves; voice.hush(); setUi({ offer: null }); void startWave(); }, // the offer line goes with the card
     /**
      * The fleet's box on screen in CSS px (the ships still flying, not their labels), or null with no
      * fleet. The guided first shot rings it.
