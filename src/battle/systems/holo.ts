@@ -36,6 +36,7 @@ export function holoText(text: string, height: number, color: string = LOOK.holo
   texture.needsUpdate = true;
   const m = new THREE.Mesh(new THREE.PlaneGeometry((height * w) / pxH, height), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
   m.renderOrder = 5;
+  m.userData.text = text; // the playfield review reads it
   return m;
 }
 export const holoWidth = (o: THREE.Object3D) => ((o as THREE.Mesh).geometry as THREE.PlaneGeometry).parameters.width;

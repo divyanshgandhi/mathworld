@@ -521,6 +521,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const over = n > p, value = over ? plan.extra : plan.remaining;
     bus.emit("resolved", { correct: false, n, product: p, attempt: bs.attempts });
     setUi({ outcome: { kind: over ? "over" : "under", value } });
+    kill.clearTicks(); // the volley's squad counts go before the miss is counted in the world
     if (over) misses.over(value);
     else {
       const alive = fv.gather(order), gathered = alive.length > 0 && fv.views.every((v) => v.kind === "fighter");
@@ -576,6 +577,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     root.worldToLocal(p);
     const isLeader = lead.kind === "fighter" && lead.leader;
     if (isLeader) kill.pennant(p.clone().add(new THREE.Vector3(0, 0.5 * fv.scale, 0.2)), fv.scale * 0.78);
+    // the left lane holds one thing at a time: with "7 squads" on show there, the squads are not counted again
+    if (fv.words && fv.axis.squads !== "off") return void (key >= 0 && cue("tick"));
     const h = 20 * unitsPerPx() * fv.scale;
     kill.tick(p.clone().add(new THREE.Vector3(-(lead.size.x / 2 + 0.45) * fv.scale, 0, 0.6)), fmt(count), h);
     if (key >= 0) cue("tick");
@@ -826,6 +829,52 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         rectBox.expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z));
       }
       return onScreen(rectBox);
+    },
+    /**
+     * Dev (the playfield review, docs/overhaul/playfield.md): every mark drawn round the fleet now, as a
+     * screen rectangle in CSS px (labels, hairlines, scan counts and bracket, miss marks, Power-Up marks,
+     * kill ticks), the fleet, the rocket, one ship's size, and every pair of marks that overlap.
+     */
+    playfield() {
+      type R = { id: string; text: string | null; x: number; y: number; w: number; h: number };
+      const out: R[] = [], box = new THREE.Box3();
+      const visible = (o: THREE.Object3D) => { for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false; return true; };
+      const push = (id: string, o: THREE.Object3D) => {
+        if (!visible(o)) return;
+        const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (m && "opacity" in m && m.opacity < 0.05) return;
+        box.setFromObject(o);
+        const r = onScreen(box);
+        if (r && r.width > 0.5 && r.height > 0.5) out.push({ id, text: (o.userData.text as string) ?? null, x: r.x, y: r.y, w: r.width, h: r.height });
+      };
+      for (const c of fv.labels.children) push(`axis:${c.userData.axis ?? "?"}${c.userData.axisText ? ":label" : ":hairline"}`, c);
+      for (const c of fv.overlay.children) push(c.userData.text ? "overlay:text" : "overlay:bracket", c);
+      for (const c of fv.visuals.children) push(c.userData.text ? "visual:text" : "visual", c);
+      for (const c of root.children) if (c.userData.text) push("world:text", c);
+      const rocket = this.rocketRect();
+      // the fleet's box from every ship in place (an instanced fleet draws its fighters without their groups)
+      box.makeEmpty();
+      for (const v of fv.views) {
+        if (!v.alive) continue;
+        v.g.getWorldPosition(rectAt);
+        const hx = (v.size.x * fv.scale) / 2, hy = (v.size.y * fv.scale) / 2;
+        box.expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z));
+      }
+      const fleet = wave ? onScreen(box) : null;
+      const ship = fv.views.find((v) => v.alive);
+      let shipPx: number | null = null;
+      if (ship) { ship.g.getWorldPosition(rectAt); const hy = (ship.size.y * fv.scale) / 2; const hx = (ship.size.x * fv.scale) / 2; box.makeEmpty().expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z)); shipPx = onScreen(box)?.height ?? null; }
+      const hit: [string, string][] = [];
+      const all = [...out, ...(fleet ? [{ id: "fleet", text: null, x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }] : [])];
+      for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+        const p = all[i], q = all[j];
+        if (p.x < q.x + q.w - 1 && q.x < p.x + p.w - 1 && p.y < q.y + q.h - 1 && q.y < p.y + p.h - 1) {
+          // a scan's bracket and the visual marks are meant to sit on the fleet
+          if ((p.id === "fleet" || q.id === "fleet") && /bracket|visual/.test(p.id + q.id)) continue;
+          hit.push([`${p.id}${p.text ? ` "${p.text}"` : ""}`, `${q.id}${q.text ? ` "${q.text}"` : ""}`]);
+        }
+      }
+      return { time: stage.time, fleet: fleet && { x: fleet.x, y: fleet.y, w: fleet.width, h: fleet.height }, rocket: rocket && { x: rocket.x, y: rocket.y, w: rocket.width, h: rocket.height }, shipPx, marks: out, overlaps: hit, scan: scan.debug(), hint: ui.hint, words: fv.words };
     },
     /** The rocket and the number on its nose, as a box on screen in CSS px (the guide keeps its captions off them). */
     rocketRect(): DOMRect | null {
