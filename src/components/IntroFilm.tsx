@@ -12,6 +12,9 @@ import { PauseMenu } from "./battle/PauseMenu";
 import { FirstShotGuide } from "./teach/FirstShotGuide";
 import { CadetSignUp } from "./hub/CadetSignUp";
 
+/** The film's fade grammar (ms): out to the void, and back in (the same as FADE in intro.ts). */
+const FILM_FADE = { out: 700, in: 900 };
+
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
 
 /** What the address asks for: `?dev` adds the chapter dock, `?replay` plays the film again, `from` is where to go back to after a replay. */
@@ -84,15 +87,27 @@ export function IntroFilm() {
   /** How the film ends: into Cadet Bay the first time, back where the cadet came from on a replay. Read when it ends. */
   const ending = useRef<() => void>(() => {});
 
+  /**
+   * The hand-off from the film to Cadet Bay is one designed dip, in the film's own fade grammar: the last
+   * frame goes to the void, the battle is built behind it, and the void lifts. (The battle's framing depends
+   * on the screen and the HUD, so a cut would only match the film's last frame by luck.)
+   */
+  const [veil, setVeil] = useState<"off" | "down" | "lifting">("off");
   const startBay = useCallback(async () => {
     const s = stage.current;
     if (!s) return;
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // load what the battle needs while the film's last frame is still up, so the void is short
+    const [{ mountCadetBay }, log] = await Promise.all([import("@/worlds/space/cadetBay"), history()]);
+    setVeil("down");
+    await new Promise((r) => setTimeout(r, still ? 0 : FILM_FADE.out));
     film.current?.dispose();
-    const { mountCadetBay } = await import("@/worlds/space/cadetBay");
-    bay.current = mountCadetBay(s, { onUi: setBayUi, onEvent: post, history: await history(), dev: new URLSearchParams(location.search).has("dev") });
+    bay.current = mountCadetBay(s, { onUi: setBayUi, onEvent: post, history: log, dev: new URLSearchParams(location.search).has("dev") });
     window.__mw = { stage: s, arena: bay.current };
     setBayArena(bay.current);
     setPhase("bay");
+    requestAnimationFrame(() => requestAnimationFrame(() => setVeil("lifting")));
+    setTimeout(() => setVeil("off"), (still ? 0 : FILM_FADE.in) + 100);
   }, []);
   useEffect(() => { ending.current = again ? () => router.replace(from) : () => void startBay(); }, [again, from, router, startBay]);
 
@@ -185,6 +200,12 @@ export function IntroFilm() {
     // in Cadet Bay this is the game root (data-cockpit): the HUD gives it focus back after a card or the pause menu, so Enter fires
     <div className="fixed inset-0 select-none overflow-hidden bg-void text-ink-1 outline-none" data-cockpit={phase === "bay" ? "" : undefined} tabIndex={-1}>
       <div ref={box} className="absolute inset-0" />
+      {veil !== "off" && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-[5] bg-void ease-out"
+          style={{ opacity: veil === "down" ? 1 : 0, transition: `opacity ${veil === "down" ? FILM_FADE.out : FILM_FADE.in}ms`, animation: veil === "down" ? `mw-veil-in ${FILM_FADE.out}ms ${MOTION.ease} both` : undefined }}>
+          <style>{"@keyframes mw-veil-in{from{opacity:0}to{opacity:1}}"}</style>
+        </div>
+      )}
 
       {dev && (
         <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-140px)] flex-wrap gap-1.5" role="toolbar" aria-label="Chapters">
