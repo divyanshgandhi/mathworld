@@ -50,8 +50,15 @@ const SPEC: Record<Exclude<BodyId, "asteroid-belt">, Spec> = {
 
 /* ---------- map painting: a small worker pool, with a main-thread fallback ---------- */
 
-let pool: Worker[] | null = null, next = 0, ticket = 0;
-const waiting = new Map<number, (m: BodyMaps) => void>();
+let pool: Worker[] | null = null, ticket = 0;
+interface Job { n: number; id: MapBodyId; w: number; done: (m: BodyMaps) => void }
+/** Jobs not yet sent, and the job each worker is painting. Workers take one job at a time, smallest maps first. */
+const backlog: Job[] = [];
+const busy = new Map<Worker, Job>();
+/** Paint on the main thread instead (no worker, a worker that failed to load, or one that went quiet). */
+const paintHere = (id: MapBodyId, w: number) => new Promise<BodyMaps>((resolve) => setTimeout(() => resolve(paintBody(id, w)), 0));
+/** A job a worker has not answered in this long is painted on the main thread instead (the maps are deterministic). */
+const WORKER_PATIENCE_MS = 20_000;
 function workers(): Worker[] {
   if (pool) return pool;
   pool = [];
@@ -59,11 +66,33 @@ function workers(): Worker[] {
     const n = typeof navigator !== "undefined" && navigator.hardwareConcurrency > 2 ? 2 : 1;
     for (let i = 0; i < n; i++) {
       const w = new Worker(new URL("./planetMaps.worker.ts", import.meta.url), { type: "module" });
-      w.onmessage = (e: MessageEvent<{ n: number; maps: BodyMaps }>) => { waiting.get(e.data.n)?.(e.data.maps); waiting.delete(e.data.n); };
+      w.onmessage = (e: MessageEvent<{ n: number; maps: BodyMaps }>) => {
+        const job = busy.get(w);
+        busy.delete(w);
+        if (job && job.n === e.data.n) job.done(e.data.maps);
+        dispatch();
+      };
+      // a worker that cannot load or crashes: stop using workers, and paint everything still waiting here
+      w.onerror = () => {
+        pool = [];
+        for (const job of [...busy.values(), ...backlog.splice(0)]) void paintHere(job.id, job.w).then(job.done);
+        busy.clear();
+      };
       pool.push(w);
     }
   } catch { pool = []; }
   return pool;
+}
+/** Give every idle worker the smallest job waiting: a screen's quick maps land before any sharp 2048 map. */
+function dispatch() {
+  for (const w of pool ?? []) {
+    if (busy.has(w) || !backlog.length) continue;
+    let k = 0;
+    for (let i = 1; i < backlog.length; i++) if (backlog[i].w < backlog[k].w) k = i;
+    const job = backlog.splice(k, 1)[0];
+    busy.set(w, job);
+    w.postMessage({ n: job.n, id: job.id, w: job.w });
+  }
 }
 const painted = new Map<string, Promise<BodyMaps>>();
 function paintAsync(id: MapBodyId, w: number): Promise<BodyMaps> {
@@ -72,8 +101,14 @@ function paintAsync(id: MapBodyId, w: number): Promise<BodyMaps> {
   if (!p) {
     const ws = typeof Worker !== "undefined" ? workers() : [];
     p = ws.length
-      ? new Promise<BodyMaps>((resolve) => { const n = ++ticket; waiting.set(n, resolve); ws[next++ % ws.length].postMessage({ n, id, w }); })
-      : new Promise<BodyMaps>((resolve) => setTimeout(() => resolve(paintBody(id, w)), 0));
+      ? new Promise<BodyMaps>((resolve) => {
+        let settled = false;
+        const done = (m: BodyMaps) => { if (!settled) { settled = true; clearTimeout(timer); resolve(m); } };
+        const timer = setTimeout(() => { void paintHere(id, w).then(done); }, WORKER_PATIENCE_MS);
+        backlog.push({ n: ++ticket, id, w, done });
+        dispatch();
+      })
+      : paintHere(id, w);
     painted.set(key, p);
   }
   return p;
