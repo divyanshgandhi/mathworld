@@ -72,7 +72,9 @@ The owner's seven points and the round's closed decisions are in `OVERHAUL.md`, 
 - The Star map tour mounts in `SolarMap.tsx` in place of the map's greeting. The Hangar and Academy greeting mounts are gone; their tours speak for them. The map greeting's words stay in `src/teach/greetings.ts` for /dev/teach only.
 - The film's first battle has a pause-menu way out ("Leave for now", to the Title).
 - `ui.hint.squads` and `ui.hint.each` are typed `"on" | "off"` (`HintShow`); the console prints structure words only when one is `on`.
-- Removed: the old icon-only Power-Up `Slot` and `EmptySlot` and their styles.
+- Removed: the old icon-only Power-Up `Slot` and `EmptySlot` and their styles, and the bay's first-arrival greeting (its tour shows the screen instead).
+- An empty belt's reserved Power-Ups space carries no `powerups` anchor, so the battle tour skips that step instead of spotlighting nothing.
+- On phone widths (under 420 px) the wave dots drop their "0 won" words, which ran under the orb counter at 375 px.
 
 ## Review routes
 Run the dev server and open these. Add `?dev` to the game routes to skip progress gates.
