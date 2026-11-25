@@ -115,7 +115,8 @@ export function IntroFilm() {
       if (gone || !box.current) return;
       const s = createStage(box.current, { fill: true });
       stage.current = s;
-      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits });
+      // `?calm` plays the film as someone who asked for less motion sees it (for review; the system setting does it for real)
+      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits, calm: new URLSearchParams(location.search).has("calm") || undefined });
       window.__mw = { stage: s, film: film.current };
       setFilmReady(true);
       cleanup = () => { film.current?.dispose(); bay.current?.dispose(); s.dispose(); };

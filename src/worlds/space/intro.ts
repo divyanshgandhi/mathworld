@@ -7,6 +7,7 @@ import { createOverlay, readingTime, scheduleCaptions, splitCaption } from "@/en
 import type { Stage } from "@/engine/stage";
 import { approach, clamp, ease, keyframes, seeded } from "@/engine/util";
 import { prepare, warmVoice } from "@/engine/voice";
+import { LOOK as BATTLE } from "@/battle/look";
 import { applyLook, LOOKS, type LookId } from "@/worlds/looks";
 import { animateCharacter, ANSWERERS, cadetCloth, CAPTAIN, CLASSMATES, eyePosition, face, headPosition, makeCharacter, mix, NAMED, PLAYER, PRINCIPAL, recolour, seat, SKIN, TEACHER, type Character, type Expression } from "./cast";
 import { BOARD_TEXT, buildClassroom, CHAIR_BACK, DESK_DEPTH, DESK_HEIGHT, DOOR_POINT, PLAYER_SEAT, SEAT_HEIGHT, SEATS } from "./classroom";
@@ -136,12 +137,14 @@ export interface IntroOptions {
   fits?: (who: string, text: string) => boolean;
   /** The cadet's colour from sign-up (a token colour): the hoodie and the first-person sleeve take it. */
   colour?: string;
+  /** Less motion: every setup is a still frame, the crane and the dive do not travel, nothing shakes. Defaults to the system setting. */
+  calm?: boolean;
 }
 
-export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOptions = {}) {
+export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calmer }: IntroOptions = {}) {
   const { scene, camera, mats: M } = stage;
   const rnd = seeded(11);
-  const calm = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const calm = calmer ?? (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   void audio.preload();
   const overlay = createOverlay(stage.container, stage.renderer.domElement);
   const cam = new CameraRig();
@@ -265,7 +268,9 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
   let again: (() => void) | null = null, lastAspect = camera.aspect;
   /** Who the soft key is on, and how strongly. */
   let lit: (() => THREE.Vector3) | null = null, litPower = 0;
-  const light = (on: (() => THREE.Vector3) | null, power = 1) => { lit = on; litPower = power; };
+  /** A new setup has its light from its first frame: the key is set at once on a cut, and only eases as its subject moves. */
+  let litCut = false;
+  const light = (on: (() => THREE.Vector3) | null, power = 1) => { lit = on; litPower = power; litCut = true; };
   /** A setup: cut to it, then drift a little closer (unless the player asked for less motion). */
   function shoot(pts: THREE.Vector3[], from: THREE.Vector3, o: { box?: Box; ax?: number; ay?: number; push?: number; speed?: number; walls?: boolean; dir?: THREE.Vector3 } = {}) {
     const { p, d, dist } = compose(pts, from, o.box, o), l = p.clone().addScaledVector(d, dist);
@@ -733,13 +738,17 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       beats: [{ id: "teacher_pick_generic", who: "Teacher", c: T_, live: () => nameLine, text: () => `And our fifth cadet is… ${cadet || "you"}!`,
         go: () => audio.sfx("fanfare"),
         after: (t, start, len) => {
-          if (t > start + len * 0.8 && player.rig.stand === 0) { player.rig.stand = 1; player.rig.mood = "happy"; }
+          if (t > start + len * 0.8 && player.rig.stand === 0) {
+            player.rig.stand = 1; player.rig.mood = "happy";
+            // for less motion the camera does not follow the rise: one cut to a frame that already holds the whole cheer
+            if (calm) { const g = player.rig.seat!; lens("portrait"); shoot([P(g.x - 0.5, 1.9, g.z), P(g.x + 0.5, 1.9, g.z), P(g.x - 0.3, 0.6, g.z), P(g.x + 0.3, 0.6, g.z)], P(g.x + 0.85, 1.0, g.z - 1.5), { walls: true }); }
+          }
           // the camera stays on the cadet as they rise and holds the whole cheer: both hands stay in the frame
-          if (player.rig.s > 0.02) {
+          if (player.rig.s > 0.02 && !calm) {
             const h = headOf(player), H = player.rig.H, up = player.rig.cheer;
             lens("portrait");
             const { p, d, dist } = compose([...bust(player, 2.4), P(h.x - 0.36, h.y + H * (1.4 + 1.9 * up), h.z), P(h.x + 0.36, h.y + H * (1.4 + 1.9 * up), h.z)], P(h.x + 0.85, h.y - 0.1, h.z - 1.5), SAFE, { walls: true });
-            cam.shot(arr(p), arr(p.clone().addScaledVector(d, dist)), calm ? 0 : 5);
+            cam.shot(arr(p), arr(p.clone().addScaledVector(d, dist)), 5);
           }
           if (player.rig.s > 0.9) player.rig.mood = "cheer";
           // out to the void, and the cadet's new name on it
@@ -935,7 +944,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       eyeLight.position.copy(camera.position).addScaledVector(right, -0.9).add(kick.set(0, 0.75, 0));
       eyeLight.target.position.copy(aim);
       const d = eyeLight.position.distanceTo(aim);
-      eyeLight.intensity = approach(eyeLight.intensity, 2.6 * litPower * d * d, 6, dt);
+      eyeLight.intensity = litCut ? 2.6 * litPower * d * d : approach(eyeLight.intensity, 2.6 * litPower * d * d, 6, dt);
+      litCut = false;
     } else eyeLight.intensity = 0;
     overlay.fade(fade, fadeColor);
     overlay.lids(lids);
@@ -1023,7 +1033,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       return true;
     },
     /** For tests and review: the film's clock, the step, and what is being said. */
-    get state() { return { played, step: director.current?.name ?? null, t: director.t, saying, env, fov: camera.fov }; },
+    get state() { return { played, step: director.current?.name ?? null, t: director.t, saying, env, fov: camera.fov, sound: audio.context?.state ?? null }; },
     get ui() { return ui; },
     dispose() {
       window.clearTimeout(prepTimer);
@@ -1038,6 +1048,11 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       flight.removeFromParent();
       unframe();
       eyeLight.intensity = 0;
+      // the battle that follows lights the same Earth with its own key and fill: the film's sun steps down by that
+      // much and its fill goes dark, so the Earth of the last frame is the Earth of the first shot. Both lights stay
+      // in the scene (at these strengths), because taking a light out would rebuild every shader on the cut
+      hemi.intensity = 0;
+      earth.sun.intensity = Math.max(0, earth.sun.intensity - BATTLE.light.key.intensity);
       stage.grade.tint.value.set(1, 1, 1);
       warm?.dispose();
       camera.fov = FOV;
