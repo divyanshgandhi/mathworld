@@ -141,7 +141,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
 
       {/* the cockpit: keypad docked right (bottom on phones) */}
       {w && (
-        <div ref={dockRef} className={`${glass} absolute bottom-2 left-1/2 z-10 w-[min(96vw,340px)] -translate-x-1/2 p-2.5 md:bottom-auto md:left-auto md:right-5 md:top-1/2 md:w-[300px] md:-translate-y-1/2 md:translate-x-0 md:p-3`}>
+        <div ref={dockRef} className={`${glass} absolute bottom-2 left-1/2 z-10 w-[min(96vw,340px)] -translate-x-1/2 p-2.5 md:bottom-5 md:left-auto md:right-5 md:w-[300px] md:translate-x-0 md:p-3`}>
           {ui.belt.length > 0 && (
             <Toolbar aria-label="Tactical Belt" className="-mx-1 mb-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {ui.belt.map((t) => (
@@ -174,6 +174,19 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
               {ui.lesson.prompt && <p className="mt-0.5 type-body-sm text-ink-2">We Do: load it and fire!</p>}
             </div>
           )}
+          {/* the radar sits above the readout: the dock is anchored at the bottom, so anything that appears
+              mid-wave grows it upward and the keypad never moves under a finger */}
+          {ui.radar && (
+            <div className="mb-2" role="group" aria-label="Targeting Radar">
+              <p className="mb-1 text-center type-label-sm text-sky">Targeting radar</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {ui.radar.map((v) => (
+                  <Button key={v} aria-label={`Radar ${v}`} disabled={!ui.canFire} onClick={() => { setEntry(""); void arena?.radar(v); }}
+                    className="min-h-11 rounded-chip border border-sky/60 type-name type-number text-[15px] text-sky transition hover:border-sky data-disabled:border-line-1 data-disabled:text-ink-3">{fmt(v)}</Button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mb-1.5 flex items-center justify-between gap-3 rounded-chip border border-line-1 bg-void px-4 py-1 md:mb-2 md:py-2">
             <span className="flex items-center gap-2 type-label-sm text-ink-3"><Icon name="plasma" size={18} />{sectorActive ? `Sector ${sectorActive.label}` : "Plasma balls"}</span>
             <output aria-live="polite" aria-label="Plasma balls loaded" className="type-number text-[32px] font-medium leading-tight text-approach md:text-[40px]">{entry || "0"}</output>
@@ -186,22 +199,11 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
               </Button>
             ))}
           </div>
-          {ui.radar && (
-            <div className="mt-2" role="group" aria-label="Targeting Radar">
-              <p className="mb-1 text-center type-label-sm text-sky">Targeting radar</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {ui.radar.map((v) => (
-                  <Button key={v} aria-label={`Radar ${v}`} disabled={!ui.canFire} onClick={() => { setEntry(""); void arena?.radar(v); }}
-                    className="min-h-11 rounded-chip border border-sky/60 type-name type-number text-[15px] text-sky transition hover:border-sky data-disabled:border-line-1 data-disabled:text-ink-3">{fmt(v)}</Button>
-                ))}
-              </div>
-            </div>
-          )}
           <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson}
             className={`mw-btn mt-1.5 min-h-11 w-full border text-[15px] md:mt-2 data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2 hover:border-sky hover:text-sky"}`}>
             Show Me How
           </Button>
-          {!ui.canFire && !ui.lesson && <p className="mt-1 hidden text-center type-body-sm text-ink-3 md:block">Stand by…</p>}
+          <p aria-hidden={ui.canFire || !!ui.lesson} className={`mt-1 hidden text-center type-body-sm text-ink-3 md:block ${ui.canFire || ui.lesson ? "invisible" : ""}`}>Stand by…</p>
         </div>
       )}
 
