@@ -104,7 +104,7 @@ export function Flashcards({ state, emit, onClose, table = null, facts, title: n
               {deck.map((_, k) => <i key={k} data-state={k < i ? "done" : k === i ? "now" : undefined} />)}
             </span>
           )}
-          <DialogClose aria-label="Close flashcards" title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
+          <DialogClose aria-label={name ? `Close ${name.toLowerCase()}` : "Close flashcards"} title="Close" className={buttonClass("icon")}><Icon name="close" size={20} /></DialogClose>
         </header>
 
         {/* laid over the top of the card, so nothing moves when it goes */}
