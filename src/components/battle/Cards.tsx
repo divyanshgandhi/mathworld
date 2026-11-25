@@ -24,10 +24,10 @@ export function Card({ open, title, children, actions, art, dismissible = false,
   return (
     <Dialog open={open} dismissible={dismissible} onOpenChange={(o) => { if (!o) onClose?.(); }}>
       <DialogBackdrop className={backdrop} />
-      <DialogContent className={`${dialogBox} ${css.card}`} aria-label={label} initialFocus="[data-primary]">
-        {art}
+      <DialogContent className={`${dialogBox} ${css.card}`} data-art={art ? "" : undefined} aria-label={label} initialFocus="[data-primary]">
+        {art && <div className={css.cardArt}>{art}</div>}
         <DialogTitle className={css.cardTitle}>{title}</DialogTitle>
-        {children && <DialogDescription render={<div />} className="flex flex-col items-center gap-2">{children}</DialogDescription>}
+        {children && <DialogDescription render={<div />} className={`${css.cardBody} flex flex-col items-center gap-2`}>{children}</DialogDescription>}
         <div className={css.cardActions}>{actions}</div>
       </DialogContent>
     </Dialog>

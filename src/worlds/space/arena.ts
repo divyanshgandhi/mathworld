@@ -680,7 +680,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const nv = nova.update(dt, T, m.w, m.h, bs.lessonOn);
     // a ship's cell stays at most ~120 px (less on a short screen), so 1 × 4 does not fill the sky with four giants
     const cellMax = Math.min(120, cam.free.fh * 0.2);
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.visiblePad()), !bs.lessonOn, cellMax / fv.scale);
+    // the room for the axis words is kept from the first frame (structure "discover" reveals them later)
+    const pad = structure === "discover" ? fv.wordsPad() : fv.visiblePad();
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale);
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
@@ -798,9 +800,14 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       if (!rectBox.isEmpty()) rectBox.max.y += (rectBox.max.y - rectBox.min.y) * 0.9; // the number rides just above the nose
       return onScreen(rectBox);
     },
+    /**
+     * Where the axis words go: beside the fleet (`true`, wide screens) or only in the HUD (`false`, a
+     * narrow portrait screen, where the room beside the fleet would shrink it). Each word shows once.
+     */
+    setAxisWords(on: boolean) { if (fv.words === on) return; fv.words = on; fv.showAxis(fv.axis.squads, fv.axis.each); },
     /** The HUD's footprint in px, so the fleet is framed in the free part of the screen. */
     setSafe(s: Partial<Safe>) { cam.safe = { ...cam.safe, ...s }; },
-    captionAt: (px: number, side?: "centre" | "left") => overlay.captionAt(px, side),
+    captionAt: (px: number, side?: "centre" | "left", maxPx?: number) => overlay.captionAt(px, side, maxPx),
     get ui() { return ui; },
     log: () => log,
     /** The battle's event bus: subscribe for fire, hit, miss, resolved, wave_cleared, hint_shown, charge… */

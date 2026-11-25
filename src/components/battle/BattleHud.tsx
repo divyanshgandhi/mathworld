@@ -40,7 +40,7 @@ export type Safe = { top: number; right: number; bottom: number; left: number };
  * mount, resize and rotation only: nothing in the cockpit changes size during play.
  */
 export function useCockpitSafe(layout: ConsoleLayout, strip: React.RefObject<HTMLElement | null>, con: React.RefObject<HTMLElement | null>,
-  apply: ((s: Omit<Safe, "left">, caption: { px: number; side: "centre" | "left" }) => void) | null) {
+  apply: ((s: Omit<Safe, "left">, caption: { px: number; side: "centre" | "left"; max?: number }) => void) | null) {
   const safe = useRef<Safe>({ top: 0, right: 0, bottom: 0, left: 0 });
   useEffect(() => {
     if (!apply) return;
@@ -48,16 +48,18 @@ export function useCockpitSafe(layout: ConsoleLayout, strip: React.RefObject<HTM
       const W = window.innerWidth, H = window.innerHeight, s = strip.current?.getBoundingClientRect(), c = con.current?.getBoundingClientRect();
       if (!s || !c) return;
       const top = Math.round(s.bottom + 6);
-      let right = 0, bottom: number, cap: { px: number; side: "centre" | "left" };
+      let right = 0, bottom: number, cap: { px: number; side: "centre" | "left"; max?: number };
       if (layout === "pad") {
         // Nova's caption has its own band right above the keypad, under the rocket
         const band = 76;
         bottom = Math.round(H - c.top + band);
-        cap = { px: Math.round(H - c.top + 10), side: "centre" };
+        cap = { px: Math.round(H - c.top + 10), side: "centre", max: W - 24 };
       } else if (layout === "column") {
+        // a phone on its side: Nova speaks bottom-left, beside the rocket rather than under it, so the
+        // fleet keeps the height. The plate stops short of the rocket at the free area's bottom centre
         right = Math.round(W - c.left);
-        bottom = 64;
-        cap = { px: 8, side: "left" };
+        bottom = 34; // the rocket's flame hangs below its base: this keeps it on screen
+        cap = { px: 10, side: "left", max: Math.max(160, (W - right) / 2 - 32 - 52) };
       } else {
         bottom = Math.round(H - c.top + 8);
         cap = { px: Math.round(H - c.top + 14), side: "left" };
@@ -155,8 +157,11 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   useEffect(() => { if (ui?.lockTotal != null) set(String(ui.lockTotal)); }, [ui?.lockTotal, set]);
 
   // ---- where the cockpit is ----
-  const apply = useMemo(() => arena ? (s: Omit<Safe, "left">, cap: { px: number; side: "centre" | "left" }) => { arena.setSafe(s); arena.captionAt(cap.px, cap.side); } : null, [arena]);
+  const apply = useMemo(() => arena ? (s: Omit<Safe, "left">, cap: { px: number; side: "centre" | "left"; max?: number }) => { arena.setSafe(s); arena.captionAt(cap.px, cap.side, cap.max); } : null, [arena]);
   const centre = useCockpitSafe(layout, stripRef, conRef, apply);
+  // each structure word shows once: beside the fleet where there is room, in the strip on a phone held upright
+  const wordsInStrip = layout === "pad";
+  useEffect(() => { arena?.setAxisWords(!wordsInStrip); }, [arena, wordsInStrip]);
 
   // ---- orbs: earned this battle, and the flight to the counter ----
   const shownOrbs = useOrbReward(ui?.orbs ?? 0, orbsRef, centre, { reduced, still: cardOpen });
@@ -177,7 +182,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const o = ui.outcome, h = ui.hint ?? null, lesson = ui.lesson;
 
   // ---- the two message lines under the question ----
-  const hintWords = w && h && (h.squads !== "off" || h.each !== "off") ? (
+  const hintWords = wordsInStrip && w && h && (h.squads !== "off" || h.each !== "off") ? (
     <>
       {h.squads !== "off" && <span className={h.squads === "soft" ? css.soft : undefined}><b>{fmtN(ra)}</b> {plural(ra, "squad", "squads")}</span>}
       {h.squads !== "off" && h.each !== "off" && <span className={css.soft}> · </span>}

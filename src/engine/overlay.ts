@@ -68,7 +68,7 @@ export interface Overlay {
    * Lift captions clear of a panel docked at the bottom of the frame (px from the bottom). `left`
    * moves the caption to the bottom-left corner, clear of whatever sits at the bottom centre.
    */
-  captionAt(bottomPx: number, side?: "centre" | "left"): void;
+  captionAt(bottomPx: number, side?: "centre" | "left", maxWidthPx?: number): void;
   /**
    * A title card: one title in the display voice and an optional plain line under it. The first
    * argument is kept so earlier callers compile, and is not shown: a title carries no label above it.
@@ -107,6 +107,7 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
   cap.setAttribute("aria-hidden", "true");
   card.setAttribute("aria-hidden", "true");
 
+  let compact = false;
   const barW = div(root, { left: "50%", bottom: "10px", transform: "translateX(-50%)", width: "200px", height: "2px", borderRadius: "1px", background: LINE[1], opacity: "0", transition: `opacity ${MOTION.quick}ms ${ease}` });
   const bar = div(barW, { position: "relative", height: "100%", width: "0", background: COLOR.approach, borderRadius: "1px" });
 
@@ -114,16 +115,23 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
     caption(speaker, txt) {
       if (txt) {
         chip.textContent = speaker;
-        chip.style.display = speaker ? "" : "none";
+        chip.style.display = speaker && !compact ? "" : "none";
         chip.style.color = NAME_INK[speaker] ?? INK[2];
         text.textContent = txt;
       }
       cap.style.opacity = txt ? "1" : "0"; // the words stay in place while the plate fades out
       cap.setAttribute("aria-hidden", txt ? "false" : "true");
     },
-    captionAt(px, side = "centre") {
+    captionAt(px, side = "centre", maxPx) {
       cap.style.bottom = `${px}px`; barW.style.bottom = `${Math.max(8, px - 10)}px`;
-      css(cap, side === "left" ? { left: "64px", transform: "none", maxWidth: "min(36%, 440px)" } : { left: "50%", transform: "translateX(-50%)", maxWidth: "min(92%, 760px)" });
+      const left = side === "left" ? Math.min(64, Math.max(12, (root.clientWidth || 800) * 0.04)) : 0;
+      css(cap, side === "left"
+        ? { left: `${left}px`, transform: "none", maxWidth: maxPx ? `${Math.round(maxPx)}px` : "min(36%, 440px)" }
+        : { left: "50%", transform: "translateX(-50%)", maxWidth: maxPx ? `${Math.round(maxPx)}px` : "min(92%, 760px)" });
+      // a narrow plate keeps its words: the speaker's name goes (the face and the place say who is talking)
+      compact = (maxPx ?? root.clientWidth) < 520;
+      chip.style.display = compact || !chip.textContent ? "none" : "";
+      cap.style.padding = compact ? "9px 14px 10px" : "11px 20px 12px";
     },
     card(_kicker, m, s = "", at = "centre") {
       if (m) {

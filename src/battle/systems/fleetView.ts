@@ -82,6 +82,11 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
     flipped: false, flipT: 0,
     pulses: [] as { v: ShipView; t0: number }[], rowPulse: null as { rows: number; t0: number } | null, labelPulse: -1,
     axis: { squads: "on" as AxisShow, each: "on" as AxisShow },
+    /**
+     * The axis words ("6 squads", "8 in each squad") are written beside the fleet. Off on a narrow screen,
+     * where the HUD writes them instead (each word in one place): the brackets still show the squads.
+     */
+    words: true,
     /** When this fleet's warp-in ends (stage time). */
     landed: 0,
     /** The fleet's fighters drawn as instances (big fleets), or null. */
@@ -213,15 +218,24 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
         const which = c.userData.axis as "squads" | "each" | undefined;
         if (!which) continue;
         const s = which === "squads" ? squads : each;
-        if (c.visible !== (s !== "off") && s !== "off") c.userData.settle = stage.time;
-        c.visible = s !== "off";
+        const show = s !== "off" && (fv.words || !c.userData.axisText);
+        if (c.visible !== show && show) c.userData.settle = stage.time;
+        c.visible = show;
         const m = (c as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
         if (m) { m.opacity = s === "soft" ? LOOK.soft.opacity : 1; m.transparent = true; }
       }
     },
     /** How far the visible axis labels reach (world units): nothing when they are hidden. */
     visiblePad() {
+      if (!fv.words) return { left: 0, top: 0 };
       return { left: fv.axis.squads !== "off" && fv.axisBox ? fv.axisPad.left : 0, top: fv.axis.each !== "off" && fv.axisBox ? fv.axisPad.top : 0 };
+    },
+    /**
+     * The room the axis words could need on this fleet (world units), shown or not. Framed from the
+     * fleet's first frame, so a hint arriving later never shrinks or moves the fleet being counted.
+     */
+    wordsPad() {
+      return fv.words && fv.axisBox ? fv.axisPad : { left: 0, top: 0 };
     },
 
     /** A ball is on its way: the ship flinches just before `at` (stage time). */

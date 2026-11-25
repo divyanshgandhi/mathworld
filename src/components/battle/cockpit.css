@@ -368,6 +368,33 @@
 .mwc-console[data-layout="pad"] .mwc-fire { --fire-n: clamp(34px, 6dvh, 48px); }
 .mwc-console[data-layout="pad"] .mwc-help { gap: 8px; padding: 0 12px 0 6px; }
 
+/*
+ * A short phone held upright (under 700 px tall): the keypad folds into two rows of five, so the fleet gets
+ * the height back. Fire stands two rows tall at the thumb's side; Power-Ups, Delete and Show me how sit under.
+ */
+@media (max-height: 699px) {
+  .mwc-console[data-layout="pad"] { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .mwc-console[data-layout="pad"] .mwc-grid {
+    --key: 48px;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.6fr);
+    grid-template-rows: var(--key) var(--key) 50px;
+    grid-template-areas:
+      "k1 k2 k3 k4 k5 fire"
+      "k6 k7 k8 k9 k0 fire"
+      "slots slots slots del help help";
+  }
+  .mwc-console[data-layout="pad"] .mwc-fire,
+  .mwc-console[data-layout="pad"] .mwc-slots,
+  .mwc-console[data-layout="pad"] .mwc-help { margin-left: 0; }
+  .mwc-console[data-layout="pad"] .mwc-fire { grid-template-columns: 1fr; grid-template-rows: auto 1fr; padding: 10px 8px; justify-items: center; }
+  .mwc-console[data-layout="pad"] .mwc-fireWord { justify-self: center; }
+  .mwc-console[data-layout="pad"] .mwc-fireGlyph { display: none; }
+  .mwc-console[data-layout="pad"] .mwc-fireNumber { --fire-n: 30px; justify-self: center; align-self: center; }
+  .mwc-console[data-layout="pad"] .mwc-help { padding: 0 8px; }
+  .mwc-console[data-layout="pad"] .mwc-help .mwc-ring { display: none; }
+  .mwc-console[data-layout="pad"] .mwc-helpWords { font-size: 16px; }
+}
+
 /* ---- column: a phone on its side ---- */
 .mwc-console[data-layout="column"] {
   top: 0;
@@ -468,6 +495,33 @@
   width: min(92vw, 440px);
   padding: 28px 24px 24px;
   text-align: center;
+}
+.mwc-cardArt { display: grid; place-items: center; }
+/*
+ * A short screen (a phone on its side): the card lies down. The planet on the left, the words and the
+ * buttons on the right, so every action is on screen without scrolling.
+ */
+@media (max-height: 520px) and (min-aspect-ratio: 1/1) {
+  .mwc-card[data-art] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "art title" "art body" "art actions";
+    align-content: center;
+    align-items: center;
+    column-gap: 28px;
+    row-gap: 10px;
+    width: min(94vw, 640px);
+    padding: 18px 24px;
+    text-align: left;
+  }
+  .mwc-card[data-art] .mwc-cardArt { grid-area: art; }
+  .mwc-card[data-art] .mwc-cardArt [data-sprite] { width: 96px !important; height: 96px !important; }
+  .mwc-card[data-art] .mwc-cardTitle { grid-area: title; font-size: 30px; }
+  .mwc-card[data-art] .mwc-cardBody { grid-area: body; align-items: flex-start; }
+  .mwc-card[data-art] .mwc-orbsLine { justify-content: flex-start; }
+  .mwc-card[data-art] .mwc-cardActions { grid-area: actions; margin-top: 2px; }
+  .mwc-card .mwc-cardActions { gap: 8px; }
+  .mwc-card .mwc-planetRing { margin: 10px; }
 }
 .mwc-cardTitle { margin: 0; font-weight: 200; font-stretch: 125%; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1.05; font-size: clamp(30px, 8vw, 40px); text-wrap: balance; }
 .mwc-cardText { margin: 0; font-size: var(--text-child); line-height: 1.45; color: var(--color-ink-2); max-width: 32ch; text-wrap: pretty; }
