@@ -25,7 +25,7 @@ export async function touchPlayer(db: DB, id: string) {
 export async function appendEvents(db: DB, playerId: string, list: EventInput[]) {
   return db
     .insert(events)
-    .values(list.map(normalize).map((e) => ({ playerId, type: e.type, payload: e.payload as Record<string, unknown> })))
+    .values(list.map((e) => normalize(e)).map((e) => ({ playerId, type: e.type, payload: e.payload as Record<string, unknown> })))
     .returning({ id: events.id, type: events.type, createdAt: events.createdAt });
 }
 

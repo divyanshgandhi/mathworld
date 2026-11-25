@@ -1,5 +1,6 @@
+import { PATROL_SIZE } from "@/db/events";
 import { band, GOLD_STREAK_FOR_JUMP, JUMP, type Band } from "@/rig/adaptive";
-import { factKey, factsOf, MAX_TIER, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
+import { ENUMERABLE_TIERS, factKey, factsOf, MAX_TIER, parseKey, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
 import type { Rng } from "@/engine/util";
 import type { PlayerState } from "./fold";
 
@@ -51,17 +52,59 @@ export function flashcardDeck(s: PlayerState, rng: Rng): Fact[] {
   const keys = [...new Set([...shaky, ...gold, ...fresh])].slice(0, DECK_SIZE);
   return keys.map((k) => { const [a, b] = k.split("x").map(Number); return rng() < 0.5 ? { a, b } : { a: b, b: a }; });
 }
-/** One bonus Orb for each correct card: never lost, never a streak. */
-export const FLASHCARD_ORBS = 1;
+/** Flashcards pay no orbs (wave 2 decision 5): the daily patrol pays once a day instead. Kept for callers. */
+export const FLASHCARD_ORBS = 0;
+
+// ---- The daily patrol: a few facts due for review, once a day (its screen comes in wave 3) ----
+const HOUR = 3_600_000, DAY = 24 * HOUR;
+/**
+ * How long each kind of fact rests before the patrol asks for it again (spacing: a review is worth
+ * most once the fact has had time to fade). Learning facts rest 8 hours, so the patrol is
+ * tomorrow's job, not the tail of today's session.
+ */
+export const PATROL_REST = { practicing: 8 * HOUR, understood: 2 * DAY, gold: 7 * DAY } as const;
+export interface PatrolFact extends Fact { key: string; band: Band }
+
+/**
+ * The facts due for review now, at most five: Learning facts first, then Got it facts not seen for
+ * two days, then Gold facts not seen for seven; oldest first within each. Times-table and
+ * Jupiter-sized facts only (the listable planets): a Deep Space sum is never met twice.
+ * A fact with no known time counts as seen long ago. Null when nothing is due.
+ */
+export function patrol(s: PlayerState, now: number): PatrolFact[] | null {
+  const groups: Record<"practicing" | "understood" | "gold", { key: string; seen: number }[]> = { practicing: [], understood: [], gold: [] };
+  for (const [key, f] of Object.entries(s.facts)) {
+    if (f.seen === 0) continue;
+    const { a, b } = parseKey(key), t = tierOf(a, b);
+    if (t === null || !ENUMERABLE_TIERS.includes(t)) continue;
+    const b0 = band(f);
+    if (b0 === "unseen") continue;
+    const seen = s.lastSeen[key] ?? 0;
+    if (now - seen >= PATROL_REST[b0]) groups[b0].push({ key, seen });
+  }
+  const order = (["practicing", "understood", "gold"] as const).flatMap((g) => groups[g].sort((x, y) => x.seen - y.seen || (x.key < y.key ? -1 : 1)));
+  const due = order.slice(0, PATROL_SIZE).map(({ key }) => ({ ...parseKey(key), key, band: band(s.facts[key]) }));
+  return due.length ? due : null;
+}
+/** Whether the patrol has already paid for this calendar day (`patrolDay(Date.now())` from src/db/events). */
+export const patrolDone = (s: PlayerState, day: number) => s.patrol.lastDay !== null && s.patrol.lastDay >= day;
 
 // ---- The Solar System map ----
 export type StopStatus = "warmup" | "cleared" | "ace" | "frontier" | "open" | "locked";
 export interface Stop { id: "mercury" | "venus" | PlanetId; tier: number | null; status: StopStatus; teaches: string }
 
+/** What each planet teaches, in a child's words (the Star map and the briefing read this). */
 export const TEACHES: Record<Stop["id"], string> = {
-  mercury: "Addition warm-up · up to 20", venus: "Subtraction warm-up · up to 20",
-  earth: "×0 and ×1", moon: "×2, ×5, ×10", mars: "×3, ×4", "asteroid-belt": "×6, ×7, ×8, ×9",
-  jupiter: "2-digit × 1-digit", saturn: "2-digit × 2-digit", uranus: "3-digit × 1–2-digit", "deep-space": "Unbounded armadas",
+  mercury: "Adding, up to 20",
+  venus: "Taking away, up to 20",
+  earth: "Times 0 and times 1",
+  moon: "Times 2, 5 and 10",
+  mars: "Times 3 and 4",
+  "asteroid-belt": "Times 6, 7, 8 and 9",
+  jupiter: "Big numbers times small ones, like 23 × 4",
+  saturn: "Two big numbers, like 23 × 45",
+  uranus: "Hundreds, like 234 × 56",
+  "deep-space": "As big as you like",
 };
 
 /** Mercury and Venus first (always open), then the multiplication frontier, Earth outward. */

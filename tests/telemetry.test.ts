@@ -9,7 +9,8 @@ const shot = (a: number, b: number, guess: number, o: { transfer?: boolean; i?: 
   payload: { a, b, planetId: "moon", guess, latencyMs: 1500, errorType: null, attemptIndex: o.i ?? 1, usedRadar: false, powerUpUsed: null, isTransferCheck: !!o.transfer, waveRole: o.role ?? (o.transfer ? "transfer" : "discovery") },
 });
 const lesson = (a: number, b: number, trickId: "easy-5-10" | "double-it" = "easy-5-10"): LoggedEvent => ({ type: "explanation_completed", payload: { trickId, a, b, mode: "full", wedoCorrect: true } });
-const moon: LoggedEvent[] = [{ type: "intro_completed", payload: {} }, { type: "planet_cleared", payload: { planetId: "earth" } }];
+/** On the Moon (a forged planet clear no longer counts, so the fixture jumps there). */
+const moon: LoggedEvent[] = [{ type: "intro_completed", payload: {} }, { type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "moon" } }];
 
 describe("telemetry (src/director/telemetry.ts)", () => {
   it("splits first-try accuracy by whether the fleet's trick was explained before the wave", () => {

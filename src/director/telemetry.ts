@@ -171,7 +171,8 @@ export function describe(e: LoggedEvent): string {
     case "powerup_used": return `Power-Up ${CARD[e.payload.trickId]} on ${e.payload.a} × ${e.payload.b}${e.payload.valid ? "" : " (did not fit)"}`;
     case "planet_cleared": return `cleared ${e.payload.planetId}`;
     case "hyper_jump_taken": return `Hyper-Jump ${e.payload.fromPlanet} → ${e.payload.toPlanet}`;
-    case "orb_earned": return `+${e.payload.amount} orbs (${e.payload.reason})`;
+    case "orb_earned": return `client said +${e.payload.amount} orbs (${e.payload.reason}) · not counted`;
+    case "patrol_completed": return `daily patrol, day ${e.payload.day} · ${e.payload.facts.map((f) => `${f.a} × ${f.b}`).join(", ")}`;
     case "upgrade_purchased": return `bought ${e.payload.slot} ${e.payload.itemId}`;
     case "flashcard_answered": { const p = e.payload; return `flashcard ${p.a} × ${p.b} → ${p.guess} ${p.guess === p.a * p.b ? "✓" : "✗"} · ${(p.latencyMs / 1000).toFixed(1)} s`; }
     case "warmup_answered": { const p = e.payload, r = p.op === "add" ? p.a + p.b : p.a - p.b; return `warm-up ${p.a} ${p.op === "add" ? "+" : "−"} ${p.b} → ${p.guess} ${p.guess === r ? "✓" : "✗"}`; }

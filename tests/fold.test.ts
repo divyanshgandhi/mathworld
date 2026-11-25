@@ -98,7 +98,11 @@ describe("fold", () => {
     const after = fold([...careful, card(8, 7, 56, 1500)]);
     expect(band(after.facts["7x8"])).toBe("gold");
     expect(after.facts["7x8"].m).toBe(before.facts["7x8"].m); // a correct card never lowers mastery
-    expect({ ...after, facts: null }).toEqual({ ...before, facts: null }); // no mission wave, clear, Hyper-Jump streak or history
+    // no mission wave, clear, Hyper-Jump streak or history; the only orbs are the first Gold (flashcards pay nothing)
+    const rest = (x: typeof after) => ({ ...x, facts: null, orbs: null, ledger: null, goldEver: null, lastSeen: null });
+    expect(rest(after)).toEqual(rest(before));
+    expect(after.orbs - before.orbs).toBe(10);
+    expect(after.ledger.at(-1)).toMatchObject({ amount: 10, reason: "New Gold fact", fact: "7x8" });
     // Below the observation it is a gentle step: alpha 0.18 toward 0.78.
     const low = fold([right(6, 7, { tier: 3, ms: 9000 }), card(6, 7, 42, 1000)]);
     expect(low.facts["6x7"].m).toBeCloseTo(ewma(ewma(0.25, 0.85), 0.78, 0.18));
@@ -129,13 +133,18 @@ describe("fold", () => {
     expect(fold(log).cleared).toEqual([7]);
   });
 
-  it("counts orbs and equips upgrades at the catalogue price (Solar Gold is 30, whatever the client sends)", () => {
+  it("works orbs out from the waves, ignores the client's amounts, and charges the catalogue price", () => {
+    clock = 0;
+    // seven first tries on different facts: 7 × 5, plus 5 for the fifth in a row = 40
+    const waves = [[2, 3], [2, 4], [2, 6], [2, 7], [2, 8], [2, 9], [3, 3]].map(([a, b]) => right(a, b, { role: "practice", ms: 9000 }));
     const s = fold([
+      ...waves,
       { type: "orb_earned", payload: { amount: 40, reason: "wave" } },
       { type: "upgrade_purchased", payload: { slot: "hull", itemId: "solar-gold", cost: 20 } },
     ]);
     expect(s.orbs).toBe(10);
     expect(s.equipped.hull).toBe("solar-gold");
+    expect(s.ledger.at(-1)).toMatchObject({ amount: -30, reason: "Bought Solar Gold", rule: "spent" });
   });
 
   it("counts what the cadet has seen, by key, and nothing else moves", () => {
