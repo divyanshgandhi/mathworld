@@ -9,8 +9,9 @@ import { fold } from "@/director/fold";
 import { canLaunch } from "@/director/hub";
 import { BattleHud } from "./battle/BattleHud";
 import { PauseMenu } from "./battle/PauseMenu";
-import { CadetSignUp, type Cadet } from "./battle/ui";
+import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
 import { css } from "./battle/cockpit";
+import { Sheet } from "@/components/kit";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -23,7 +24,8 @@ const readQuery = () => {
 /**
  * A planet battle as a full-screen game: the stage fills the viewport, the cockpit sits on its edges
  * (BattleHud: the mission strip on top, the console at the bottom or right). Fleets start with their
- * structure hidden (`structure: "discover"`): the hint ladder reveals squads and ships each.
+ * structure hidden (the arena's default, `structure: "discover"`; `?dev&labels` turns the labels back on):
+ * the hint ladder reveals squads and ships each.
  * Waves come from the cadet's folded event log; every action is appended to /api/events.
  * `?dev` shows shot timings and unlocks every Power-Up; `?dev&a=6&b=24` drills one exact fleet.
  */
@@ -53,7 +55,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere)
       if (!dev && !canLaunch(fold(log), planet)) return router.replace("/map");
       const stage = createStage(box.current, { fill: true });
-      const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force, structure: "discover" });
+      const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
       const { audio } = await import("@/engine/audio");
       window.__mw = { stage, arena: a, audio };
       setArena(a);
@@ -70,7 +72,11 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
     // the game root: focused on mount so the keyboard works without a click; no text selection, no zoom
     <div className={css.root} data-cockpit tabIndex={-1} inputMode="none" autoFocus>
       <div ref={box} className="absolute inset-0" />
-      {cadet === null && <CadetSignUp cta="Enlist" onDone={setCadet} />}
+      {cadet === null && (
+        <Sheet className="absolute inset-0 z-30 m-auto h-fit max-h-[92dvh] w-[min(92%,520px)] overflow-y-auto p-6 md:p-8">
+          <CadetSignUp onDone={setCadet} />
+        </Sheet>
+      )}
       <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />} />
     </div>
   );

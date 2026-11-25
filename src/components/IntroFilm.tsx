@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Button, NovaLine } from "@/components/kit";
+import { Button, NovaLine, Sheet } from "@/components/kit";
 import { CADET, MOTION, type CadetColor } from "@/design/tokens";
 import { flushed, history, post } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
@@ -9,7 +9,7 @@ import type { Bay, BayUi } from "@/worlds/space/cadetBay";
 import type { Chapter, Film, FilmCaption, FilmUi } from "@/worlds/space/intro";
 import { PLANET_NAMES } from "@/worlds/space/lines";
 import { BattleHud } from "./battle/BattleHud";
-import { CadetSignUp } from "./battle/ui";
+import { CadetSignUp } from "./hub/CadetSignUp";
 
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
 
@@ -193,7 +193,11 @@ export function IntroFilm() {
         </div>
       )}
 
-      {phase === "gate" && player === null && <CadetSignUp onDone={(p) => { setPlayer(p); begin(p.name); }} />}
+      {phase === "gate" && player === null && (
+        <Sheet className="absolute inset-0 z-30 m-auto h-fit max-h-[92dvh] w-[min(92%,520px)] overflow-y-auto p-6 md:p-8">
+          <CadetSignUp onDone={(p) => { setPlayer(p); begin(p.name); }} />
+        </Sheet>
+      )}
       {phase === "gate" && player && (
         <div ref={arrive} className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-7 bg-[radial-gradient(ellipse_70%_60%_at_50%_50%,var(--color-void)_0%,transparent_100%)] px-6 text-center">
           <h1 className="type-display m-0 text-[clamp(30px,6vw,64px)] leading-none [overflow-wrap:anywhere]">{again ? "The film" : <>{inBay ? "Welcome back" : "Ready"}, {player.name}?</>}</h1>

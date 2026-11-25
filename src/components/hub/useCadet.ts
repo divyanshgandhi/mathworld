@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EventInput } from "@/db/events";
 import { fold, type LoggedEvent } from "@/director/fold";
 import { history, post } from "@/engine/outbox";
-import type { Cadet } from "../battle/ui";
+import type { Cadet } from "./CadetSignUp";
 
 /**
  * The current cadet for a hub screen (Bay, Map, Hangar, Academy): their name, their event log and
