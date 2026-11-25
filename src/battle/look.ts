@@ -45,7 +45,7 @@ export const LOOK = {
   /** A soft label (a hint the player did not ask for). */
   soft: { opacity: 0.6 },
   /** Scans: the lock-on bracket, its counts, and a soft (first-sight) scan's strength. */
-  scan: { color: hex(COLOR.sky), ink: COLOR.sky, soft: 0.55, line: 1.5, countPx: 22, softPx: 18 },
+  scan: { color: hex(COLOR.sky), ink: COLOR.sky, soft: 0.55, line: 1.5, countPx: 24, softPx: 21 },
   /** Misses in the world: the survivors' and the extras' brackets and their words. */
   miss: { color: hex(COLOR.sky), ink: COLOR.approach, px: 24 },
   /** The kill: a hairline ring and matte shards, gone within about a quarter second (shards drift on). */

@@ -240,7 +240,7 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
     gather(order: number[]) {
       const alive = order.map((id) => fv.views[id]).filter((v) => v.alive);
       // only a fleet of single fighters packs cleanly; pods and big ships stay where they are
-      if (alive.some((v) => v.kind !== "fighter")) return alive;
+      if (fv.views.some((v) => v.kind !== "fighter")) return alive;
       alive.forEach((v, i) => {
         const to = fv.views[order[i]];
         v.shiftFrom.copy(v.shift); v.shiftTo.set(to.home.x - v.home.x, to.home.y - v.home.y, 0); v.shiftT = stage.time + i * 0.012;

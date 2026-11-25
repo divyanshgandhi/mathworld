@@ -127,10 +127,17 @@ describe("scans", () => {
       const steps = squadScan(layoutFleet(battleFleet(a, b)), a, b);
       if (a === 0 || a > SCAN_MAX_SQUADS) { expect(steps).toBeNull(); continue; }
       expect(steps, `${a}×${b}`).not.toBeNull();
-      expect(steps!.map((s) => s.count)).toEqual(Array.from({ length: a }, (_, i) => i + 1));
+      const counts = steps!.map((s) => s.count);
+      expect(counts[counts.length - 1]).toBe(a);
+      for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThan(counts[i - 1]);
+      if (a <= 10 && b <= 10) expect(counts).toEqual(Array.from({ length: a }, (_, i) => i + 1));
       // top to bottom
       for (let i = 1; i < steps!.length; i++) expect(steps![i].box.y).toBeLessThan(steps![i - 1].box.y);
     }
+  });
+  it("a row of stood-up pods is one step that counts its ten squads", () => {
+    expect(squadScan(layoutFleet(battleFleet(12, 4)), 12, 4)!.map((s) => s.count)).toEqual([10, 11, 12]);
+    expect(squadScan(layoutFleet(battleFleet(16, 24)), 16, 24)!.map((s) => s.count)).toEqual([10, 11, 12, 13, 14, 15, 16]);
   });
   it("an a × 0 fleet's squad scan steps down its empty lanes", () => {
     expect(squadScan(layoutFleet(battleFleet(7, 0)), 7, 0)?.map((s) => s.count)).toEqual([1, 2, 3, 4, 5, 6, 7]);

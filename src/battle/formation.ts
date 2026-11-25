@@ -10,7 +10,7 @@ import { fleetOf, type Fleet, type Hit, type VolleyPlan } from "@/rig/fleet";
  */
 
 /** A fighter cell, a big ship's cell, the gap between ships in a squad, between squads, and between place-value bands in a squad. */
-export const CELL = 1.0, BIG = 2.4, GAP = 0.16, SQUAD_GAP = 0.74, BAND_GAP = 0.5;
+export const CELL = 1.0, BIG = 2.4, GAP = 0.16, SQUAD_GAP = 0.56, BAND_GAP = 0.5;
 /** The pitch of ships along a squad and of squads down the fleet (fighters). */
 export const PITCH = CELL + GAP, SQUAD_PITCH = CELL + SQUAD_GAP;
 
@@ -182,7 +182,8 @@ export const SCAN_MAX_SQUADS = 20;
 export const SCAN_MAX_STOPS = 24;
 
 /**
- * The squad scan: one step per squad, top to bottom, counting 1, 2, 3… The last count is `a`.
+ * The squad scan: one step per squad, top to bottom, counting 1, 2, 3… The last count is `a`. A row of
+ * stood-up pods (ten squads each) is one step that counts ten.
  * Null when a scan cannot be truthful for this shape (no squads, too many to step): show the label.
  */
 export function squadScan(l: Layout, a: number, b = 1): ScanStep[] | null {
@@ -190,6 +191,18 @@ export function squadScan(l: Layout, a: number, b = 1): ScanStep[] | null {
   // a × 0: the squads are there, every one of them empty: the scan steps down the lanes
   if (b === 0) return laneBoxes(a).map((box, i) => ({ box, count: i + 1 }));
   const steps: ScanStep[] = [];
+  // stood-up pods hold ten squads each, in strips too thin to count on screen: step their row as one,
+  // counting all ten at once (10, then 11, 12…), which is still the true count of squads
+  if (l.slots.some((x) => x.span > 1)) {
+    const rows = [...new Set(l.slots.map((x) => x.row))].sort((p, q) => p - q);
+    for (const r of rows) {
+      const parts = l.slots.filter((x) => x.row === r);
+      const x0 = Math.min(...parts.map((x) => x.x - x.w / 2)), x1 = Math.max(...parts.map((x) => x.x + x.w / 2));
+      const y0 = Math.min(...parts.map((x) => x.y - x.h / 2)), y1 = Math.max(...parts.map((x) => x.y + x.h / 2));
+      steps.push({ box: { x: (x0 + x1) / 2, y: (y0 + y1) / 2, hx: (x1 - x0) / 2, hy: (y1 - y0) / 2 }, count: Math.max(...parts.map((x) => x.squad + x.span)) });
+    }
+    return steps[steps.length - 1]?.count === a ? steps : null;
+  }
   for (let s = 0; s < a; s++) { const box = squadBox(l, s); if (!box) return null; steps.push({ box, count: s + 1 }); }
   return steps;
 }

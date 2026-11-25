@@ -238,8 +238,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: step.soft, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
     const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); };
     if (step.id === "show-me-how") { scan.skip(); return reveal(); }
-    // what was already up stays up while the new label is scanned
-    fv.showAxis(before.squads, before.each);
+    // what was already up stays up while the new label is scanned; the label being scanned waits for its scan
+    fv.showAxis(step.id === "squads" ? "off" : before.squads, step.id === "each" ? "off" : before.each);
     const [ra, rb] = fv.flipped ? [wave.b, wave.a] : [wave.a, wave.b];
     scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal, { soft: step.soft });
   }
@@ -475,7 +475,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     setUi({ outcome: { kind: over ? "over" : "under", value } });
     if (over) misses.over(value);
     else {
-      const alive = fv.gather(order), gathered = alive.length > 0 && alive.every((v) => v.kind === "fighter");
+      const alive = fv.gather(order), gathered = alive.length > 0 && fv.views.every((v) => v.kind === "fighter");
       fv.wink(GATHER);
       sched.at(GATHER + 0.05, () => { if (wave === w && !bs.lessonOn) misses.under(alive, value, gathered); });
     }
@@ -627,12 +627,13 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
       cannon.scale = (cam.band * ROCKET_SHARE) / ppuR / ROCKET_MODEL_H;
-      cam.bottomCentre(cam.band * 0.36, ROCKET_Z, rocketAt);
+      cam.bottomCentre(cam.band * 0.3, ROCKET_Z, rocketAt);
       cannon.pose(T, rocketAt);
     }
-    // the typed number rides the nose: its figures 32 px tall on a phone, 44 px on a larger screen
-    const ppuN = cam.pxPerUnit(ROCKET_Z + 0.4), phone = (stage.renderer.domElement.clientWidth || 800) < 600;
-    if (ppuN > 0) charge.update(1 / ppuN, phone ? 32 : 44);
+    // the typed number rides the nose: its figures 28–30 px tall on a phone, 44 px on a larger screen
+    const el = stage.renderer.domElement, phone = Math.min(el.clientWidth || 800, el.clientHeight || 800) < 600;
+    const ppuN = cam.pxPerUnit(ROCKET_Z + 0.4);
+    if (ppuN > 0) charge.update(1 / ppuN, phone ? (cam.band < 100 ? 28 : 30) : 44);
     // axis labels ("7 squads", "8 in each squad") keep at least ~26 px on screen, on a phone too
     const ppu = cam.pxPerUnit();
     if (ppu > 0) {
@@ -665,6 +666,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     showMeHow: () => void showMeHow(),
     /** Dev: the lesson plan this fleet would get now. */
     plan: () => (wave ? planShowMeHow(wave.a, wave.b, state().seenTricks) : null),
+    /** Dev: play the planet-clear beat in the world (the gold ring) without clearing the planet. */
+    devClearRing: () => { if (opts.dev) backdrop.clearRing(); },
     /** Dev: where Show Me How's lines came from (baked clip, live Phonon, captions only). */
     voice: () => ({ ...player.stats, slow: player.slow }),
     selectSector(i: number) { if (sector.select(i)) setUi(sector.ui()); },
