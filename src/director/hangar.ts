@@ -13,18 +13,18 @@ export const CATALOG: Record<Slot, Item[]> = {
     { id: "cadet-white", name: "Cadet White", cost: 0, blurb: "Fresh from the academy" },
     { id: "solar-gold", name: "Solar Gold", cost: 30, blurb: "Shines like the Sun" },
     { id: "nebula-violet", name: "Nebula Violet", cost: 60, blurb: "Painted in deep space" },
-    { id: "obsidian-stealth", name: "Obsidian Stealth", cost: 100, blurb: "Dark hull, cyan trim" },
+    { id: "obsidian-stealth", name: "Obsidian Stealth", cost: 100, blurb: "Dark hull, sky-blue trim" },
   ],
   blaster: [
     { id: "plasma-ball", name: "Plasma Ball", cost: 0, blurb: "One bright ball a shot" },
     { id: "twin-plasma", name: "Twin Plasma", cost: 35, blurb: "Two balls, side by side" },
-    { id: "ion-arc", name: "Ion Arc", cost: 70, blurb: "Long cyan bolts" },
-    { id: "nova-beam", name: "Nova Beam", cost: 110, blurb: "Lime streaks of light" },
+    { id: "ion-arc", name: "Ion Arc", cost: 70, blurb: "Long blue bolts" },
+    { id: "nova-beam", name: "Nova Beam", cost: 110, blurb: "Gold streaks of light" },
   ],
   thruster: [
     { id: "amber-flame", name: "Amber Flame", cost: 0, blurb: "The classic burn" },
     { id: "cyan-ion", name: "Cyan Ion", cost: 40, blurb: "A cool blue jet" },
-    { id: "starlight-comet", name: "Starlight Comet", cost: 80, blurb: "A violet comet tail" },
+    { id: "starlight-comet", name: "Starlight Comet", cost: 80, blurb: "A white comet with gold sparks" },
   ],
 };
 export const SLOT_NAMES: Record<Slot, string> = { hull: "Hull Paint", blaster: "Blaster FX", thruster: "Thruster Trail" };
