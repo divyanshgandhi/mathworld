@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { freshOnly } from "@/app/api/events/dedupe";
+import { freshOnly, storeOnce } from "@/app/api/events/dedupe";
 
 describe("event retry safety", () => {
   it("drops ids the server already stored for that cadet", () => {
@@ -8,6 +8,16 @@ describe("event retry safety", () => {
     expect(freshOnly(seen, "p1", ["a", "b", "c"], ["1", "2", "3"])).toEqual(["c"]);
     expect(freshOnly(seen, "p2", ["a"], ["1"])).toEqual(["a"]);
     expect(freshOnly(seen, "p1", ["x"], undefined)).toEqual(["x"]);
+  });
+
+  it("lets a retry through when the first try failed to store, and still stores it once", async () => {
+    const seen = new Map<string, Set<string>>(), stored: string[] = [];
+    const down = async (): Promise<string[]> => { throw new Error("store down"); };
+    const up = async (fresh: string[]) => { stored.push(...fresh); return fresh; };
+    await expect(storeOnce(seen, "p1", ["a", "b"], ["1", "2"], down)).rejects.toThrow("store down");
+    await expect(storeOnce(seen, "p1", ["a", "b"], ["1", "2"], up)).resolves.toEqual(["a", "b"]);
+    await expect(storeOnce(seen, "p1", ["a", "b", "c"], ["1", "2", "3"], up)).resolves.toEqual(["c"]);
+    expect(stored).toEqual(["a", "b", "c"]);
   });
 });
 

@@ -25,3 +25,20 @@ export function freshOnly<E>(seen: Seen, playerId: string, list: E[], ids: unkno
   for (const id of mine) { if (mine.size <= cap) break; mine.delete(id); }
   return out;
 }
+
+/**
+ * Stores the events of a batch that were not stored before. If the store fails, the ids this batch
+ * marked are taken back, so the client's retry is let through and not dropped as a double.
+ */
+export async function storeOnce<E, R>(seen: Seen, playerId: string, list: E[], ids: unknown, store: (fresh: E[]) => Promise<R[]>, cap = 2000): Promise<R[]> {
+  const before = new Set(seen.get(playerId));
+  const fresh = freshOnly(seen, playerId, list, ids, cap);
+  if (!fresh.length) return [];
+  try {
+    return await store(fresh);
+  } catch (err) {
+    const mine = seen.get(playerId);
+    if (mine && Array.isArray(ids)) for (const id of ids) if (typeof id === "string" && !before.has(id)) mine.delete(id);
+    throw err;
+  }
+}
