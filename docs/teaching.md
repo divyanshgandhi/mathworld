@@ -87,7 +87,7 @@ Where each tour sits in the first five minutes:
 | ~3:30, before the second wave of the first planet battle | `battle` | `powerups`: "Power-Ups help with tricky fleets." / `help`: "Stuck? Nova shows you how." / `dots`: "Win these to clear the planet." / `pause`: "Need a break? Pause here." | After the guided first shot (never with it) and between waves (never during a wave's action). The game holds still (`hold.on("tour")`). One shot has been fired, so the controls around Fire are what is new. |
 | First visit to the Star map | `map` | `map-planet`, `map-next`, `map-dots`, `map-launch` | The map is a pager; the tour shows where the next planet is and where Launch is. |
 | First visit to the Hangar | `hangar` | `hangar-list`: "Paint, blasters and thrusters for your rocket." / `hangar-rocket`: "Tap one to try it on." / `hangar-buy`: "Buy it with orbs." | The player has orbs by then; try-on is free, buying is the dock. |
-| First visit to the Academy | `academy` | `academy-list`: "Every trick, shown with real ships." | One step: the list is the whole screen. |
+| First visit to the Academy | `academy` | `academy-list`: "Every trick, shown with real ships." / `academy-watch`: "Tap a trick to watch it." | The second step rings the first trick, the one action on the screen. |
 
 A screen with a tour shows the tour, not its greeting (`Greeting` renders nothing for `bay`, `map`, `hangar` and `academy`). The Flashcards and the first battle in Cadet Bay keep their greetings: they have no tour.
 

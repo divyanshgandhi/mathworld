@@ -132,9 +132,9 @@ function TrickList({ seen, reached, next, highlight, onWatch }: {
             <span className="type-name text-[17px] text-ink-2">{STOP_WORDS[planet].name}</span>
           </h3>
           <ul className="m-0 list-none p-0 pl-[36px] sm:pl-[52px]">
-            {films.map((f) => (
+            {films.map((f, j) => (
               <li key={f.trick} className="border-b border-line-1 last:border-b-0">
-                <TrickRow f={f} seen={seen(f.trick)} future={!reached(planet)} next={next === f.trick} lit={highlight === f.trick} onWatch={onWatch} />
+                <TrickRow f={f} seen={seen(f.trick)} future={!reached(planet)} next={next === f.trick} lit={highlight === f.trick} onWatch={onWatch} guide={i === 0 && j === 0 ? "academy-watch" : undefined} />
               </li>
             ))}
           </ul>
@@ -144,10 +144,10 @@ function TrickList({ seen, reached, next, highlight, onWatch }: {
   );
 }
 
-function TrickRow({ f, seen, future, next, lit, onWatch }: { f: Film; seen: boolean; future: boolean; next: boolean; lit: boolean; onWatch: (f: Film) => void }) {
+function TrickRow({ f, seen, future, next, lit, onWatch, guide }: { f: Film; seen: boolean; future: boolean; next: boolean; lit: boolean; onWatch: (f: Film) => void; guide?: string }) {
   const status = seen ? ACADEMY_WORDS.watched : next ? ACADEMY_WORDS.next : ACADEMY_WORDS.watch;
   return (
-    <UiButton data-trick={f.trick} onClick={() => onWatch(f)}
+    <UiButton data-trick={f.trick} data-guide={guide} onClick={() => onWatch(f)}
       aria-label={`${f.card}. ${TRICK_REASON[f.trick]} Example: ${f.a} × ${f.b}. ${seen ? ACADEMY_WORDS.watched : ACADEMY_WORDS.watch}.`}
       className={`group my-1 flex w-full flex-col gap-3 rounded-chip px-3 py-4 text-left transition-colors hover:bg-raised sm:grid sm:grid-cols-[176px_1fr_auto] sm:items-center sm:gap-x-6 ${lit ? "bg-raised" : ""}`}>
       <span className="flex items-center gap-4 sm:flex-col sm:gap-1.5">

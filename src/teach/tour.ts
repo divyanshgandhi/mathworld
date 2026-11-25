@@ -49,6 +49,7 @@ export const TOURS: Record<TourId, TourStep[]> = {
   ],
   academy: [
     s("academy-list", "Every trick, shown with real ships."),
+    s("academy-watch", "Tap a trick to watch it."),
   ],
 };
 
