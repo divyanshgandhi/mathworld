@@ -27,8 +27,14 @@
     transition-duration: var(--transition-duration-quick);
     transition-timing-function: var(--ease-out);
   }
-  .mw-btn:active:not([data-disabled]):not([aria-disabled="true"]) {
+  .mw-btn:active:not([data-disabled]):not([aria-disabled="true"]),
+  .mw-btn[data-force="pressed"] {
     transform: translateY(1px);
+  }
+  /* the showcase (/kit) pins a state with data-force; nothing in the game sets it */
+  [data-force="focus"] {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 4px;
   }
   .mw-btn[data-disabled],
   .mw-btn[aria-disabled="true"] {
@@ -54,10 +60,12 @@
     text-transform: uppercase;
   }
   .mw-primary:hover:not([data-disabled]):not([aria-disabled="true"]),
-  .mw-primary[data-armed] {
+  .mw-primary[data-armed],
+  .mw-primary[data-force="hover"] {
     background: linear-gradient(var(--color-lift), var(--color-lift)) padding-box, var(--edge-hot) border-box;
   }
-  .mw-primary:active:not([data-disabled]):not([aria-disabled="true"]) {
+  .mw-primary:active:not([data-disabled]):not([aria-disabled="true"]),
+  .mw-primary[data-force="pressed"] {
     background: linear-gradient(var(--color-shadow), var(--color-shadow)) padding-box, var(--edge-hot) border-box;
   }
   .mw-primary[data-disabled],
@@ -67,7 +75,8 @@
   .mw-glyph {
     transition: transform var(--transition-duration-moment) var(--ease-out);
   }
-  .mw-btn:hover:not([data-disabled]) .mw-glyph {
+  .mw-btn:hover:not([data-disabled]) .mw-glyph,
+  .mw-btn[data-force="hover"] .mw-glyph {
     transform: translateY(-4px);
   }
   .mw-btn[data-disabled] .mw-glyph,
@@ -80,10 +89,12 @@
   .mw-secondary {
     border-color: var(--color-line-2);
   }
-  .mw-secondary:hover:not([data-disabled]) {
+  .mw-secondary:hover:not([data-disabled]),
+  .mw-secondary[data-force="hover"] {
     border-color: var(--color-gold);
   }
-  .mw-secondary:active:not([data-disabled]) {
+  .mw-secondary:active:not([data-disabled]),
+  .mw-secondary[data-force="pressed"] {
     background: var(--color-raised);
   }
   .mw-secondary[data-disabled],
@@ -95,7 +106,9 @@
   .mw-quiet {
     color: var(--color-ink-2);
   }
-  .mw-quiet:hover:not([data-disabled]) {
+  .mw-quiet:hover:not([data-disabled]),
+  .mw-quiet[data-force="hover"],
+  .mw-quiet[data-force="pressed"] {
     color: var(--color-ink-1);
     background: var(--color-raised);
   }
@@ -109,10 +122,12 @@
     flex: none;
     border-color: var(--color-line-2);
   }
-  .mw-icon:hover:not([data-disabled]) {
+  .mw-icon:hover:not([data-disabled]),
+  .mw-icon[data-force="hover"] {
     border-color: var(--color-line-3);
   }
-  .mw-icon:active:not([data-disabled]) {
+  .mw-icon:active:not([data-disabled]),
+  .mw-icon[data-force="pressed"] {
     background: var(--color-raised);
   }
 
@@ -140,6 +155,7 @@
     transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
   }
   .mw-tile:hover:not([data-disabled]),
+  .mw-tile[data-force="hover"],
   .mw-tile[aria-expanded="true"],
   .mw-tile[aria-pressed="true"],
   .mw-tile[data-selected] {
@@ -173,10 +189,9 @@
     height: var(--mark, 8px);
     border-radius: 50%;
   }
-  /* Gold: filled, with a hairline ring around it */
+  /* Gold: a bullseye (a filled core inside a ring), in the same footprint as the other marks */
   .mw-mark-gold {
-    background: var(--color-mastery-gold);
-    box-shadow: 0 0 0 1.5px var(--color-void), 0 0 0 2.5px var(--color-mastery-gold);
+    background: radial-gradient(circle closest-side, var(--color-mastery-gold) 0 44%, transparent 56% 64%, var(--color-mastery-gold) 76% 100%);
   }
   /* Got it: filled */
   .mw-mark-got { background: var(--color-mastery-got); }

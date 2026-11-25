@@ -4,22 +4,34 @@ import { Field, FieldLabel } from "@ui-sdk/react/field";
 import { Input } from "@ui-sdk/react/input";
 import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
 import { useEffect, useRef, useState } from "react";
+import { RocketGlyph, Icon } from "@/components/kit/Icon";
+import { CADET } from "@/design/tokens";
 
-/** The game's shared look: dark glass panels, lime accent, chunky buttons. */
-export const btn = "rounded-xl px-4 py-2 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-lime-300 data-disabled:opacity-40";
-export const ghost = `${btn} border border-white/15 text-white/85 hover:border-white/40`;
-export const lime = `${btn} bg-lime-300 text-[#0d0e1a] hover:bg-lime-200`;
-export const glass = "rounded-2xl border border-white/10 bg-[#0b0d1a]/78 backdrop-blur-md shadow-[0_10px_40px_rgba(0,0,0,.45)]";
+/**
+ * The shared class strings every older screen uses, now in the Void and Gold language (see DESIGN.md).
+ * The names are kept so nothing that imports them breaks; new code should use the kit
+ * (`@/components/kit`) instead: <Button variant="primary">, <Sheet>, <IconButton>.
+ * - `btn`: the base of every button (a pill, 44 px tall at least, gold focus ring, neutral disabled).
+ * - `ghost`: a hairline pill (secondary). `quiet`: words only.
+ * - `lime`: the primary action, the gradient-edge pill. The old name stays; nothing is lime any more.
+ * - `glass`: the rare raised sheet. No glass, no blur, no shadow any more.
+ */
+export const btn = "mw-btn min-h-11 px-4 py-2 text-[15px]";
+export const ghost = `${btn} mw-secondary`;
+export const lime = `${btn} mw-primary`;
+export const quiet = `${btn} mw-quiet`;
+export const primary = lime;
+export const glass = "mw-sheet";
 
 export interface Cadet { name: string; avatar: string }
 
-const AVATARS = [
-  { id: "cadet-1", color: "#7ddc3e" }, { id: "cadet-2", color: "#38bdf8" }, { id: "cadet-3", color: "#ff8f70" },
-  { id: "cadet-4", color: "#b79cff" }, { id: "cadet-5", color: "#f2c14e" }, { id: "cadet-6", color: "#ef6f8a" },
-];
+const AVATARS = Object.entries(CADET).map(([id, color]) => ({ id, color }));
+const NAME_OF: Record<string, string> = { "cadet-1": "Sky blue", "cadet-2": "Gold", "cadet-3": "Ember", "cadet-4": "White", "cadet-5": "Violet", "cadet-6": "Rose" };
+/** Older callers pass a glyph in their label ("▶ Begin"); the kit draws its own glyph instead. */
+const words = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
 /** The one-card Cadet Sign-Up (name + colour). Creates the player and sets the cookie. */
-export function CadetSignUp({ onDone, cta = "▶ Start (sound on)" }: { onDone: (p: Cadet) => void; cta?: string }) {
+export function CadetSignUp({ onDone, cta = "Start" }: { onDone: (p: Cadet) => void; cta?: string }) {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("cadet-1");
   const signUp = async (e: React.FormEvent) => {
@@ -28,30 +40,37 @@ export function CadetSignUp({ onDone, cta = "▶ Start (sound on)" }: { onDone: 
     if (res.ok) onDone((await res.json()).player);
   };
   return (
-    <form onSubmit={signUp} className={`${glass} absolute inset-0 z-30 m-auto flex h-fit w-[min(92%,420px)] flex-col gap-4 p-6`}>
-      <p className="font-mono text-xs tracking-[0.3em] text-lime-300">CADET SIGN-UP</p>
+    <form onSubmit={signUp} aria-labelledby="signup-title" className={`${glass} absolute inset-0 z-30 m-auto flex h-fit w-[min(92%,440px)] flex-col gap-6 p-6 md:p-8`}>
+      <h2 id="signup-title" className="m-0 type-display text-[clamp(30px,6vw,40px)]">New cadet</h2>
       <Field name="name">
-        <FieldLabel className="text-sm text-white/70">Your name</FieldLabel>
-        <Input autoFocus required maxLength={24} value={name} onValueChange={setName} autoComplete="given-name" className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-lg outline-none focus:border-lime-300" />
+        <FieldLabel className="type-name text-[17px] text-ink-2">Your name</FieldLabel>
+        <Input autoFocus required maxLength={24} value={name} onValueChange={setName} autoComplete="given-name" className="mw-input mt-2" />
       </Field>
       <Field name="avatar">
-        <FieldLabel className="text-sm text-white/70">Pick your colour</FieldLabel>
-        <RadioGroup value={avatar} onValueChange={(v) => setAvatar(String(v))} className="mt-2 flex gap-3">
+        <FieldLabel className="type-name text-[17px] text-ink-2">Pick your colour</FieldLabel>
+        <RadioGroup value={avatar} onValueChange={(v) => setAvatar(String(v))} className="mt-3 flex flex-wrap gap-3">
           {AVATARS.map((a) => (
             <label key={a.id} data-slot="label" className="cursor-pointer">
-              <Radio value={a.id} aria-label={a.id} className="grid size-10 place-items-center rounded-full border-2 border-transparent outline-none data-checked:border-white focus-visible:ring-2 focus-visible:ring-lime-300" style={{ background: a.color }}>
-                <RadioIndicator className="size-2.5 rounded-full bg-white" />
+              <Radio value={a.id} aria-label={NAME_OF[a.id] ?? a.id}
+                className="grid size-11 place-items-center rounded-full outline-none ring-offset-2 ring-offset-panel transition data-checked:ring-2 data-checked:ring-approach focus-visible:ring-2 focus-visible:ring-gold"
+                style={{ background: a.color }}>
+                <RadioIndicator className="size-3 rounded-full bg-void" />
               </Radio>
             </label>
           ))}
         </RadioGroup>
       </Field>
-      <Button type="submit" className={`${lime} py-3 text-base`} disabled={!name.trim()}>{cta}</Button>
+      <Button type="submit" className="mw-btn mw-primary mw-md mw-has-glyph w-full justify-between" disabled={!name.trim()}>
+        {words(cta) || "Start"}
+        <RocketGlyph size={34} />
+      </Button>
     </form>
   );
 }
 
 const PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
+/** A keypad key: a chip-radius hairline key, big equal-width digits. */
+export const padKey = "mw-btn mw-secondary min-h-12 rounded-chip px-0 type-number text-[22px] font-medium";
 
 /**
  * The cockpit keypad on its own (warm-ups, Quick Flashcards): a readout and twelve keys, with the
@@ -82,15 +101,15 @@ export function Keypad({ onFire, disabled = false, label = "Plasma balls", fire 
   }, []);
   return (
     <div className={className}>
-      <div className="mb-2 flex items-baseline justify-between rounded-xl bg-black/40 px-4 py-1.5 md:py-2">
-        <span className="text-[11px] uppercase tracking-wider text-white/50">{label}</span>
-        <output aria-live="polite" aria-label={label} className="font-mono text-3xl tabular-nums text-lime-200 md:text-4xl">{entry || "0"}</output>
+      <div className="mb-2 flex items-center justify-between gap-3 rounded-chip border border-line-1 bg-void px-4 py-1.5 md:py-2">
+        <span className="flex items-center gap-2 type-label-sm text-ink-3"><Icon name="plasma" size={18} />{label}</span>
+        <output aria-live="polite" aria-label={label} className="type-number text-[34px] font-medium leading-none text-approach md:text-[40px]">{entry || "0"}</output>
       </div>
       <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
         {PAD.map((k) => (
           <Button key={k} aria-label={k === "⌫" ? "Delete" : k === "Fire" ? fire : k} disabled={k === "Fire" && (entry === "" || disabled)}
-            className={k === "Fire" ? `${lime} py-2 text-lg font-semibold md:py-3` : `${ghost} bg-white/[.04] py-2 text-lg md:py-3`} onClick={() => press(k)}>
-            {k === "Fire" ? fire : k}
+            className={k === "Fire" ? `${lime} min-h-12 px-2 text-[15px]` : padKey} onClick={() => press(k)}>
+            {k === "Fire" ? fire : k === "⌫" ? <Icon name="delete" size={22} /> : k}
           </Button>
         ))}
       </div>
@@ -99,5 +118,5 @@ export function Keypad({ onFire, disabled = false, label = "Plasma balls", fire 
 }
 
 /** Dialog parts render in the top layer: pin the backdrop to the whole screen and centre the box. */
-export const backdrop = "fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-black/55 p-0";
-export const dialogBox = `${glass} fixed left-1/2 top-1/2 m-0 max-h-[92dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto text-white`;
+export const backdrop = "fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-scrim p-0";
+export const dialogBox = `${glass} fixed left-1/2 top-1/2 m-0 max-h-[92dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto text-approach`;
