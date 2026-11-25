@@ -473,8 +473,8 @@
 .mwc-cardText { margin: 0; font-size: var(--text-child); line-height: 1.45; color: var(--color-ink-2); max-width: 32ch; text-wrap: pretty; }
 .mwc-cardText b { color: var(--color-ink-1); font-weight: 600; }
 .mwc-cardActions { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: 100%; margin-top: 4px; }
-.mwc-cardRow { display: flex; gap: 10px; justify-content: center; }
-.mwc-cardRow > * { flex: 1; }
+.mwc-cardRow { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.mwc-cardRow > * { flex: 1 1 150px; }
 .mwc-planetRing { position: relative; display: grid; place-items: center; }
 .mwc-planetRing::after {
   content: "";
