@@ -62,7 +62,7 @@ type RGB = readonly [number, number, number];
 export const HULLS = {
   "cadet-white": { hull: C("approach"), trim: C("gold"), accent: C("sky") },
   "solar-gold": { hull: C("gold"), trim: C("ember"), accent: C("approach") },
-  "nebula-violet": { hull: mix("disk", "recede", 0.3), trim: C("gold"), accent: C("approach") },
+  "nebula-violet": { hull: mix("disk", "recede", 0.22), trim: C("gold"), accent: C("approach") },
   "obsidian-stealth": { hull: C("horizon"), trim: C("sky"), accent: C("sky") },
 } as const;
 
@@ -74,9 +74,9 @@ export const THRUSTERS: Record<"amber-flame" | "cyan-ion" | "starlight-comet", {
   // the classic: a short, round ember burn with a gold heart
   "amber-flame": { outer: lin("ember", 0.62), inner: lin("gold", 0.55), length: 1, width: 1, sparks: false },
   // a cool blue jet: long and narrow
-  "cyan-ion": { outer: lin("sky", 0.45), inner: lin("approach", 0.42), length: 1.45, width: 0.7, sparks: false },
+  "cyan-ion": { outer: lin("sky", 0.62), inner: lin("approach", 0.5), length: 1.45, width: 0.7, sparks: false },
   // a white comet with a gold heart and a trail of sparks
-  "starlight-comet": { outer: lin("approach", 0.34), inner: lin("gold", 0.5), length: 1.25, width: 1.1, sparks: true },
+  "starlight-comet": { outer: lin("approach", 0.45), inner: lin("gold", 0.5), length: 1.25, width: 1.1, sparks: true },
 };
 
 /**
