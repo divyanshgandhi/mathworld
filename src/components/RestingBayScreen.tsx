@@ -13,6 +13,7 @@ import { Flashcards } from "./hub/Flashcards";
 import { FieldManual } from "./teach/FieldManual";
 import { GREETINGS } from "@/teach/greetings";
 import { greetKey } from "@/teach/keys";
+import { readMs } from "@/teach/words";
 import { useCadet } from "./hub/useCadet";
 import { PlanetSprite } from "./world/PlanetSprite";
 import "./hub/hub.css";
@@ -145,6 +146,16 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
     greeted.current = true;
     emit({ type: "seen", payload: { key: GREET } });
   }, [first, emit]);
+  // the first visit's line is the bay's greeting: like every greeting it goes on the first action or after its reading time
+  const [greetDone, setGreetDone] = useState(false);
+  useEffect(() => {
+    if (!first) return;
+    const go = () => setGreetDone(true), opts = { capture: true, passive: true } as const;
+    const t = setTimeout(go, readMs(GREETINGS.bay.text));
+    addEventListener("pointerdown", go, opts);
+    addEventListener("keydown", go, opts);
+    return () => { clearTimeout(t); removeEventListener("pointerdown", go, opts); removeEventListener("keydown", go, opts); };
+  }, [first]);
   // an opened table scrolls into view (only as far as it needs); Escape closes it
   useEffect(() => {
     if (open === null) return;
@@ -195,7 +206,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
             <div data-slot="daily-patrol" className="empty:hidden">{patrol}</div>
-            <NovaLine className="mw-bay-nova">{novaLine(state, log, who, !!first, name, ps)}</NovaLine>
+            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, who, !!first, name, ps)}</NovaLine>
           </div>
         </section>
 

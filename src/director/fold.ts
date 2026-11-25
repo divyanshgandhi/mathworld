@@ -97,6 +97,12 @@ export const initialState = (): PlayerState => ({
  * Player state is a pure fold over the event log: the same events always give the same state,
  * nothing is stored that could drift from the log. Correctness and error types are recomputed here.
  */
+/**
+ * Two answers closer than this (by the log's clock) cannot both have been played: a volley alone takes
+ * longer. The second one moves mastery as usual but pays no orbs.
+ */
+export const MIN_SHOT_MS = 1000;
+
 export function fold(events: LoggedEvent[]): PlayerState {
   const s = initialState();
   let wild: number[] = [];
@@ -148,9 +154,13 @@ export function fold(events: LoggedEvent[]): PlayerState {
     const mode = w.role === "academy" ? "academy" : w.role === "practice" ? "practice" : "campaign";
     const day = at === undefined ? -1 : dayNumber(at);
     const paid = payWave({ mode, firstTry: w.attempts === 1 && !w.explained && !w.usedRadar, shown: w.explained, wasGold, replayPaidToday: replayPaid[key] === day, streak: s.firstTryStreak });
-    for (const l of paid.lines) pay(l.rule, l.amount, key);
-    s.firstTryStreak = paid.streak;
-    if (paid.goldReplay) replayPaid[key] = day;
+    // a shot faster than a volley can fly is not a shot that was played: it pays nothing and does not
+    // feed the first-try run (forged answers posted in a burst mint nothing; see w2-economy.md)
+    if (!tooFast) {
+      for (const l of paid.lines) pay(l.rule, l.amount, key);
+      s.firstTryStreak = paid.streak;
+      if (paid.goldReplay) replayPaid[key] = day;
+    }
     if (mode !== "academy") goldCheck(key);
 
     if (w.role === "practice" || w.role === "academy") {
@@ -198,11 +208,15 @@ export function fold(events: LoggedEvent[]): PlayerState {
     s.open = null;
   };
 
+  /** When the last answer was given, and whether this one came too soon after it to have been played. */
+  let lastShotAt: number | undefined, tooFast = false;
   for (const e of events) {
     at = timeOf(e);
     switch (e.type) {
       case "intro_completed": s.introCompleted = true; break;
       case "attempt_submitted": {
+        tooFast = at !== undefined && lastShotAt !== undefined && at - lastShotAt < MIN_SHOT_MS;
+        if (at !== undefined) lastShotAt = at;
         const p = e.payload, w = openFor(p.a, p.b, p.waveRole, p.isTransferCheck);
         w.attempts++;
         if (w.attempts === 1) w.firstLatencyMs = p.latencyMs;
@@ -236,8 +250,11 @@ export function fold(events: LoggedEvent[]): PlayerState {
         break;
       }
       case "hyper_jump_taken": {
+        // only a jump the log has earned (the offer the director makes after a Gold run and a Gold probe),
+        // and only to where that offer goes: a jump posted without one moves nothing
         const from = tierOfPlanet(e.payload.fromPlanet), to = tierOfPlanet(e.payload.toPlanet);
-        if (from === s.tier && to > from) { for (let t = from; t < to; t++) s.aceCleared.push(t); move(to); }
+        const offered = s.probePassed && s.goldStreak >= GOLD_STREAK_FOR_JUMP && s.tier < MAX_TIER ? Math.min(MAX_TIER, s.tier + JUMP) : null;
+        if (from === s.tier && to === offered) { for (let t = from; t < to; t++) s.aceCleared.push(t); move(to); }
         break;
       }
       case "orb_earned": break; // the client's claim: never believed (decision 4)

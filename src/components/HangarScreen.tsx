@@ -186,9 +186,10 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
     if (confirming) {
       return (
         <div className="flex flex-col gap-3" role="group" aria-labelledby="hangar-ask">
+          {/* both answers wait out ARM_MS: the second tap of a double tap on Buy is neither a yes nor a no */}
           <p id="hangar-ask" className="type-child text-approach">Buy {confirming.item.name} for {confirming.cost} orbs?</p>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="secondary" size="md" autoFocus onKeyDown={noRepeat} onClick={() => setPhase({ kind: "idle" })} className="w-full">Not now</Button>
+            <Button variant="secondary" size="md" autoFocus onKeyDown={noRepeat} onClick={(e) => { if (e.timeStamp >= confirming.armedAt) setPhase({ kind: "idle" }); }} className="w-full">Not now</Button>
             <Button variant="primary" size="md" glyph={false} onKeyDown={noRepeat} onClick={(e) => { if (e.timeStamp >= confirming.armedAt) void save(confirming.item, confirming.cost); }} className="w-full">Buy</Button>
           </div>
         </div>
@@ -239,7 +240,7 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
     <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
       {/* the part of the screen the rocket is framed in (the scene reads its size) */}
-      <div ref={frameEl} aria-hidden className="pointer-events-none absolute inset-x-0 top-16 h-[calc(45dvh-4rem)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bottom-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:right-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:h-auto [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]" />
+      <div ref={frameEl} aria-hidden className="pointer-events-none absolute inset-x-0 top-16 h-[calc(45dvh-4rem)] [@media(max-height:699px)_and_(max-aspect-ratio:1/1)]:h-[calc(36dvh-4rem)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bottom-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:right-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:h-auto [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]" />
 
       <TopBar left={<HomeLink />} title="Hangar" orbs={orbs} onHelp={onHelp ?? (() => setHelp(true))} className="absolute inset-x-0 top-0" />
       {state && <Greeting screen="hangar" edge="top" seen={{ seen: state.seen, emit }} className="[@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:pr-[calc(clamp(340px,34vw,480px)+16px)] [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[92px]" />}
@@ -247,7 +248,7 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
 
       <section
         aria-label="Shop"
-        className="absolute inset-x-0 bottom-0 top-[45dvh] z-10 flex flex-col rounded-t-panel border-t border-line-1 bg-sheet [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:left-auto [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:top-16 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:w-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:rounded-none [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-l [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-t-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bg-void [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]"
+        className="absolute inset-x-0 bottom-0 top-[45dvh] [@media(max-height:699px)_and_(max-aspect-ratio:1/1)]:top-[36dvh] z-10 flex flex-col rounded-t-panel border-t border-line-1 bg-sheet [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:left-auto [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:top-16 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:w-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:rounded-none [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-l [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-t-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bg-void [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]"
       >
         <Tabs value={slot} onValueChange={(v) => { if (v && !busy.current) { setSlot(v as Slot); setPhase({ kind: "idle" }); } }} className="flex min-h-0 flex-1 flex-col">
           <TabsList aria-label="What to change" className="grid grid-cols-3 gap-2 px-4 pt-3.5 md:px-6 md:pt-6">
@@ -286,7 +287,7 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
         <div className="border-t border-line-1 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 md:px-6 md:pb-6 md:pt-5" aria-live="polite">
           {dock()}
           {state && st?.kind === "equipped" && state.orbs === 0 && !state.owned.length && (
-            <PillLink href="/map" variant="secondary" size="sm" icon="map" className="mt-3">Star map</PillLink>
+            <PillLink href="/map" variant="secondary" size="sm" icon="map" className="mt-3 [@media(max-height:699px)_and_(max-aspect-ratio:1/1)]:hidden">Star map</PillLink>
           )}
         </div>
       </section>

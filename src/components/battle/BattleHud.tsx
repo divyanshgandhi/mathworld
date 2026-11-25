@@ -209,6 +209,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       lineA = <span className={o.last ? css.last : css.miss}>{missLine(o.kind, n, noun)}</span>;
     }
   } else if (w && ui.mode !== "academy" && BONUS.has(w.role) && ui.mode !== "practice") lineA = <span className={css.soft}>Bonus wave</span>;
+  // a mission's first fleet is an easier one that sets up the trick: it does not count toward the mission, so it says so
+  else if (w && ui.mode === "campaign" && w.role === "anchor") lineA = <span className={css.soft}>Warm-up wave: it does not count</span>;
   if (ui.sectors && layout !== "strip" && !lesson) lineB = <span><b>{ui.sectors.filter((s) => s.value !== null).length}</b> of {ui.sectors.length} sectors locked</span>;
   if (ui.lockTotal !== null && ui.sectors) lineB = <span className={css.exact}>{ui.sectors.map((s) => fmtN(s.value ?? 0)).join(" + ")} = <b>{fmtN(ui.lockTotal)}</b></span>;
 

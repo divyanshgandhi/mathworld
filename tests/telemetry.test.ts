@@ -9,20 +9,25 @@ const shot = (a: number, b: number, guess: number, o: { transfer?: boolean; i?: 
   payload: { a, b, planetId: "moon", guess, latencyMs: 1500, errorType: null, attemptIndex: o.i ?? 1, usedRadar: false, powerUpUsed: null, isTransferCheck: !!o.transfer, waveRole: o.role ?? (o.transfer ? "transfer" : "discovery") },
 });
 const lesson = (a: number, b: number, trickId: "easy-5-10" | "double-it" = "easy-5-10"): LoggedEvent => ({ type: "explanation_completed", payload: { trickId, a, b, mode: "full", wedoCorrect: true } });
-/** On the Moon (a forged planet clear no longer counts, so the fixture jumps there). */
-const moon: LoggedEvent[] = [{ type: "intro_completed", payload: {} }, { type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "moon" } }];
+/** On the Moon, played there (forged clears and jumps move nothing): Earth's three tutorial fleets, won, then its clear. */
+const earth = [[0, 5], [1, 7], [1, 3]].map(([a, b]): LoggedEvent => ({
+  type: "attempt_submitted", payload: { a, b, planetId: "earth", guess: a * b, latencyMs: 9000, errorType: null, attemptIndex: 1, usedRadar: false, powerUpUsed: null, isTransferCheck: false, waveRole: "tutorial" },
+}));
+const moon: LoggedEvent[] = [{ type: "intro_completed", payload: {} }, ...earth, { type: "planet_cleared", payload: { planetId: "earth" } }];
+/** Waves played on the Moon (the fixture's Earth waves come first). */
+const onMoon = <T,>(xs: T[]) => xs.slice(earth.length);
 
 describe("telemetry (src/director/telemetry.ts)", () => {
   it("splits first-try accuracy by whether the fleet's trick was explained before the wave", () => {
     // 10 × 7 missed twice, then Show Me How (its own wave counts as neither), then the sister 10 × 4 as a transfer check
     const log = [...moon, shot(10, 7, 60), shot(10, 7, 50, { i: 2 }), lesson(10, 7), shot(10, 7, 70, { i: 3 }), shot(5, 2, 9), shot(5, 2, 10, { i: 2 }), shot(10, 4, 40, { transfer: true })];
     const s = fold(log);
-    expect(s.history.map((w) => [w.key, w.trick, w.afterLesson])).toEqual([["7x10", "easy-5-10", false], ["2x5", "easy-5-10", true], ["4x10", "easy-5-10", true]]);
+    expect(onMoon(s.history).map((w) => [w.key, w.trick, w.afterLesson])).toEqual([["7x10", "easy-5-10", false], ["2x5", "easy-5-10", true], ["4x10", "easy-5-10", true]]);
     const r = transferReport(s);
     expect(r.checks).toEqual({ n: 1, solved: 1, rate: 1 });
-    expect(r.before).toEqual({ n: 0, solved: 0, rate: null });
+    expect(r.before).toEqual({ n: 3, solved: 3, rate: 1 }); // Earth's three tutorial fleets, none explained
     expect(r.after).toEqual({ n: 2, solved: 1, rate: 0.5 }); // 5 × 2 self-corrected, 10 × 4 first try
-    expect(r.byTrick[0]).toMatchObject({ trick: "easy-5-10", card: "Easy 5s & 10s" });
+    expect(r.byTrick.find((t) => t.trick === "easy-5-10")).toMatchObject({ trick: "easy-5-10", card: "Easy 5s & 10s" });
   });
 
   it("X-Ray: the fleet on screen, its misses classified, the queue and this session's transfer rate", () => {
@@ -32,7 +37,7 @@ describe("telemetry (src/director/telemetry.ts)", () => {
     expect(x.planet).toBe("moon");
     expect(x.current).toMatchObject({ key: "2x7", attempts: 1, seen: 0 });
     expect(x.activeError).toEqual({ type: "added_instead", a: 2, b: 7, guess: 9 });
-    expect(x.recent.map((f) => f.key)).toEqual(["2x7", "3x10", "8x10", "2x6"]);
+    expect(x.recent.map((f) => f.key).slice(0, 4)).toEqual(["2x7", "3x10", "8x10", "2x6"]); // then Earth's
     expect(x.session).toEqual({ n: 1, solved: 1, rate: 1 }); // only the stamped (live) events
     expect(x.overall.n).toBe(1);
     // a Show Me How wave queues its sister problem until the transfer check is served
