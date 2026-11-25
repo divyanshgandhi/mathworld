@@ -60,17 +60,18 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     /** The rocket band (px) this frame; 0 in a lesson pushes the fleet down to the bottom edge. */
     band: 0,
     /**
-     * Ease toward framing `box` in the free area above the rocket band. `band` false (a lesson): the box
-     * may use the whole free area.
+     * Ease toward framing `box` in the free area above the rocket band. `withBand` false (a lesson): the
+     * box may use the whole free area. `maxPpu`: the most px per world unit (keeps a tiny fleet a sane size).
      */
-    follow(dt: number, box: { xmin: number; xmax: number; ymin: number; ymax: number }, withBand = true) {
+    follow(dt: number, box: { xmin: number; xmax: number; ymin: number; ymax: number }, withBand = true, maxPpu = Infinity) {
       const { safe } = rig, { W, H, fw, fh } = free(safe), t = tan();
       clock += dt;
       const band = withBand ? rocketBand(fh) : Math.min(90, rocketBand(fh) * 0.5);
       rig.band = band;
       const availH = Math.max(80, fh - band);
       const bw = box.xmax - box.xmin, bh = box.ymax - box.ymin;
-      const d = Math.max((bh * H) / (2 * t * availH * 0.94), (bw * H) / (2 * t * fw * 0.94), 7);
+      // as large as the free area allows, but a tiny fleet is not blown up past `maxPpu` px per unit
+      const d = Math.max((bh * H) / (2 * t * availH * 0.94), (bw * H) / (2 * t * fw * 0.94), H / (2 * t * maxPpu), 7);
       const ppu = H / (2 * d * t);
       // the free area's centre on screen sits `band / 2` px below the box's centre
       const cx = (box.xmin + box.xmax) / 2, cy = (box.ymin + box.ymax) / 2 - band / 2 / ppu;

@@ -133,6 +133,12 @@ export function createKillFx(stage: Stage, root: THREE.Object3D, rnd: Rng) {
         t.ink.mesh.position.y += dt * 0.25 * t.h;
       }
     },
+    /** Show one of everything (for a shader compile before the first shot), or hide it again. */
+    prewarm(on: boolean) {
+      rings[0].m.visible = on;
+      shards.count = on ? 1 : 0;
+      if (on && !shards.instanceColor) shards.setColorAt(0, color.setHex(LOOK.kill.ring));
+    },
     /** Everything in flight goes (a new fleet, a dispose). */
     clear() {
       for (const s of S) s.live = false;

@@ -14,13 +14,14 @@ import { FLIP_SEC, planShowMeHow, safetyNetApplies, SHOT, WHY, type Plan } from 
 import { CARD, selectTrick, type TrickId } from "@/rig/tricks";
 import { createBus } from "@/battle/bus";
 import { planVolley, targetOrder, volleySchedule } from "@/battle/formation";
-import { reducedMotion, sairaReady } from "@/battle/look";
+import { LOOK, reducedMotion, sairaReady } from "@/battle/look";
 import { nextHint, type HintStep } from "@/battle/hints";
 import { createLessonStage } from "@/battle/lessonBeats";
 import { attachPersistence } from "@/battle/persistence";
 import { themeOf } from "@/battle/planets";
 import { POWERUPS } from "@/battle/powerups";
-import { INVADER, INVADER_TONES } from "./ships";
+import { INVADER, INVADER_TONES, makeInvader, makePlasmaBall } from "./ships";
+import { createInstancedFleet } from "@/battle/systems/instanced";
 import { planetClearOrbs, waveClearOrbs } from "@/battle/rewards";
 import { createScheduler } from "@/battle/scheduler";
 import { createSectorLock } from "@/battle/sectorLock";
@@ -196,7 +197,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     fv.axisLabels(ra, rb);
   }
   function build(a: number, b: number) { fv.build(a, b); axisLabels(); }
-  const clearFleet = () => fv.clear();
+  const clearFleet = () => { scan.reset(); misses.clear(); fv.clear(); };
 
   // ---- Power-Ups ----
   function flip() { fv.flipped = !fv.flipped; fv.flipT = stage.time; axisLabels(); setUi({ wave: { ...ui.wave!, flipped: fv.flipped } }); }
@@ -622,7 +623,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     // the camera frames the fleet (and the labels on show) in the HUD's free area, above the rocket's band
     const m = measure(fv);
     const nv = nova.update(dt, T, m.w, m.h, bs.lessonOn);
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.visiblePad()), !bs.lessonOn);
+    // a ship's cell stays at most ~120 px (less on a short screen), so 1 × 4 does not fill the sky with four giants
+    const cellMax = Math.min(120, cam.free.fh * 0.2);
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.visiblePad()), !bs.lessonOn, cellMax / fv.scale);
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
@@ -645,7 +648,29 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   });
 
   backdrop.applyLook();
+  prewarm();
   setUi({});
+
+  /**
+   * Compile every shader a shot will need before the first shot, so the first volley does not stall
+   * on a phone: the ball and the extra ball, the shards, the ring, the ink, and the instanced drones.
+   */
+  function prewarm() {
+    const g = new THREE.Group();
+    const ball = makePlasmaBall(stage.mats, s0.equipped.blaster), over = makePlasmaBall(stage.mats, s0.equipped.blaster);
+    over.material = stage.mats.glow(LOOK.over.color, LOOK.over.intensity, { roughness: 0.4 });
+    g.add(ball, over);
+    const inst = createInstancedFleet(g, ["ember|1", "ember|0", "apricot|1", "apricot|0"].map((style) => ({ g: new THREE.Object3D(), style, visible: () => false })), (key) => {
+      const [tone, leader] = key.split("|");
+      return makeInvader(stage.mats, { tone: tone as "ember" | "apricot", leader: leader === "1" });
+    });
+    root.add(g);
+    kill.prewarm(true);
+    try { stage.renderer.compile(scene, camera); } catch { /* a lost context compiles on first draw instead */ }
+    kill.prewarm(false);
+    inst.dispose();
+    root.remove(g);
+  }
 
   return {
     /** Begin (from a click or key press, so sound can start). */
