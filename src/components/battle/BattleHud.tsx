@@ -1,265 +1,282 @@
 "use client";
-import { Button } from "@ui-sdk/react/button";
-import { Toolbar, ToolbarButton } from "@ui-sdk/react/toolbar";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { PlanetId } from "@/rig/pools";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { fold } from "@/director/fold";
+import { PRACTICE_WAVES } from "@/director/next";
+import { flushed } from "@/engine/outbox";
+import { missionLength, solvesToClear } from "@/rig/adaptive";
+import { tierOfPlanet, type PlanetId } from "@/rig/pools";
+import { CARD, type TrickId } from "@/rig/tricks";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
-import { PLANET_NAMES } from "@/worlds/space/lines";
-import { Icon, RocketGlyph } from "@/components/kit/Icon";
-import { ghost, glass, lime, padKey } from "./ui";
+import { BODY_NAME } from "@/worlds/space/bodies";
+import { Button } from "@/components/kit/Button";
+import { Icon } from "@/components/kit/Icon";
+import { BriefingCard, ClearCard, OfferCard, PLANET_TEACHES, UnlockCard } from "./Cards";
+import { Console, EmptySlot, fmtN, Slot, useEntry } from "./Console";
+import { useConsoleLayout, useReducedMotion, type ConsoleLayout } from "./layout";
+import { MissionStrip, useOrbReward } from "./MissionStrip";
+import { usePauseWhenHidden } from "./PauseMenu";
+import { hold } from "./pause";
+import { PowerUpGlyph } from "./PowerUpGlyph";
 import { XRay } from "./XRay";
+import { css } from "./cockpit";
 
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
-const fmt = (n: number) => n.toLocaleString("en-US");
-/** Waves that do not count toward the mission (a breather, a check from another planet): the counter would stall on them. */
+/** Waves that do not count toward the mission (a breather, a check from another planet). */
 const BONUS = new Set(["recharge", "probe", "transfer"]);
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+const TRICK_BY_CARD = Object.fromEntries(Object.entries(CARD).map(([id, name]) => [name, id as TrickId])) as Record<string, TrickId>;
+/** At most this many Power-Ups on the console: the ones that fit this fleet. */
+const SLOTS = 3;
+/** A planet by its own name, never the mission's ("Earth", not "Cadet Bay"); "the Moon" in the middle of a sentence. */
+export const planetName = (id: PlanetId, mid = false) => (mid ? BODY_NAME[id].replace(/^The /, "the ") : BODY_NAME[id]);
+
+export type Safe = { top: number; right: number; bottom: number; left: number };
 
 /**
- * The battle HUD, shared by every planet and Cadet Bay. The multiplication is the hero: a big,
- * centred `a × b` plate naming both axes. The cockpit keypad docks right on desktop and along the
- * bottom on phones; it reports its footprint so the stage frames the fleet in the free space.
+ * Tell the 3D side where the cockpit is: the free area for the fleet and the rocket, and the band
+ * for Nova's caption (just above the console on phones, bottom left on wider screens). Measured on
+ * mount, resize and rotation only: nothing in the cockpit changes size during play.
+ */
+export function useCockpitSafe(layout: ConsoleLayout, strip: React.RefObject<HTMLElement | null>, con: React.RefObject<HTMLElement | null>,
+  apply: ((s: Omit<Safe, "left">, caption: { px: number; side: "centre" | "left" }) => void) | null) {
+  const safe = useRef<Safe>({ top: 0, right: 0, bottom: 0, left: 0 });
+  useEffect(() => {
+    if (!apply) return;
+    const measure = () => {
+      const W = window.innerWidth, H = window.innerHeight, s = strip.current?.getBoundingClientRect(), c = con.current?.getBoundingClientRect();
+      if (!s || !c) return;
+      const top = Math.round(s.bottom + 6);
+      let right = 0, bottom: number, cap: { px: number; side: "centre" | "left" };
+      if (layout === "pad") {
+        // Nova's caption has its own band right above the keypad, under the rocket
+        const band = 76;
+        bottom = Math.round(H - c.top + band);
+        cap = { px: Math.round(H - c.top + 10), side: "centre" };
+      } else if (layout === "column") {
+        right = Math.round(W - c.left);
+        bottom = 64;
+        cap = { px: 8, side: "left" };
+      } else {
+        bottom = Math.round(H - c.top + 8);
+        cap = { px: Math.round(H - c.top + 14), side: "left" };
+      }
+      safe.current = { ...safe.current, top, right, bottom };
+      apply({ top, right, bottom }, cap);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (strip.current) ro.observe(strip.current);
+    if (con.current) ro.observe(con.current);
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); window.removeEventListener("orientationchange", measure); };
+  }, [layout, apply, strip, con]);
+  /** The middle of the free area (where the fleet is), in px. */
+  const centre = useCallback(() => {
+    const s = safe.current, W = window.innerWidth, H = window.innerHeight;
+    return { x: (W - s.right) / 2, y: (s.top + H - s.bottom) / 2 };
+  }, []);
+  return centre;
+}
+
+/** "5 ships got away. Try again." / "5 plasma balls flew past. Try again." Never the word wrong. */
+export function missLine(kind: "under" | "over", n: number, noun: { one: string; many: string } = { one: "ship", many: "ships" }) {
+  return kind === "under"
+    ? <><b>{fmtN(n)}</b> {plural(n, `${noun.one} got`, `${noun.many} got`)} away. Try again.</>
+    : <><b>{fmtN(n)}</b> {plural(n, "plasma ball", "plasma balls")} flew past. Try again.</>;
+}
+
+/**
+ * The battle's 2D layer, shared by every planet, Cadet Bay and the Academy: the mission strip along the
+ * top, the console on the edge, and the cards (briefing, new Power-Up, Hyper-Jump, planet clear).
+ * The world owns the middle of the screen. There is no input box: the typed number rides on Fire
+ * (and the arena draws it on the rocket's nose through `setCharge`).
  */
 export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneActions, launch = true, menu }: {
   arena: Arena | null; ui: ArenaUi | null; onFly?: (to: PlanetId) => void; dev?: boolean; drone?: boolean;
-  /** Buttons for the end-of-mission card (default: fly to the next planet). */
+  /** Buttons for the end card (default: fly to the next planet, Star map, Resting Bay). */
   doneActions?: (done: NonNullable<ArenaUi["done"]>) => ReactNode;
-  /** Show the "Launch (sound on)" card before the first wave. */
+  /** Show the briefing card before the first wave. */
   launch?: boolean;
   /** The pause menu button (top-left). */
   menu?: ReactNode;
 }) {
-  const [entry, setEntryState] = useState("");
-  // the latest entry, so a digit and Enter in the same frame (fast fingers, scripts) are never lost
-  const live = useRef("");
-  const setEntry = useCallback((v: string | ((prev: string) => string)) => {
-    live.current = typeof v === "function" ? v(live.current) : v;
-    setEntryState(live.current);
-  }, []);
-  // a Hyper-Jump loads the next planet's route: say so while it loads instead of showing a dead screen
+  const router = useRouter();
+  const layout = useConsoleLayout();
+  const reduced = useReducedMotion();
+  // the menu or a card holds the game: the controls rest. (A hidden tab holds it too, but nobody can press anything then.)
+  const paused = useSyncExternalStore(hold.subscribe, () => hold.has("menu") || hold.has("card"), () => false);
+  usePauseWhenHidden();
+  useEffect(() => () => hold.clear(), []);
+
+  const stripRef = useRef<HTMLDivElement>(null), conRef = useRef<HTMLDivElement>(null), orbsRef = useRef<HTMLDivElement>(null), rootRef = useRef<HTMLDivElement>(null);
+  const w = ui?.wave ?? null;
+  const sectorActive = ui?.sectors?.find((s) => s.active) ?? null;
+
+  // ---- cards ----
+  const [unlocks, setUnlocks] = useState<{ id: TrickId; name: string; sector: boolean }[]>([]);
+  const [prevUnlock, setPrevUnlock] = useState<ArenaUi["unlock"]>(null);
+  if ((ui?.unlock ?? null) !== prevUnlock) {
+    setPrevUnlock(ui?.unlock ?? null);
+    const add = (ui?.unlock?.cards ?? []).map((name) => TRICK_BY_CARD[name]).filter(Boolean)
+      .map((id) => ({ id, name: id === "big-small-split" && w?.sectorLock ? "Sector-Lock" : CARD[id], sector: id === "big-small-split" && !!w?.sectorLock }));
+    if (add.length) setUnlocks((u) => [...u, ...add.filter((a) => !u.some((x) => x.id === a.id))]);
+  }
+  const unlock = unlocks[0] ?? null;
   const [jumping, setJumping] = useState<string | null>(null);
-  const plateRef = useRef<HTMLDivElement>(null), dockRef = useRef<HTMLDivElement>(null);
-  const w = ui?.wave, sectorActive = ui?.sectors?.find((s) => s.active) ?? null;
+  const briefing = !!ui && launch && !ui.started && !ui.done;
+  const offer = !!ui?.offer && !jumping;
+  const done = !!ui?.done;
+  const cardOpen = briefing || !!unlock || offer || done || !!jumping;
+  // a card to read holds the game still (the next fleet waits for "Got it")
+  useEffect(() => { if (unlock) hold.on("card"); else hold.off("card"); }, [unlock]);
+  // the keyboard works without a click: the game root has focus whenever no card is up
+  useEffect(() => { if (!cardOpen && !paused) rootRef.current?.closest<HTMLElement>("[data-cockpit]")?.focus({ preventScroll: true }); }, [cardOpen, paused]);
 
-  // when every sector is locked, the plasma lock (their sum) loads into the readout
-  const [prevTotal, setPrevTotal] = useState<number | null>(null);
-  if ((ui?.lockTotal ?? null) !== prevTotal) { setPrevTotal(ui?.lockTotal ?? null); if (ui?.lockTotal != null) setEntryState(String(ui.lockTotal)); }
-  useEffect(() => { live.current = entry; }, [entry]);
+  // ---- the number ----
+  const live = !!ui?.canFire && !!w && !cardOpen && !paused;
+  const [lastFired, setLastFired] = useState<number | null>(null);
+  const maxDigits = w ? Math.max(2, String(w.a * w.b).length + 1) : 2;
+  const { entry, press, set } = useEntry({
+    maxDigits, live,
+    onChange: (n) => arena?.setCharge(n),
+    onFire: (n) => {
+      if (!arena || !ui) return false;
+      if (sectorActive) { arena.lockSector(n); return; }
+      setLastFired(n);
+      void arena.fire(n);
+    },
+  });
+  const waveKey = w ? `${w.index}:${w.a}x${w.b}` : "";
+  const [prevWave, setPrevWave] = useState(waveKey);
+  if (waveKey !== prevWave) { setPrevWave(waveKey); setLastFired(null); }
+  useEffect(() => { set(""); }, [waveKey, set]);
+  // every sector locked: their sum loads onto Fire
+  useEffect(() => { if (ui?.lockTotal != null) set(String(ui.lockTotal)); }, [ui?.lockTotal, set]);
 
-  const fire = useCallback(() => {
-    const v = live.current;
-    if (!arena || !ui || v === "") return;
-    if (sectorActive) { arena.lockSector(Number(v)); setEntry(""); return; }
-    if (!ui.canFire) return;
-    void arena.fire(Number(v));
-    setEntry("");
-  }, [arena, ui, sectorActive, setEntry]);
-  const press = useCallback((k: string) => {
-    arena?.poke();
-    if (k === "Fire") return fire();
-    if (k === "⌫") return setEntry((v) => v.slice(0, -1));
-    setEntry((v) => (v === "0" ? k : (v + k).slice(0, 9)));
-  }, [fire, arena, setEntry]);
+  // ---- where the cockpit is ----
+  const apply = useMemo(() => arena ? (s: Omit<Safe, "left">, cap: { px: number; side: "centre" | "left" }) => { arena.setSafe(s); arena.captionAt(cap.px, cap.side); } : null, [arena]);
+  const centre = useCockpitSafe(layout, stripRef, conRef, apply);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // the X-Ray is a non-modal side sheet: the cadet keeps typing while it is open
-      if ((e.target as HTMLElement)?.closest?.("input, textarea, dialog:not([data-xray])") || document.querySelector("dialog[open]:not([data-xray])")) return;
-      if (ui && !ui.started && e.key === "Enter") { e.preventDefault(); arena?.start(); return; }
-      if (!ui?.wave) return;
-      if (/^\d$/.test(e.key)) press(e.key);
-      else if (e.key === "Backspace") press("⌫");
-      else if (e.key === "Enter") { e.preventDefault(); press("Fire"); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [press, ui, arena]);
+  // ---- orbs: earned this battle, and the flight to the counter ----
+  const [firstOrbs, setFirstOrbs] = useState<number | null>(null);
+  if (ui && firstOrbs === null) setFirstOrbs(ui.orbs);
+  const shownOrbs = useOrbReward(ui?.orbs ?? 0, orbsRef, centre, { reduced, still: cardOpen });
 
-  // tell the stage where the HUD is, so the fleet sits in the clear part of the screen
-  useEffect(() => {
-    if (!arena) return;
-    const measure = () => {
-      const phone = window.innerWidth < 768, plate = plateRef.current?.getBoundingClientRect(), dock = dockRef.current?.getBoundingClientRect();
-      // the top keeps the plate and its chip row (outcome, Show Me How) clear of the fleet.
-      // Phones: Nova's caption floats just above the keypad, in a band the stage keeps free, so it
-      // covers neither the fleet nor the rocket. Desktop: it sits bottom-left, away from the rocket.
-      const capBand = phone ? 84 : 0;
-      arena.setSafe({ top: (plate?.bottom ?? 130) + 50, right: !phone && dock ? window.innerWidth - dock.left + 8 : 0, bottom: phone && dock ? window.innerHeight - dock.top + 4 + capBand : 0 }); // `left` belongs to the X-Ray
-      if (phone && dock) arena.captionAt(window.innerHeight - dock.top + 8, "centre");
-      else arena.captionAt(22, "left");
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (plateRef.current) ro.observe(plateRef.current);
-    if (dockRef.current) ro.observe(dockRef.current);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [arena, w, ui?.radar, ui?.sectors, ui?.belt.length]);
+  // ---- mission progress ----
+  const tier = ui ? tierOfPlanet(ui.planet) : 0;
+  const dots = useMemo(() => {
+    if (!ui || !w || ui.mode === "academy") return null;
+    if (ui.mode === "practice") return { total: w.of, won: Math.min(w.index, w.of), current: true };
+    const m = arena ? fold(arena.log()).mission : null;
+    return { total: tier === 0 ? missionLength(0) : missionLength(tier) - 1, won: m?.solved ?? 0, current: true };
+  }, [ui?.mode, waveKey, arena, tier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ui) return null;
+
   const [ra, rb] = w?.flipped ? [w.b, w.a] : [w?.a ?? 0, w?.b ?? 0];
-  const noun = drone ? plural(rb, "drone", "drones") : plural(rb, "ship", "ships");
-  const o = ui.outcome;
-  // the big a × b stays on one line: long numbers step the display size down instead of wrapping
-  const digits = fmt(ra).length + fmt(rb).length;
-  const plateSize = digits > 9 ? "text-3xl md:text-5xl" : digits > 6 ? "text-4xl md:text-6xl" : "text-5xl md:text-7xl";
+  const noun = drone ? { one: "drone", many: "drones" } : { one: "ship", many: "ships" };
+  const o = ui.outcome, h = ui.hint ?? null, lesson = ui.lesson;
+
+  // ---- the two message lines under the question ----
+  const hintWords = w && h && (h.squads !== "off" || h.each !== "off") ? (
+    <>
+      {h.squads !== "off" && <span className={h.squads === "soft" ? css.soft : undefined}><b>{fmtN(ra)}</b> {plural(ra, "squad", "squads")}</span>}
+      {h.squads !== "off" && h.each !== "off" && <span className={css.soft}> · </span>}
+      {h.each !== "off" && <span className={h.each === "soft" ? css.soft : undefined}><b>{fmtN(rb)}</b> {plural(rb, noun.one, noun.many)} each</span>}
+    </>
+  ) : null;
+  let lineA: ReactNode = null, lineB: ReactNode = hintWords;
+  if (jumping) lineA = <span className={css.lesson}>Hyper-Jumping to <b>{jumping}</b></span>;
+  else if (lesson) {
+    if (lesson.prompt) {
+      lineA = <span className={css.turn}>Your turn</span>;
+      lineB = lesson.equation ? <span className={css.equation}>{lesson.equation}</span> : <span>{lesson.prompt}</span>;
+    } else {
+      lineA = <span className={css.lesson}><Icon name="trick" size={20} className={css.icon} />Nova shows you <b>{lesson.card}</b></span>;
+      lineB = lesson.why ? <span>{lesson.why.charAt(0).toUpperCase() + lesson.why.slice(1)}.</span> : hintWords;
+    }
+  } else if (o && w) {
+    const p = w.a * w.b, fired = lastFired;
+    if (o.kind === "exact") lineA = <span className={css.exact}><Icon name="check" size={20} className={css.icon} />Exactly right{o.orbs ? <> · <b>+{o.orbs}</b> orbs</> : null}</span>;
+    else {
+      // the count comes from the shot itself: fired against a × b
+      const n = fired !== null ? Math.abs(fired - p) : o.value;
+      lineA = <span className={o.last ? css.last : css.miss}>{missLine(o.kind, n, noun)}</span>;
+    }
+  } else if (w && ui.mode !== "academy" && BONUS.has(w.role) && ui.mode !== "practice") lineA = <span className={css.soft}>Bonus wave</span>;
+  if (ui.lockTotal !== null && ui.sectors) lineB = <span className={css.exact}>{ui.sectors.map((s) => fmtN(s.value ?? 0)).join(" + ")} = <b>{fmtN(ui.lockTotal)}</b></span>;
+
+  // ---- the Power-Up slots: only the ones that fit this fleet, at most three, in belt order ----
+  const fits = ui.belt.filter((t) => t.fits);
+  const want = new Set([h?.powerUp, ...fits.filter((t) => t.active).map((t) => t.id)].filter(Boolean) as TrickId[]);
+  const chosen = [...fits.filter((t) => want.has(t.id)), ...fits.filter((t) => !want.has(t.id))].slice(0, SLOTS);
+  const shown = fits.filter((t) => chosen.includes(t));
+  const slots = ui.sectors ? (
+    <div className={css.sectors} role="group" aria-label="Sectors">
+      <span className={css.sectorCount}>{ui.sectors.filter((s) => s.value !== null).length} of {ui.sectors.length} locked</span>
+      {ui.sectors.map((s) => (
+        <button key={s.i} type="button" className={css.sector} data-active={s.active || undefined} data-locked={s.value !== null || undefined}
+          disabled={s.value !== null || !live} aria-label={`Sector ${s.label}`} aria-pressed={s.active}
+          ref={s.active ? (el) => el?.scrollIntoView?.({ block: "nearest", inline: "nearest" }) : undefined}
+          onClick={() => { arena?.selectSector(s.i); set(""); }}>
+          {s.label}{s.value !== null ? ` = ${fmtN(s.value)}` : ""}
+        </button>
+      ))}
+    </div>
+  ) : (
+    <>
+      {shown.map((t) => (
+        <Slot key={t.id} label={t.card} glyph={<PowerUpGlyph id={t.id} lock={t.card === "Sector-Lock"} />} pressed={t.active}
+          disabled={!live || !!lesson} pulse={!reduced && h?.powerUp === t.id && !t.active} onPress={() => arena?.powerUp(t.id)} />
+      ))}
+      {Array.from({ length: SLOTS - shown.length }, (_, i) => <EmptySlot key={`e${i}`} />)}
+    </>
+  );
+
+  const leave = (to: string) => void flushed().then(() => router.push(to));
+  const planetTitle = planetName(ui.planet);
+  const d = ui.done;
+  const clearTitle = !d ? "" : /clear$/i.test(d.title) ? `${planetTitle} is clear` : /practice/i.test(d.title) ? "Practice done" : d.title.charAt(0) + d.title.slice(1).toLowerCase();
+  const nextName = d?.next ? (d.next === ui.planet ? "the next sector" : planetName(d.next, true)) : null;
+  const winLine = ui.mode === "practice" ? `${PRACTICE_WAVES} practice waves. Fire as many plasma balls as there are ships.`
+    : `Win ${solvesToClear(tier)} of ${tier === 0 ? missionLength(0) : missionLength(tier) - 1} waves.`;
 
   return (
-    <>
+    <div ref={rootRef} data-cockpit-hud className="contents">
       <XRay arena={arena} ui={ui} />
-      {/* the multiplication: big, centred, both axes named */}
-      {w && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-14 md:px-0">
-          <div ref={plateRef} className={`${glass} max-w-full px-4 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="type-label-sm tracking-[0.08em] text-balance text-ink-2 md:whitespace-nowrap md:tracking-[0.16em]">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : ui.mode !== "practice" && BONUS.has(w.role) ? "Bonus wave" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
-            <p className={`mt-1 whitespace-nowrap type-display type-number md:mt-2 ${plateSize}`}>
-              {fmt(ra)}<span className="mx-3 text-ink-3">×</span>{fmt(rb)}
-            </p>
-            <p className="mt-1.5 type-body-sm text-ink-2">
-              <b className="font-semibold text-approach">{fmt(ra)}</b> {plural(ra, "squad", "squads")} · <b className="font-semibold text-approach">{fmt(rb)}</b> {noun} each{w.flipped ? " · flipped" : ""}
-            </p>
-          </div>
-          {/* the outcome chip sits in a row under the plate that the stage keeps clear of the fleet */}
-          {/* Show Me How: the Card Name banner, with its WHY the first time */}
-          {ui.lesson && !o && (
-            <div role="status" className="flex max-w-[92vw] flex-col items-center rounded-chip border border-sky bg-void px-5 py-1.5 text-center text-sky">
-              <span className="flex items-center gap-2 type-label"><Icon name="trick" size={18} />{ui.lesson.card}</span>
-              {ui.lesson.why && <span className="type-body-sm text-ink-2">why? {ui.lesson.why}</span>}
-            </div>
-          )}
-          {ui.unlock && (
-            <div role="status" className="flex items-center gap-2 rounded-pill border border-gold bg-void px-4 py-1.5 type-label-sm text-gold">
-              <Icon name="trick" size={18} />New Power-Up on your belt: {ui.unlock.cards.join(" + ")}
-            </div>
-          )}
-          {o && (
-            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number transition ${o.last ? "border-line-2 text-[15px] text-ink-2" : `text-lg ${o.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}`}>
-              {o.kind === "exact" && <Icon name="check" size={20} />}{o.last ? "Last shot: " : ""}{o.kind === "exact" ? `Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="pointer-events-none absolute right-16 top-3 z-10 hidden h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px] md:flex"><Icon name="orb" size={20} className="text-gold" />{ui.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
-      {menu && <div className="absolute left-3 top-3 z-20">{menu}</div>}
+      <MissionStrip layout={layout} stripRef={stripRef} orbsRef={orbsRef} orbs={shownOrbs}
+        menu={menu} dots={dots}
+        question={w ? { a: ra, b: rb } : null}
+        lines={[lineA, lineB]} />
       {dev && (
-        <div className="pointer-events-none absolute left-3 top-16 z-10 hidden type-body-sm type-number text-ink-3 md:block [:root:has([data-xray][data-open])_&]:left-[356px] [:root:has([data-xray][data-open])_&]:block">
+        <div className="pointer-events-none absolute left-3 top-40 z-10 hidden type-body-sm type-number text-ink-3 [:root:has([data-xray][data-open])_&]:left-[356px] [:root:has([data-xray][data-open])_&]:block">
           <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
           <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
         </div>
       )}
+      <Console layout={layout} consoleRef={conRef} entry={entry} live={live} fireWord={sectorActive ? "Lock" : "Fire"} onKey={press}
+        slots={slots} label={sectorActive ? `Console, sector ${sectorActive.label}` : "Console"}
+        help={ui.mode === "academy" ? null : { onPress: () => arena?.showMeHow(), disabled: !live || !!lesson, invite: ui.invite }} />
+      <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${fmtN(Number(entry))} plasma balls loaded`}</p>
 
-      {/* the cockpit: keypad docked right (bottom on phones). It never grows past the screen: the belt
-          and the sectors are single scrolling rows on phones, and the desktop dock scrolls inside itself. */}
-      {w && (
-        <div ref={dockRef} className={`${glass} absolute bottom-2 left-1/2 z-10 w-[min(96vw,340px)] -translate-x-1/2 p-2 md:bottom-5 md:left-auto md:right-5 md:max-h-[calc(100dvh-40px)] md:w-[300px] md:translate-x-0 md:overflow-y-auto md:p-3`}>
-          {ui.belt.length > 0 && (
-            <Toolbar aria-label="Power-Ups" className="-mx-1 mb-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-              {ui.belt.map((t) => (
-                <ToolbarButton key={t.id} aria-label={`Power-Up ${t.card}`} aria-pressed={t.active} onClick={() => arena?.powerUp(t.id)} disabled={!ui.canFire || !!ui.lesson}
-                  className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 type-name text-[15px] md:min-h-10 transition data-disabled:border-line-1 data-disabled:bg-transparent data-disabled:text-ink-3 ${t.active ? "border-gold bg-raised text-gold" : t.fits ? "border-line-3 text-approach hover:border-gold" : "border-line-1 text-ink-3 hover:border-line-2"}`}>
-                  <Icon name="trick" size={16} />{t.card}
-                </ToolbarButton>
-              ))}
-            </Toolbar>
-          )}
-          {ui.sectors && (
-            <div className="mb-1.5 md:mb-2" role="group" aria-label="Battle Sectors">
-              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0">
-                {ui.sectors.map((s) => (
-                  <Button key={s.i} aria-label={`Sector ${s.label}`} onClick={() => { arena?.selectSector(s.i); setEntry(""); }} disabled={s.value !== null}
-                    ref={s.active ? (el: HTMLButtonElement | null) => el?.scrollIntoView?.({ block: "nearest", inline: "nearest" }) : undefined}
-                    className={`min-h-11 shrink-0 whitespace-nowrap rounded-chip border px-3 type-name type-number text-[15px] md:min-h-10 md:px-2 ${s.value !== null ? "border-gold text-gold" : s.active ? "border-approach bg-raised text-approach" : "border-line-2 text-ink-2"}`}>
-                    {s.label}{s.value !== null ? ` = ${fmt(s.value)}` : ""}
-                  </Button>
-                ))}
-              </div>
-              <p className="mt-1 text-center type-body-sm type-number text-ink-2 md:hidden">{ui.sectors.filter((s) => s.value !== null).length} of {ui.sectors.length} sectors locked</p>
-              {ui.lockTotal !== null && <p className="mt-1.5 text-center type-body-sm type-number text-gold">Plasma lock: {ui.sectors.map((s) => fmt(s.value ?? 0)).join(" + ")} = {fmt(ui.lockTotal)}</p>}
-            </div>
-          )}
-          {ui.lesson && (
-            <div className="mb-1.5 rounded-chip border border-sky px-3 py-1.5 text-center md:mb-2" aria-live="polite">
-              <p className="type-label-sm text-sky">{ui.lesson.fallback ? "Safety net" : "Show Me How"} · {ui.lesson.card}</p>
-              {ui.lesson.equation
-                ? <p className="mt-0.5 type-number text-2xl font-medium text-approach md:text-3xl">{ui.lesson.equation}</p>
-                : <p className="mt-0.5 type-body-sm text-ink-2">Watch, or fire any time</p>}
-              {ui.lesson.prompt && <p className="mt-0.5 type-body-sm text-ink-2">Your turn: load it and fire!</p>}
-            </div>
-          )}
-          {/* the radar sits above the readout: the dock is anchored at the bottom, so anything that appears
-              mid-wave grows it upward and the keypad never moves under a finger */}
-          {ui.radar && (
-            <div className="mb-1.5 md:mb-2" role="group" aria-label="Radar">
-              <p className="mb-1 text-center type-label-sm text-sky">Radar · pick one</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {ui.radar.map((v) => (
-                  <Button key={v} aria-label={`Radar ${v}`} disabled={!ui.canFire} onClick={() => { setEntry(""); void arena?.radar(v); }}
-                    className="min-h-11 rounded-chip border border-sky/60 type-name type-number text-[15px] text-sky transition hover:border-sky data-disabled:border-line-1 data-disabled:text-ink-3">{fmt(v)}</Button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mb-1.5 flex items-stretch gap-1.5 md:mb-2">
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-chip border border-line-1 bg-void px-3 md:px-4 md:py-2">
-              <span className="flex min-w-0 items-center gap-1.5 truncate type-label-sm tracking-[0.04em] text-ink-3 md:gap-2 md:tracking-[0.12em]"><Icon name="plasma" size={18} className="shrink-0" />{sectorActive ? <span className="truncate"><span className="hidden md:inline">Sector </span>{sectorActive.label}</span> : "Plasma balls"}</span>
-              <output aria-live="polite" aria-label="Plasma balls loaded" className="type-number text-[30px] font-medium leading-tight text-approach md:text-[40px]">{entry || "0"}</output>
-            </div>
-            {/* phones: Show Me How rides beside the readout, so the dock is one row shorter (the Academy's film is one already) */}
-            {ui.mode !== "academy" && <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson} aria-label="Show Me How"
-              className={`mw-btn min-h-11 shrink-0 border px-3 text-[15px] md:hidden data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2"}`}>
-              <Icon name="help" size={20} />Show me
-            </Button>}
+      <BriefingCard open={briefing} body={ui.planet} name={planetTitle} teaches={PLANET_TEACHES[ui.planet] ?? ""} win={winLine} onLaunch={() => arena?.start()} />
+      {unlock && <UnlockCard open id={unlock.id} name={unlock.name} sector={unlock.sector} onClose={() => setUnlocks((u) => u.slice(1))} />}
+      <OfferCard open={offer} title={ui.offer ? planetName(ui.offer.to) : ""} name={ui.offer ? planetName(ui.offer.to, true) : ""} body={ui.offer?.to ?? null}
+        onJump={() => { const name = ui.offer ? planetName(ui.offer.to, true) : null, to = arena?.acceptJump(); if (to) { setJumping(name); onFly?.(to); } }}
+        onStay={() => arena?.declineJump()} />
+      <ClearCard open={done && !jumping} body={ui.planet} title={clearTitle} orbs={ui.orbs - (firstOrbs ?? ui.orbs)}
+        sub={d?.sub && !/clear$/i.test(d.title) ? d.sub : d?.next && d.next !== ui.planet ? `${planetName(d.next)} is open.` : undefined}
+        actions={d && (doneActions ? <div className="flex flex-wrap justify-center gap-3">{doneActions(d)}</div> : <>
+          {d.next && <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => onFly?.(d.next!)}>Fly to {nextName}</Button>}
+          <div className={css.cardRow}>
+            <Button variant="secondary" size="md" icon="map" onClick={() => leave("/map")}>Star map</Button>
+            <Button variant="secondary" size="md" icon="bay" onClick={() => leave("/bay")}>Resting Bay</Button>
           </div>
-          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
-            {KEYS.map((k) => (
-              <Button key={k} aria-label={k === "⌫" ? "Delete" : k === "Fire" ? (sectorActive ? "Lock sector" : "Fire") : k} disabled={k === "Fire" && (entry === "" || (!sectorActive && !ui.canFire))}
-                className={k === "Fire" ? `${lime} min-h-11 px-2 text-[15px] md:min-h-12` : `${padKey} min-h-11 md:min-h-12`} onClick={() => press(k)}>
-                {k === "Fire" && sectorActive ? "Lock" : k === "⌫" ? <Icon name="delete" size={22} /> : k}
-              </Button>
-            ))}
-          </div>
-          {ui.mode !== "academy" && <Button onClick={() => arena?.showMeHow()} disabled={!ui.canFire || !!ui.lesson}
-            className={`mw-btn mt-2 hidden min-h-11 w-full border text-[15px] md:flex data-disabled:border-line-1 data-disabled:text-ink-3 ${ui.invite ? "border-sky bg-raised text-sky" : "border-line-2 text-ink-2 hover:border-sky hover:text-sky"}`}>
-            Show Me How
-          </Button>}
-          <p aria-hidden={ui.canFire || !!ui.lesson} className={`mt-1 hidden text-center type-body-sm text-ink-3 md:block ${ui.canFire || ui.lesson ? "invisible" : ""}`}>Stand by…</p>
-        </div>
+        </>)} />
+      {jumping && (
+        <div role="status" className="sr-only">Hyper-Jumping to {jumping}</div>
       )}
-
-      {launch && !ui.started && !ui.done && (
-        <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,440px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="type-display text-balance text-[clamp(28px,8vw,36px)]">{ui.planetName}{ui.mode === "practice" ? " · practice" : ""}</p>
-          <p className="type-child text-ink-2">Squads on the scanner, cadet.</p>
-          <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => arena?.start()}>Launch<RocketGlyph size={34} /></Button>
-        </div>
-      )}
-
-      {ui.offer && (
-        <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,420px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="type-child text-[22px]">You are flying like an ace. Hyper-Jump straight to <b className="font-semibold">{ui.offer.name}</b>?</p>
-          <div className="flex gap-3">
-            <Button className={`${lime} px-5 py-3 text-base`} onClick={() => { const name = ui.offer?.name ?? null, to = arena?.acceptJump(); if (to) { setJumping(name); onFly?.(to); } }}><Icon name="jump" size={20} />Hyper-Jump</Button>
-            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => arena?.declineJump()}>Keep flying here</Button>
-          </div>
-        </div>
-      )}
-
-      {jumping && !ui.offer && (
-        <div role="status" className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,420px)] flex-col items-center gap-2 p-6 text-center`}>
-          <Icon name="jump" size={28} className="text-gold" />
-          <p className="type-child text-[22px]">Hyper-Jumping to <b className="font-semibold">{jumping}</b>…</p>
-        </div>
-      )}
-
-      {ui.done && (
-        <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,440px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="type-display text-balance text-[clamp(28px,8vw,36px)]">{ui.done.title}</p>
-          <p className="flex items-center gap-2 type-child text-ink-2">{ui.done.sub} · <Icon name="orb" size={20} className="text-gold" />{ui.orbs} orbs</p>
-          {doneActions ? <div className="flex flex-wrap justify-center gap-3">{doneActions(ui.done)}</div>
-            : ui.done.next && <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => onFly?.(ui.done!.next!)}>Fly to {PLANET_NAMES[ui.done.next]}<RocketGlyph size={34} /></Button>}
-        </div>
-      )}
-    </>
+    </div>
   );
 }
