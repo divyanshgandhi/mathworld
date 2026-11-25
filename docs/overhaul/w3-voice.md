@@ -25,7 +25,7 @@ SAW, in the browser on this track's origin, muted (`mw:mute` = 1), with the stag
 - 1440 x 900: the Captain's danger line is one whole caption; the next line (the teacher) starts after it. In the hangar: `captain_brief1` at 2.0 s, `captain_brief2` "This is your rocket." at 8.0 s, `captain_nova` at 11.5 s, `nova_hi` at 15.5 s, one caption at a time, each whole.
 - 375 x 812: the danger line splits at its sentences ("Deep space is in danger. Earth needs sharp young minds." then "Five cadets start today."), and the teacher follows at 22.5 s. In the hangar `captain_brief2` and `nova_hi` are each one caption.
 - All 131 clips in `vo.json` answer 200. No console errors on the film, a practice battle, the Star map, the Hangar, the Academy or the Resting Bay.
-- `bun run check` green (307 tests).
+- `bun run check` green (307 tests; 308 after merging `overhaul/void-and-gold`). The merge changed no line's words, so nothing was re-baked; the hangar was stepped again after it at 1440 x 900 with the same captions and times and no console errors.
 
 NOT SEEN: the guided first shot in a real first battle (`/play/earth?dev` is a practice battle and shows no guide), so the clip per step is checked by reading the code and by the test that each guide id has a clip, not watched. Nothing was heard. Small phone (360 x 640) and phone landscape were not checked.
 
