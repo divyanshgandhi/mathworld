@@ -144,7 +144,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
     if (open === null) return;
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.getElementById("facts")?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open]")) setOpen(null); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open], [data-slot=dialog-content][data-open], [data-slot=alert-dialog-content][data-open]")) setOpen(null); };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, [open]);

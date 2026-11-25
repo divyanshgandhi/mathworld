@@ -10,7 +10,8 @@ type Key = (typeof KEYS)[number];
 function elsewhere(e: KeyboardEvent, own: HTMLElement | null) {
   const t = e.target as HTMLElement | null;
   if (t?.closest?.("input, textarea, select, [contenteditable='true']")) return true;
-  const modal = [...document.querySelectorAll("dialog[open]")].at(-1);
+  // ui-sdk dialogs are not <dialog> elements: their content carries data-slot and data-open
+  const modal = [...document.querySelectorAll("dialog[open], [data-slot=dialog-content][data-open], [data-slot=alert-dialog-content][data-open]")].at(-1);
   return !!modal && !!own && !modal.contains(own);
 }
 
