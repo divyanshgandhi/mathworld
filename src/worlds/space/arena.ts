@@ -40,7 +40,8 @@ import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
 import { attachTelemetry } from "@/battle/telemetry";
 import { createVoice } from "@/battle/voice";
-import { ERROR_LINE, EXACT_LINE, PLANET_NAMES, unlockLine } from "./lines";
+import { EXACT_LINE, PLANET_NAMES, unlockLine } from "./lines";
+import { pickMissLine } from "@/battle/lines";
 
 /** On-screen height (px) the axis label pills keep, so their words read at about 16 px. */
 const AXIS_PX = 26;
@@ -522,7 +523,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     }
     setUi({ radar: null, invite: route.invite });
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help") : missLine(errorType, over), { queue: route.mash });
+    const line = say(route.mash ? "nova_hold_fire" : route.invite ? (fittingPowerUp() ? "nova_invite_power" : "nova_invite_help") : missLine(errorType, over, n, w), { queue: route.mash });
     const back = sched.after(RESTORE_AT + READY_AFTER);
     climb(line, back);
     await sched.after(RESTORE_AT);
@@ -535,11 +536,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
 
   /** Nova's reaction to a miss she has no hint for yet: the kind of mistake, in the glossary's words. */
-  function missLine(errorType: ReturnType<typeof classifyError>, over: boolean): string {
-    if (errorType === "wild_guess") return "nova_err_way_off";
-    if (errorType === "undershoot_close" || (!errorType && !over)) return "nova_too_few";
-    if (errorType === "overshoot_close" || (!errorType && over)) return "nova_too_many";
-    return ERROR_LINE[errorType!];
+  function missLine(errorType: ReturnType<typeof classifyError>, over: boolean, n: number, w: { a: number; b: number }): string {
+    return pickMissLine(errorType, over, n, w.a, w.b);
   }
 
   /** The colours a ship breaks into: its squad tone and its dark parts. */

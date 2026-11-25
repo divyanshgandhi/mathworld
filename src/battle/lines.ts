@@ -1,4 +1,6 @@
 import { GREETINGS } from "@/teach/greetings";
+import type { ErrorType } from "@/rig/errors";
+import { ERROR_LINE, type LineId } from "@/worlds/space/lines";
 
 /**
  * New battle lines from the combat track (wave 2). Captions first: none is baked yet (OVERHAUL.md,
@@ -31,3 +33,18 @@ export const COMBAT_LINES = {
   "nova_jump_deep-space": "You know these. Jump ahead to Deep Space?",
 } as const;
 export type CombatLineId = keyof typeof COMBAT_LINES;
+
+/**
+ * The line for a miss Nova has no hint for yet. It must be true of the picture (a squad is `b` ships,
+ * there are `a` squads): "One squad off" only when exactly one whole squad is missing or extra, "a hair
+ * off" only when the gap is small next to the fleet. "That added them" is jargon before squads are
+ * explained, so a sum gets the plain too few / too many. A 0 on a full fleet is not close.
+ */
+export function pickMissLine(errorType: ErrorType | null, over: boolean, n: number, a: number, b: number): LineId | CombatLineId {
+  const p = a * b, gap = Math.abs(n - p);
+  if (errorType === "wild_guess") return "nova_err_way_off";
+  if (errorType === "off_by_one_group" && a > 1 && b > 1 && n > 0 && gap === b) return ERROR_LINE.off_by_one_group;
+  if (errorType === "off_by_one_unit" && n > 0 && gap <= Math.max(1, p * 0.25)) return ERROR_LINE.off_by_one_unit;
+  if (errorType === "place_value") return ERROR_LINE.place_value;
+  return over ? "nova_too_many" : "nova_too_few";
+}

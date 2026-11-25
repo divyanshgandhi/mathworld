@@ -8,6 +8,7 @@ import { doubleSide } from "@/battle/powerups/shared";
 import { ORB_RULES, planetClearOrbs, waveClearOrbs } from "@/battle/rewards";
 import { canAim, hintState, initialBattle, MASH_LATENCY_MS, reduce, routeMiss, WILD_WINDOW_MS, type BattleAction, type BattleState } from "@/battle/state";
 import { classifyError } from "@/rig/errors";
+import { pickMissLine } from "@/battle/lines";
 import { PLANETS_BY_TIER } from "@/rig/pools";
 import { CARD, powerUpFits } from "@/rig/tricks";
 import { BATTLE_LINES, POWERUP_LINE } from "@/worlds/space/lines";
@@ -305,5 +306,20 @@ describe("Earth's first waves", () => {
       expect(w2.a * w2.b).toBeGreaterThan(0);
       expect(factKey(w2.a, w2.b)).not.toBe(factKey(w1.a, w1.b));
     }
+  });
+});
+
+describe("miss lines tell the truth about the picture", () => {
+  const line = (a: number, b: number, n: number) => pickMissLine(classifyError(a, b, n), n > a * b, n, a, b);
+  it("says one squad off only for exactly one squad of ships", () => {
+    expect(line(3, 4, 8)).toBe("nova_err_group");
+    expect(line(3, 4, 9)).toBe("nova_too_few"); // 3 got away, a squad is 4
+    expect(line(1, 4, 0)).toBe("nova_too_few"); // nothing fired is not close
+  });
+  it("keeps 'a hair off' for small gaps and plain words for a sum", () => {
+    expect(line(1, 4, 2)).toBe("nova_too_few");
+    expect(line(6, 7, 41)).toBe("nova_err_unit");
+    expect(line(6, 7, 13)).toBe("nova_too_few");
+    expect(line(0, 10, 10)).toBe("nova_too_many");
   });
 });
