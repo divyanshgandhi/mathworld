@@ -173,7 +173,7 @@ export function canvasTexture(w: number, h: number) {
 }
 
 /** Draws text centred in a box, shrinking the font until it fits with a margin. Signs never clip. */
-export function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, maxW: number, maxPx: number, weight = "bold", family = "Georgia, 'Times New Roman', serif") {
+export function fitText(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, maxW: number, maxPx: number, weight = "bold", family = "Saira, sans-serif") {
   let px = maxPx;
   do { ctx.font = `${weight} ${px}px ${family}`; px -= 2; } while (ctx.measureText(text).width > maxW && px > 8);
   ctx.textAlign = "center";

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { COLOR, INK, MASTERY } from "@/design/tokens";
 import { add, canvasTexture, fitText, outline } from "@/engine/materials";
 import type { Stage } from "@/engine/stage";
 import { seeded } from "@/engine/util";
@@ -14,11 +15,19 @@ import { makeBody, starfield } from "./planets";
  * holds the collected Trick Cards and the Quick Flashcards deck. Nova idles by the desk.
  * The HUD pins its buttons to `anchor(id)`: door:*, poster:1…10, desk:cards, desk:deck.
  */
+/** A token colour laid over the void at strength `t`, as a CSS hex string (works on canvas and in CSS). */
+function over(c: string, t: number): string {
+  const a = parseInt(COLOR.void.slice(1), 16), b = parseInt(c.slice(1), 16);
+  const ch = (s: number) => Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * t);
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, "0")}`;
+}
+
+/** Bay posters use the mastery colours (Gold, Got it, Learning, New), so the 2D marks and the 3D posters agree. */
 export const BAND_COLOURS: Record<Band, { bg: string; ink: string; edge: string }> = {
-  unseen: { bg: "#232a40", ink: "#7c86a8", edge: "#3a4260" },
-  practicing: { bg: "#0e4a6b", ink: "#bae6fd", edge: "#38bdf8" },
-  understood: { bg: "#0b5a45", ink: "#bbf7d0", edge: "#34d399" },
-  gold: { bg: "#6b4a06", ink: "#fef3c7", edge: "#fbbf24" },
+  unseen: { bg: COLOR.panel, ink: INK[3], edge: COLOR.horizon },
+  practicing: { bg: over(MASTERY.learn.color, 0.16), ink: MASTERY.learn.color, edge: MASTERY.learn.color },
+  understood: { bg: over(MASTERY.got.color, 0.12), ink: MASTERY.got.color, edge: MASTERY.got.color },
+  gold: { bg: over(MASTERY.gold.color, 0.16), ink: MASTERY.gold.color, edge: MASTERY.gold.color },
 };
 
 const W = 15, D = 10, HGT = 5.6; // room: x −7.5…7.5, z −6…4, floor at 0
@@ -31,7 +40,7 @@ function sign(text: string, w: number, h: number, colour = "#d9f99d") {
   ctx.fillStyle = "#0b0f1f"; ctx.beginPath(); ctx.roundRect(0, 0, c.width, c.height, 18); ctx.fill();
   ctx.strokeStyle = colour; ctx.lineWidth = 6; ctx.beginPath(); ctx.roundRect(6, 6, c.width - 12, c.height - 12, 14); ctx.stroke();
   ctx.fillStyle = colour;
-  fitText(ctx, text, c.width / 2, c.height / 2 + 2, c.width - 50, c.height * 0.5, "800", "ui-monospace, monospace");
+  fitText(ctx, text, c.width / 2, c.height / 2 + 2, c.width - 50, c.height * 0.5, "800", "Saira, sans-serif");
   texture.needsUpdate = true;
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: texture, emissive: 0xffffff, emissiveMap: texture, emissiveIntensity: 0.55, roughness: 0.6 }));
 }
@@ -42,13 +51,13 @@ function drawPoster(ctx: CanvasRenderingContext2D, p: Poster) {
   ctx.fillStyle = "#0b0f1f"; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = frame.edge; ctx.fillRect(0, 0, w, 10); ctx.fillRect(0, h - 10, w, 10); ctx.fillRect(0, 0, 10, h); ctx.fillRect(w - 10, 0, 10, h);
   ctx.fillStyle = frame.edge;
-  fitText(ctx, `×${p.table}`, w / 2, 52, w - 40, 64, "800", "ui-monospace, monospace");
+  fitText(ctx, `×${p.table}`, w / 2, 52, w - 40, 64, "800", "Saira, sans-serif");
   const top = 100, rowH = (h - top - 22) / 10;
   p.cells.forEach((cell, i) => {
     const col = BAND_COLOURS[cell.band], y = top + i * rowH;
     ctx.fillStyle = col.bg; ctx.beginPath(); ctx.roundRect(20, y + 3, w - 40, rowH - 6, 8); ctx.fill();
     ctx.fillStyle = col.ink;
-    fitText(ctx, `${p.table} × ${cell.n} = ${p.table * cell.n}`, w / 2, y + rowH / 2 + 1, w - 60, rowH * 0.62, "700", "ui-monospace, monospace");
+    fitText(ctx, `${p.table} × ${cell.n} = ${p.table * cell.n}`, w / 2, y + rowH / 2 + 1, w - 60, rowH * 0.62, "700", "Saira, sans-serif");
   });
 }
 

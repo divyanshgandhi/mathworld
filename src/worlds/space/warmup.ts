@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { COLOR, hex } from "@/design/tokens";
 import { audio } from "@/engine/audio";
 import type { Stage } from "@/engine/stage";
 import { ease, seeded } from "@/engine/util";
@@ -16,7 +17,7 @@ interface Drone { g: THREE.Group; home: THREE.Vector3; pos: THREE.Vector3; alive
 export function mountWarmup(stage: Stage, planet: "mercury" | "venus", style: { hull?: string; thruster?: string; blaster?: string } = {}) {
   const { scene, camera, mats: M } = stage, rnd = seeded(13), root = new THREE.Group();
   scene.add(root);
-  scene.background = new THREE.Color(0x030612);
+  scene.background = new THREE.Color(hex(COLOR.void));
   scene.fog = null;
   Object.assign(stage.bloom, { strength: 0.12, radius: 0.2, threshold: 1.4 });
   stage.renderer.toneMappingExposure = 1;

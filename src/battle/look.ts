@@ -1,3 +1,5 @@
+import { COLOR, hex } from "@/design/tokens";
+
 /**
  * The battle's current look, in one place. These are the exact values the battle drew before the
  * engine split (wave 1 changes no visuals), gathered here so the battle restyle (wave 2) swaps one
@@ -5,14 +7,15 @@
  * Nothing else under `src/battle/` writes a raw colour.
  */
 export const LOOK = {
-  scene: { background: 0x030612, far: 3000, exposure: 1.0, bloom: { strength: 0.12, radius: 0.2, threshold: 1.4 } },
+  // the one void behind every screen (tokens.ts), so the route fade and the battle share a ground
+  scene: { background: hex(COLOR.void), far: 3000, exposure: 1.0, bloom: { strength: 0.12, radius: 0.2, threshold: 1.4 } },
   light: {
     key: { color: 0xfff1dc, intensity: 1.6 },
     rim: { color: 0x7dfcff, intensity: 0.9 },
     fill: { sky: 0xc8d8ff, ground: 0x1a2244, intensity: 0.85 },
   },
   /** World labels (the holo component). */
-  holo: { ink: "#d9f99d", bg: "rgba(11,13,26,0.72)", font: "ui-sans-serif, system-ui, sans-serif", weight: "700", pxH: 96 },
+  holo: { ink: "#d9f99d", bg: "rgba(11,13,26,0.72)", font: "Saira, ui-sans-serif, system-ui, sans-serif", weight: "600", pxH: 96 },
   /** Label inks on the fleet. */
   ink: { gold: "#fde68a", cyan: "#a5f3fc", amber: "#fcd34d", coral: "#ff8f70" },
   /** Plates behind groups of ships. */
