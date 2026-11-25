@@ -241,7 +241,8 @@ What I infer, not saw:
 - **front:**
   - on the bay, a first-visit Nova line without "Welcome back";
   - mount the greeting and the manual as above;
-  - the kit could take `ShipSprite` if other screens want it.
+  - the kit could take `ShipSprite` if other screens want it;
+  - the kit's `orb` icon is a ring with a filled core, which reads as the Gold bullseye (decision 8 says an orb is a gold ring with a count). The manual draws its own orb as a ring with the count inside until the kit changes.
 - **economy:** the Hangar's 13 px "Earn Orbs…" note should be child size and say "orbs". Flashcards should stop showing "+N orbs" (decision 5).
 - **places:** shorten the Academy's 26-word intro; the greeting covers it.
 
