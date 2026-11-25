@@ -317,7 +317,10 @@
   overscroll-behavior: contain;
 }
 .mwc-sectors::-webkit-scrollbar { display: none; }
-.mwc-sectorCount { flex: none; padding: 0 4px; font-size: 16px; color: var(--color-ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mwc-sectorCount { position: sticky; left: 0; z-index: 1; flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 10px 0 4px; background: var(--color-void); font-size: 16px; color: var(--color-ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* on phones the slot is too narrow to keep the count beside the chips: it moves under the question */
+.mwc-console:not([data-layout="strip"]) .mwc-sectorCount { display: none; }
+.mwc-console[data-layout="strip"] .mwc-slots:has(.mwc-sectors) { justify-content: flex-start; }
 .mwc-sector {
   flex: none;
   min-height: 44px;

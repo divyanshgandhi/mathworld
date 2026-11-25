@@ -53,6 +53,8 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest?.("input, textarea, [contenteditable]")) return;
+      // Enter on a focused button presses that button; it must not also fire
+      if (e.key === "Enter" && t?.closest?.("button, a")) return;
       // a card or the pause menu is up (the X-Ray is a drawer, not a dialog: typing goes on behind it)
       if (document.querySelector(CARD_OPEN)) return;
       if (/^\d$/.test(e.key)) { press(e.key); return; }
@@ -65,12 +67,15 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
   return { entry, press, set };
 }
 
+/** A press with the mouse or a finger leaves focus on the game, so Enter still fires and digits still type. */
+const keep = (e: React.MouseEvent) => e.preventDefault();
+
 /** One Power-Up (or empty) slot: a round labelled button, the glyph inside, the name under it where there is room. */
 export function Slot({ label, glyph, onPress, disabled, pressed, pulse }: {
   label: string; glyph: ReactNode; onPress: () => void; disabled?: boolean; pressed?: boolean; pulse?: boolean;
 }) {
   return (
-    <Button className={css.slot} aria-label={`Power-Up ${label}`} title={label} aria-pressed={pressed} disabled={disabled} onClick={onPress}>
+    <Button className={css.slot} onMouseDown={keep} aria-label={`Power-Up ${label}`} title={label} aria-pressed={pressed} disabled={disabled} onClick={onPress}>
       <span className={css.ring}>{glyph}{pulse && !disabled && <span className={css.orbit} aria-hidden />}</span>
       <span className={css.slotName} aria-hidden>{label}</span>
     </Button>
@@ -107,13 +112,13 @@ export function Console({ layout, entry, live, fireWord = "Fire", onKey, slots, 
       <div className={css.grid} data-guide="keypad">
         <div className={css.slots} data-guide="powerups">{slots}</div>
         {DIGITS.map((d) => (
-          <Button key={d} className={css.key} style={{ gridArea: `k${d}` }} aria-label={d} disabled={!live} data-key={d}
+          <Button key={d} className={css.key} onMouseDown={keep} style={{ gridArea: `k${d}` }} aria-label={d} disabled={!live} data-key={d}
             onClick={() => onKey(d)}>{d}</Button>
         ))}
-        <Button className={css.key} style={{ gridArea: "del" }} aria-label="Delete" disabled={!live || entry === ""} onClick={() => onKey("del")}>
+        <Button className={css.key} onMouseDown={keep} style={{ gridArea: "del" }} aria-label="Delete" disabled={!live || entry === ""} onClick={() => onKey("del")}>
           <Icon name="delete" size={22} />
         </Button>
-        <Button className={`mw-btn mw-primary ${css.fire}`} data-guide="fire" data-armed={loaded || undefined} disabled={!loaded}
+        <Button className={`mw-btn mw-primary ${css.fire}`} onMouseDown={keep} data-guide="fire" data-armed={loaded || undefined} disabled={!loaded}
           aria-label={n === null ? fireWord : `${fireWord} ${fmtN(n)}`} onClick={() => onKey("fire")}>
           <span className={css.fireWord}>{fireWord}</span>
           <span className={css.fireGlyph}><RocketGlyph size={30} /></span>
@@ -122,7 +127,7 @@ export function Console({ layout, entry, live, fireWord = "Fire", onKey, slots, 
         {help === null || help === undefined ? (
           <span className={css.help} data-quiet aria-hidden />
         ) : (
-          <Button className={css.help} data-guide="help" disabled={help.disabled} data-invite={help.invite || undefined} aria-label="Show me how" title="Show me how" onClick={help.onPress}>
+          <Button className={css.help} onMouseDown={keep} data-guide="help" disabled={help.disabled} data-invite={help.invite || undefined} aria-label="Show me how" title="Show me how" onClick={help.onPress}>
             <span className={css.ring}><NovaPortrait size={layout === "strip" ? 40 : 30} /></span>
             <span className={css.helpWords}>Show me how</span>
           </Button>

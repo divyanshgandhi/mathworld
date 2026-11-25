@@ -1,33 +1,46 @@
 "use client";
-import { Button } from "@ui-sdk/react/button";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { EventInput } from "@/db/events";
 import type { PlayerState } from "@/director/fold";
 import { seeded } from "@/engine/util";
 import { flushed } from "@/engine/outbox";
 import { warmupRun, WARMUP_LENGTH, WARMUP_OF } from "@/rig/warmup";
 import type { Warmup } from "@/worlds/space/warmup";
-import { PauseMenu } from "./battle/PauseMenu";
-import { ghost, glass, Keypad, lime } from "./battle/ui";
-import { Icon, RocketGlyph } from "./kit/Icon";
+import { BriefingCard, ClearCard, PLANET_TEACHES } from "./battle/Cards";
+import { missLine, useCockpitSafe, type Safe } from "./battle/BattleHud";
+import { Console, EmptySlot, useEntry } from "./battle/Console";
+import { useConsoleLayout, useReducedMotion } from "./battle/layout";
+import { MissionStrip, useOrbReward } from "./battle/MissionStrip";
+import { PauseMenu, usePauseWhenHidden } from "./battle/PauseMenu";
+import { hold } from "./battle/pause";
+import { css } from "./battle/cockpit";
+import { Button } from "./kit/Button";
+import { Icon } from "./kit/Icon";
 import { useCadet } from "./hub/useCadet";
 import { useScene } from "./hub/Scene";
 
 const NAME = { mercury: "Mercury", venus: "Venus" } as const;
+const DRONES = { one: "drone", many: "drones" };
 
 /**
- * Mercury (addition) and Venus (subtraction) warm-ups, up to 20: five quick sums on the battle
- * stage and keypad. Each answer appends `warmup_answered`; a first-try answer earns an Orb.
+ * Mercury (adding) and Venus (taking away) warm-ups, up to 20: five quick sums on the battle stage,
+ * with the battle's own cockpit (the mission strip and the console). Each answer appends
+ * `warmup_answered`; a first-try answer earns an orb.
  */
 export function WarmupDrill({ planet }: { planet: "mercury" | "venus" }) {
   const cadet = useCadet();
-  if (!cadet.state) return <div className="fixed inset-0 bg-void" />;
+  if (!cadet.state) return <div className={css.root} />;
   return <Drill planet={planet} state={cadet.state} emit={cadet.emit} />;
 }
 
 function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: PlayerState; emit: (e: EventInput) => void }) {
   const router = useRouter();
+  const layout = useConsoleLayout();
+  const reduced = useReducedMotion();
+  const paused = useSyncExternalStore(hold.subscribe, () => hold.has("menu"), () => false);
+  usePauseWhenHidden();
+  useEffect(() => () => hold.clear(), []);
   const op = WARMUP_OF[planet];
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e6));
   const run = useMemo(() => warmupRun(op, seeded(seed + 1)), [op, seed]);
@@ -42,9 +55,11 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
   const [tries, setTries] = useState(0);
   const [outcome, setOutcome] = useState<{ kind: "exact" | "under" | "over"; value: number } | null>(null);
   const [score, setScore] = useState(0);
+  const [startOrbs] = useState(state.orbs);
   const shown = useRef(0);
-  const dock = useRef<HTMLDivElement>(null), plate = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null), conRef = useRef<HTMLDivElement>(null), orbsRef = useRef<HTMLDivElement>(null), rootRef = useRef<HTMLDivElement>(null);
   const p = run[i];
+  const done = i >= WARMUP_LENGTH;
 
   const start = async () => {
     const { audio } = await import("@/engine/audio");
@@ -62,16 +77,10 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
     return () => window.clearTimeout(t);
   }, [drill, started, p]);
 
-  useEffect(() => {
-    if (!drill) return;
-    const measure = () => {
-      const phone = window.innerWidth < 768, d = dock.current?.getBoundingClientRect(), pl = plate.current?.getBoundingClientRect();
-      (drill as Warmup).setSafe({ top: (pl?.bottom ?? 130) + 40, right: !phone && d ? window.innerWidth - d.left + 8 : 0, bottom: phone && d ? window.innerHeight - d.top + 4 : 0 });
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [drill, started, i]);
+  const apply = useMemo(() => drill ? (s: Omit<Safe, "left">) => (drill as Warmup).setSafe(s) : null, [drill]);
+  const centre = useCockpitSafe(layout, stripRef, conRef, apply);
+  const cardOpen = !started || done;
+  useEffect(() => { if (!cardOpen && !paused) rootRef.current?.focus({ preventScroll: true }); }, [cardOpen, paused]);
 
   const fire = async (n: number) => {
     if (!drill || !ready || !p) return;
@@ -92,54 +101,41 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
     shown.current = performance.now();
     setReady(true);
   };
+  const live = started && !done && ready && !paused;
+  const { entry, press, set } = useEntry({ maxDigits: 3, live, onFire: (n) => { void fire(n); } });
+  useEffect(() => { set(""); }, [i, set]);
+  const orbs = useOrbReward(state.orbs, orbsRef, centre, { reduced, still: cardOpen });
 
-  const sign = op === "add" ? "+" : "−", done = i >= WARMUP_LENGTH;
+  const sign = op === "add" ? "+" : "−";
+  let lineA: ReactNode = null;
+  if (outcome?.kind === "exact") lineA = <span className={css.exact}><Icon name="check" size={20} className={css.icon} />Exactly right{tries === 0 ? <> · <b>+1</b> orb</> : null}</span>;
+  else if (outcome) lineA = <span className={css.miss}>{missLine(outcome.kind, outcome.value, DRONES)}</span>;
+  const lineB: ReactNode = p && !done ? (op === "add"
+    ? <><b>{p.a}</b> {p.a === 1 ? "drone" : "drones"}, and <b>{p.b}</b> more {p.b === 1 ? "flies" : "fly"} in</>
+    : <><b>{p.a}</b> {p.a === 1 ? "drone" : "drones"}, and <b>{p.b}</b> {p.b === 1 ? "flies" : "fly"} away</>) : null;
+
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
+    <div ref={rootRef} className={css.root} data-cockpit tabIndex={-1} inputMode="none">
       <div ref={box} className="absolute inset-0" />
-      <div className="absolute left-3 top-3 z-20"><PauseMenu label="Warm-up paused" /></div>
-      <div className="pointer-events-none absolute right-16 top-3 z-10 hidden h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px] md:flex"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
+      <MissionStrip layout={layout} stripRef={stripRef} orbsRef={orbsRef} orbs={orbs}
+        menu={<PauseMenu label="Paused" />}
+        dots={started ? { total: WARMUP_LENGTH, won: Math.min(i, WARMUP_LENGTH), current: !done } : null}
+        question={started && p && !done ? { a: p.a, b: p.b, op: sign } : null}
+        lines={[lineA, lineB]} />
+      <Console layout={layout} consoleRef={conRef} entry={entry} live={live} onKey={press} help={null}
+        slots={<><EmptySlot /><EmptySlot /><EmptySlot /></>} />
+      <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${entry} plasma balls loaded`}</p>
 
-      {started && p && !done && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">
-          <div ref={plate} className={`${glass} px-6 py-2 text-center md:px-8 md:py-3`} aria-live="polite">
-            <p className="type-label-sm tracking-[0.08em] text-ink-2 md:tracking-[0.16em]">{NAME[planet]} · warm-up {i + 1} of {WARMUP_LENGTH}</p>
-            <p className="mt-1 type-display type-number text-5xl md:mt-2 md:text-7xl">{p.a}<span className="mx-3 text-ink-3">{sign}</span>{p.b}</p>
-            <p className="mt-1.5 type-body-sm text-ink-2">{op === "add" ? <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> more arrive</> : <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> fly away</>}</p>
+      <BriefingCard open={!started} body={planet} name={NAME[planet]} teaches={PLANET_TEACHES[planet]} win="Five quick ones." onLaunch={() => void start()} />
+      <ClearCard open={done} body={planet} title="Warm-up done" orbs={state.orbs - startOrbs}
+        sub={`${score} of ${WARMUP_LENGTH} on the first try.`}
+        actions={<>
+          <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>
+          <div className={css.cardRow}>
+            <Button variant="secondary" size="md" icon="play" onClick={() => { setSeed((x) => x + 7); setI(0); setScore(0); setOutcome(null); }}>Again</Button>
+            <Button variant="secondary" size="md" icon="bay" onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
           </div>
-          {outcome && (
-            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number text-lg ${outcome.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}>
-              {outcome.kind === "exact" && <Icon name="check" size={20} />}{outcome.kind === "exact" ? "Dead on" : outcome.kind === "under" ? `${outcome.value} still flying` : `+${outcome.value} flew past`}
-            </div>
-          )}
-        </div>
-      )}
-
-      {started && !done && (
-        <div ref={dock} className={`${glass} absolute bottom-2 left-1/2 z-10 w-[min(96vw,340px)] -translate-x-1/2 p-2.5 md:bottom-auto md:left-auto md:right-5 md:top-1/2 md:w-[300px] md:-translate-y-1/2 md:translate-x-0 md:p-3`}>
-          <Keypad onFire={(n) => void fire(n)} disabled={!ready} />
-        </div>
-      )}
-
-      {!started && (
-        <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-fit flex-col items-center gap-3 p-6 text-center`}>
-          <p className="type-display text-4xl">{NAME[planet]}</p>
-          <p className="type-label-sm text-ink-2">{op === "add" ? "Addition" : "Subtraction"} warm-up</p>
-          <p className="type-child text-ink-2">Five quick ones, up to 20.</p>
-          <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => void start()}>Launch (sound on)<RocketGlyph size={34} /></Button>
-        </div>
-      )}
-      {done && (
-        <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,420px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="type-label-sm text-ink-2">{NAME[planet]}</p>
-          <p className="type-display text-4xl">Warm-up done</p>
-          <p className="flex items-center gap-2 type-child text-ink-2">{score} of {WARMUP_LENGTH} first try · <Icon name="orb" size={20} className="text-gold" />{state.orbs} orbs</p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>
-            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => { setSeed((x) => x + 7); setI(0); setScore(0); setOutcome(null); }}>Again</Button>
-          </div>
-        </div>
-      )}
+        </>} />
     </div>
   );
 }

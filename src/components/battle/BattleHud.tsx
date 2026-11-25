@@ -205,6 +205,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       lineA = <span className={o.last ? css.last : css.miss}>{missLine(o.kind, n, noun)}</span>;
     }
   } else if (w && ui.mode !== "academy" && BONUS.has(w.role) && ui.mode !== "practice") lineA = <span className={css.soft}>Bonus wave</span>;
+  if (ui.sectors && layout !== "strip" && !lesson) lineB = <span><b>{ui.sectors.filter((s) => s.value !== null).length}</b> of {ui.sectors.length} sectors locked</span>;
   if (ui.lockTotal !== null && ui.sectors) lineB = <span className={css.exact}>{ui.sectors.map((s) => fmtN(s.value ?? 0)).join(" + ")} = <b>{fmtN(ui.lockTotal)}</b></span>;
 
   // ---- the Power-Up slots: only the ones that fit this fleet, at most three, in belt order ----
@@ -216,7 +217,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
     <div className={css.sectors} role="group" aria-label="Sectors">
       <span className={css.sectorCount}>{ui.sectors.filter((s) => s.value !== null).length} of {ui.sectors.length} locked</span>
       {ui.sectors.map((s) => (
-        <button key={s.i} type="button" className={css.sector} data-active={s.active || undefined} data-locked={s.value !== null || undefined}
+        <button key={s.i} type="button" className={css.sector} onMouseDown={(e) => e.preventDefault()} data-active={s.active || undefined} data-locked={s.value !== null || undefined}
           disabled={s.value !== null || !live} aria-label={`Sector ${s.label}`} aria-pressed={s.active}
           ref={s.active ? (el) => el?.scrollIntoView?.({ block: "nearest", inline: "nearest" }) : undefined}
           onClick={() => { arena?.selectSector(s.i); set(""); }}>
