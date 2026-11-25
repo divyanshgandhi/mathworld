@@ -140,12 +140,13 @@ describe("fold", () => {
 });
 
 describe("scaffolding", () => {
-  it("escalates gently: nudge, Radar when way off, invite, then Show Me How", () => {
-    expect(scaffold(1, 7, 8, 54)).toMatchObject({ nudge: true, radar: false, showMeHow: false });
-    expect(scaffold(1, 7, 8, 9)).toMatchObject({ radar: true });
-    expect(scaffold(2, 7, 8, 54)).toMatchObject({ radar: true, invite: true });
-    expect(scaffold(3, 7, 8, 54)).toMatchObject({ showMeHow: true });
-    expect(scaffold(0, 7, 8, 0, 11_000).radar).toBe(true);
+  it("escalates gently: nudge, then the invite and Radar on miss 2, then Show Me How", () => {
+    expect(scaffold(1)).toMatchObject({ nudge: true, radar: false, showMeHow: false });
+    // way off on the first miss is answered in the world, not with four answers to pick from
+    expect(scaffold(1)).toMatchObject({ radar: false });
+    expect(scaffold(2)).toMatchObject({ radar: true, invite: true });
+    expect(scaffold(3)).toMatchObject({ showMeHow: true });
+    expect(scaffold(0).radar).toBe(false);
   });
 });
 

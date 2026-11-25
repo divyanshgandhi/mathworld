@@ -15,13 +15,14 @@ export const LOOK = {
     fill: { sky: 0xc8d8ff, ground: 0x1a2244, intensity: 0.85 },
   },
   /** World labels (the holo component). */
-  holo: { ink: "#d9f99d", bg: "rgba(11,13,26,0.72)", font: "Saira, ui-sans-serif, system-ui, sans-serif", weight: "600", pxH: 96 },
+  holo: { ink: COLOR.sky, bg: "rgba(7,7,10,0.78)", font: "Saira, ui-sans-serif, system-ui, sans-serif", weight: "600", pxH: 96 },
   /** Label inks on the fleet. */
   ink: { gold: "#fde68a", cyan: "#a5f3fc", amber: "#fcd34d", coral: "#ff8f70" },
   /** Plates behind groups of ships. */
-  tone: { cyan: 0x2fb7d6, amber: 0xf0a13a, gold: 0xf2c14e, coral: 0xff8f70, lime: 0xbef264 },
+  // `lime` is kept as a key for callers; it now draws in the cool sky of the hint colour
+  tone: { cyan: 0x2fb7d6, amber: 0xf0a13a, gold: 0xf2c14e, coral: 0xff8f70, lime: hex(COLOR.sky) },
   plate: { opacity: 0.26, edge: 0.9, active: 0.42 },
-  bracket: { color: 0xbef264, emissive: 0.25 },
+  bracket: { color: hex(COLOR.sky) },
   rail: 0x3b4470,
   ghost: { color: 0x9fe8ff, fill: 0.12, outlineFill: 0.08 },
   laser: { color: 0xffd36b, intensity: 1.1 },

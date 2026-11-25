@@ -26,11 +26,12 @@ export function measure(fv: FleetView) {
 }
 
 /** The box to frame (battle-local units): the fleet and rocket, or in a lesson the fleet and Nova. */
-export function frameBox(m: { w: number; h: number; bottom: number }, lessonOn: boolean, nova: { to: number; y: number }) {
+export function frameBox(m: { w: number; h: number; bottom: number }, lessonOn: boolean, nova: { to: number; y: number }, pad = { left: 2.4, top: 1.0 }) {
   // a lesson pushes the camera in: frame the fleet and Nova, leave the rocket at the bottom edge
-  // (the bottom keeps room for Nova's caption, which floats over the rocket's place)
-  const ymin = lessonOn ? m.bottom - 1.9 : m.bottom - 2.9, xmax = m.w / 2 + 0.5;
-  let ymax = FLEET_Y + m.h / 2 + 1.0, xmin = -m.w / 2 - 2.4;
+  // (the bottom keeps room for Nova's caption, which floats over the rocket's place).
+  // `pad`: how far the axis labels reach left of and above the fleet.
+  const ymin = lessonOn ? m.bottom - 1.9 : m.bottom - 3.9, xmax = m.w / 2 + 0.5;
+  let ymax = FLEET_Y + m.h / 2 + pad.top, xmin = -m.w / 2 - pad.left;
   if (lessonOn) { xmin = Math.min(xmin, nova.to - 1.5); ymax = Math.max(ymax, nova.y + 1.1); }
   return { xmin, xmax, ymin, ymax };
 }
@@ -53,6 +54,11 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       camera.position.copy(camPos);
       camera.lookAt(camLook);
       camera.setViewOffset(W, H, W / 2 - (safe.left + fwPx / 2), H / 2 - (safe.top + fhPx / 2), W, H);
+    },
+    /** Screen px per world unit on the fleet's plane, as framed right now. */
+    pxPerUnit() {
+      const d = camPos.z - origin.z, H = canvas.clientHeight || 1;
+      return d > 0 ? H / (2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) : 0;
     },
     dispose() { camera.clearViewOffset(); },
   };

@@ -70,7 +70,7 @@ export function CadetSignUp({ onDone, cta = "Start" }: { onDone: (p: Cadet) => v
 
 const PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
 /** A keypad key: a chip-radius hairline key, big equal-width digits. */
-export const padKey = "mw-btn mw-secondary min-h-12 rounded-chip px-0 type-number text-[22px] font-medium";
+export const padKey = "mw-btn mw-secondary rounded-chip px-0 type-number text-[22px] font-medium";
 
 /**
  * The cockpit keypad on its own (warm-ups, Quick Flashcards): a readout and twelve keys, with the
@@ -108,7 +108,7 @@ export function Keypad({ onFire, disabled = false, label = "Plasma balls", fire 
       <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Keypad">
         {PAD.map((k) => (
           <Button key={k} aria-label={k === "⌫" ? "Delete" : k === "Fire" ? fire : k} disabled={k === "Fire" && (entry === "" || disabled)}
-            className={k === "Fire" ? `${lime} min-h-12 px-2 text-[15px]` : padKey} onClick={() => press(k)}>
+            className={k === "Fire" ? `${lime} min-h-12 px-2 text-[15px]` : `${padKey} min-h-12`} onClick={() => press(k)}>
             {k === "Fire" ? fire : k === "⌫" ? <Icon name="delete" size={22} /> : k}
           </Button>
         ))}

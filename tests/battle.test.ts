@@ -85,17 +85,17 @@ describe("battle phase machine", () => {
     expect(w.hint.level).toBe(0);
   });
 
-  it("misses follow scaffold(): Radar when way off or on miss 2, invite on miss 2, Show Me How on miss 3", () => {
+  it("misses follow scaffold(): Radar and invite on miss 2, Show Me How on miss 3", () => {
     let s = shot(aiming(3, 8), 23); // close
     expect(s.lastMiss).toEqual({ kind: "react", mash: false, radar: false, invite: false });
-    s = shot(aiming(3, 8), 2); // way off
-    expect(s.lastMiss).toMatchObject({ kind: "react", radar: true, invite: false });
+    s = shot(aiming(3, 8), 2); // way off: still no Radar on the first miss
+    expect(s.lastMiss).toMatchObject({ kind: "react", radar: false, invite: false });
     s = shot(reduce(shot(aiming(3, 8), 23), { type: "ready" }), 22);
     expect(s.lastMiss).toMatchObject({ kind: "react", radar: true, invite: true });
     s = shot(reduce(s, { type: "ready" }), 21);
     expect(s.lastMiss?.kind).toBe("show-me-how");
     for (let misses = 1; misses <= 5; misses++) {
-      const sc = scaffold(misses, 3, 8, 20);
+      const sc = scaffold(misses);
       const r = routeMiss({ ...aiming(3, 8), attempts: misses }, 3, 8, 20, false, 2);
       if (sc.showMeHow) expect(r.kind).toBe("show-me-how");
       else expect(r).toMatchObject({ kind: "react", radar: sc.radar, invite: sc.invite });
@@ -169,7 +169,7 @@ describe("hint ladder", () => {
 
   it("agrees with scaffold(): the invite on miss 2 and Show Me How on miss 3", () => {
     for (const r of LADDER) {
-      const sc = scaffold(r.misses, 3, 8, 20);
+      const sc = scaffold(r.misses);
       expect(sc.showMeHow).toBe(r.showMeHow);
       if (r.flagPowerUp && !r.showMeHow) expect(sc.invite).toBe(true);
     }

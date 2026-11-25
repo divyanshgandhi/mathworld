@@ -1,7 +1,6 @@
 import type { EventInput } from "@/db/events";
 import { seeded, type Rng } from "@/engine/util";
 import { GOLD_STREAK_FOR_JUMP, M0 } from "@/rig/adaptive";
-import { isWayOff } from "@/rig/errors";
 import { drawFrom, ENUMERABLE_TIERS, factKey, factsOf, MAX_TIER, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
 import { placeParts, selectTrick, type TrickId } from "@/rig/tricks";
 import type { PlayerState, WaveRole } from "./fold";
@@ -146,14 +145,16 @@ export function acceptHyperJump(s: PlayerState): Extract<EventInput, { type: "hy
 }
 
 /**
- * Scaffolding after a miss (SPEC 4.2): a close miss keeps free input open with a one-line nudge;
- * way off brings in the 4-choice Radar; a second miss invites a Power-Up, Radar or Show Me How;
- * a third miss starts Show Me How.
+ * Scaffolding after a miss (SPEC 4.2, tightened by the overhaul's hint ladder): the first miss is
+ * answered in the world and by Nova, with free input still open; a second miss invites a Power-Up,
+ * the 4-choice Radar or Show Me How; a third miss starts Show Me How. The Radar never comes unasked
+ * before that: four numbers on the first miss, or after a quiet spell, would turn the shot into
+ * multiple choice and hand a known fact a hint it did not need.
  */
-export function scaffold(misses: number, a: number, b: number, lastGuess: number, idleMs = 0) {
+export function scaffold(misses: number) {
   return {
     nudge: misses >= 1,
-    radar: (misses === 1 && isWayOff(a, b, lastGuess)) || misses >= 2 || idleMs > 10_000,
+    radar: misses >= 2,
     invite: misses === 2,
     showMeHow: misses >= 3,
   };

@@ -23,6 +23,8 @@ export interface ShipView {
 export const CELL = 1.0, BIG = 2.4, GAP = 0.16, GUTTER = 0.75, PITCH = CELL + GAP;
 /** The fleet's centre height above the battle origin. */
 export const FLEET_Y = 4.2;
+/** The axis labels' base world height (the battle raises it on small screens so the words stay readable). */
+export const AXIS_H = 0.5;
 export const fmt = (n: number) => n.toLocaleString("en-US");
 /** How an axis label shows: fully, softly (an unprompted first-sight hint), or not yet. */
 export type AxisShow = "on" | "soft" | "off";
@@ -74,7 +76,11 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       fv.fleet = f;
       const lite = f.ships.length > 140;
       const colW = f.colParts.map((c) => { const k = String(c).length - 1, d = c / 10 ** k, w = k === 0 ? CELL : BIG; return { d, w, span: d * w + (d - 1) * GAP }; });
-      const rowH = f.rowParts.map((r) => { const k = String(r).length - 1, d = r / 10 ** k, h = k === 0 ? CELL : BIG; return { d, h, span: d * h + (d - 1) * GAP }; });
+      // 10 × b (b under 10): the tens come from the squads, so each "pod" is one ship from each of ten
+      // squads. A ten-frame tray would read as b groups of 10; instead each pod is drawn as a column
+      // of ten ships, so the fleet is ten true rows of b, exactly like 9 × b one row shorter.
+      const tenColumn = a === 10 && b > 0 && b < 10, TEN_H = 10 * CELL + 9 * GAP;
+      const rowH = f.rowParts.map((r) => { const k = String(r).length - 1, d = r / 10 ** k, h = tenColumn ? TEN_H : k === 0 ? CELL : BIG; return { d, h, span: d * h + (d - 1) * GAP }; });
       const colX: number[] = [], rowY: number[] = [];
       colW.reduce((x, c, i) => { colX[i] = x; return x + c.span + GUTTER; }, 0);
       rowH.reduce((y, r, i) => { rowY[i] = y; return y + r.span + GUTTER; }, 0);
@@ -102,6 +108,19 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
         const style = squadStyle(v.gRow, v.gCol);
         if ((perSquad.get(v.gRow) ?? 0) < 2) style.leader = false;
         if (kind === "fighter") { v.g.add(lite ? makeFighterLite(M, style) : makeInvader(M, style)); v.base = 0.78; }
+        else if (kind === "pod" && tenColumn) {
+          // ten ships stacked, one per squad: tones alternate by squad and the first column leads
+          v.micro = [];
+          for (let i = 0; i < 10; i++) {
+            const st = squadStyle(i, v.gCol);
+            if (b < 2) st.leader = false;
+            const m = lite ? makeFighterLite(M, st) : makeInvader(M, st);
+            m.scale.setScalar(0.78);
+            m.position.y = (4.5 - i) * PITCH;
+            v.g.add(m);
+            v.micro.push(m);
+          }
+        }
         else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient, style); v.g.add(p.group); v.micro = p.micro; v.podTag = p.tag; }
         else if (kind === "carrier") { v.carrier = makeCarrier(M, sec.orient, style); v.g.add(v.carrier.group); }
         else { v.dread = makeDreadnought(M, unitLabel(ship.k), sec.orient, style); v.g.add(v.dread.group); }
@@ -128,14 +147,30 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       for (const c of [...labels.children]) if (!c.userData.rail) labels.remove(c);
       const [w, h] = fv.flipped ? [fv.fh, fv.fw] : [fv.fw, fv.fh];
       const left = holoLabel(`${fmt(squads)} ${squads === 1 ? "squad" : "squads"}`, "axis"), top = holoLabel(`${fmt(each)} each`, "axis");
-      left.position.set(-w / 2 - 0.35 - holoWidth(left) / 2, FLEET_Y, 0.4);
-      top.position.set(0, FLEET_Y + h / 2 + 0.55, 0.4);
       left.userData.axis = "squads"; top.userData.axis = "each";
+      left.userData.axisText = top.userData.axisText = true;
       labels.add(left, top);
-      const brk = M.clay(LOOK.bracket.color, { emissive: LOOK.bracket.color, emissiveIntensity: LOOK.bracket.emissive });
+      const brk = M.clay(LOOK.bracket.color);
       add(labels, new THREE.BoxGeometry(0.05, Math.max(h, 0.6), 0.05), brk, -w / 2 - 0.22, FLEET_Y, 0.3, { cast: false }).userData.axis = "squads";
       add(labels, new THREE.BoxGeometry(Math.max(w, 0.6), 0.05, 0.05), brk, 0, FLEET_Y + h / 2 + 0.22, 0.3, { cast: false }).userData.axis = "each";
+      fv.axisBox = { w, h, left, top };
+      fv.axisSize(fv.axisH);
       fv.showAxis(fv.axis.squads, fv.axis.each);
+    },
+    /** World height of the axis labels (the battle keeps them readable on screen); the frame makes room. */
+    axisH: AXIS_H,
+    axisBox: null as { w: number; h: number; left: THREE.Object3D; top: THREE.Object3D } | null,
+    /** How far the axis labels reach beyond the fleet: left of it and above it (world units). */
+    axisPad: { left: 2.4, top: 1.0 },
+    axisSize(height: number) {
+      fv.axisH = height;
+      const b = fv.axisBox;
+      if (!b) return;
+      const k = height / AXIS_H, lw = holoWidth(b.left) * k;
+      b.left.userData.k = b.top.userData.k = k;
+      b.left.position.set(-b.w / 2 - 0.35 - lw / 2, FLEET_Y, 0.4);
+      b.top.position.set(0, FLEET_Y + b.h / 2 + 0.3 + height / 2, 0.4);
+      fv.axisPad = { left: Math.max(2.4, 0.35 + lw + 0.3), top: Math.max(1.0, 0.3 + height + 0.25) };
     },
     /** Show, soften or hide each axis label with its bracket (structure "discover"). */
     showAxis(squads: AxisShow, each: AxisShow) {
@@ -215,7 +250,7 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       for (const g of fv.ghosts) if (!g.userData.slide) g.position.y += Math.sin(T * 2.4) * 0.002;
       // the "3 squads" / "8 each" labels pulse when a beat points at the whole fleet
       const lp = fv.labelPulse >= 0 ? now - fv.labelPulse : 9;
-      for (const c of labels.children) if (!c.userData.rail) c.scale.setScalar(1 + (lp < 0.8 ? Math.sin((lp / 0.8) * Math.PI) * 0.18 : 0));
+      for (const c of labels.children) if (!c.userData.rail) c.scale.setScalar(((c.userData.k as number | undefined) ?? 1) * (1 + (lp < 0.8 ? Math.sin((lp / 0.8) * Math.PI) * 0.18 : 0)));
       const sh = shield.userData.t0 as number | undefined;
       (shield.material as THREE.MeshBasicMaterial).opacity = sh === undefined ? 0 : Math.max(0, LOOK.shield.peak * (1 - (now - sh) / 0.5));
       zeroRing.rotation.z += dt * 0.6;

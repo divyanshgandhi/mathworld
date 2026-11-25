@@ -23,8 +23,11 @@ const NAME_INK: Record<string, string> = { Nova: COLOR.sky };
 
 export interface Overlay {
   caption(speaker: string, text: string): void;
-  /** Lift captions clear of a panel docked at the bottom of the frame (px from the bottom). */
-  captionAt(bottomPx: number): void;
+  /**
+   * Lift captions clear of a panel docked at the bottom of the frame (px from the bottom). `left`
+   * moves the caption to the bottom-left corner, clear of whatever sits at the bottom centre.
+   */
+  captionAt(bottomPx: number, side?: "centre" | "left"): void;
   /**
    * A title card: one title in the display voice and an optional plain line under it. The first
    * argument is kept so earlier callers compile, and is not shown: a title carries no label above it.
@@ -57,7 +60,7 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
   // caption: the speaker's name, then the line, on a near-black plate with a hairline
   const cap = div(root, { left: "50%", bottom: "20px", transform: "translateX(-50%)", width: "max-content", maxWidth: "min(92%, 760px)", display: "flex", alignItems: "baseline", gap: "14px", background: alpha(COLOR.panel, 0.92), border: `1px solid ${LINE[1]}`, padding: "11px 20px 12px", borderRadius: `${RADIUS.chip}px`, opacity: "0", transition: `opacity ${MOTION.quick}ms ${ease}, bottom ${MOTION.route}ms ${ease}` });
   const chip = document.createElement("span"), text = document.createElement("span");
-  css(chip, { flex: "none", fontWeight: "600", fontStretch: stretch(TYPE.label.stretch), fontSize: `${TYPE.min.label}px`, letterSpacing: "0.14em", textTransform: "uppercase", color: INK[2] });
+  css(chip, { flex: "none", fontWeight: "600", fontStretch: stretch(TYPE.label.stretch), fontSize: `${TYPE.min.body}px`, letterSpacing: "0.1em", textTransform: "uppercase", color: INK[2] });
   css(text, { fontWeight: String(TYPE.body.weight), fontSize: "clamp(17px, 0.6vw + 14px, 21px)", lineHeight: "1.4", color: INK[1], textWrap: "pretty" } as Partial<CSSStyleDeclaration>);
   cap.append(chip, text);
   cap.setAttribute("aria-hidden", "true");
@@ -77,7 +80,10 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
       cap.style.opacity = txt ? "1" : "0"; // the words stay in place while the plate fades out
       cap.setAttribute("aria-hidden", txt ? "false" : "true");
     },
-    captionAt(px) { cap.style.bottom = `${px}px`; barW.style.bottom = `${Math.max(8, px - 10)}px`; },
+    captionAt(px, side = "centre") {
+      cap.style.bottom = `${px}px`; barW.style.bottom = `${Math.max(8, px - 10)}px`;
+      css(cap, side === "left" ? { left: "64px", transform: "none", maxWidth: "min(36%, 440px)" } : { left: "50%", transform: "translateX(-50%)", maxWidth: "min(92%, 760px)" });
+    },
     card(_kicker, m, s = "", at = "centre") {
       if (m) {
         css(card, at === "top"

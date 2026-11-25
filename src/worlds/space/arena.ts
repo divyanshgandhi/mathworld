@@ -27,7 +27,9 @@ import { canAim, hintState, initialBattle, reduce, type BattleAction, type Battl
 import { createBackdrop } from "@/battle/systems/backdrop";
 import { createCameraRig, frameBox, measure, type Safe } from "@/battle/systems/camera";
 import { createCannon } from "@/battle/systems/cannon";
-import { createFleetView, fmt, type AxisShow } from "@/battle/systems/fleetView";
+import { AXIS_H, createFleetView, fmt, type AxisShow } from "@/battle/systems/fleetView";
+/** On-screen height (px) the axis label pills keep, so their words read at about 16 px. */
+const AXIS_PX = 26;
 import { createFx } from "@/battle/systems/fx";
 import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
@@ -139,7 +141,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   // ---- state ----
   let mode: ArenaUi["mode"] = opts.academy ? "academy" : opts.force || s0.tier !== tier ? "practice" : "campaign";
   let practiceK = 0, declinedAt = -1, started = false, disposed = false;
-  let wave: Wave | null = null, shownAt = 0, lastActivity = 0;
+  let wave: Wave | null = null, shownAt = 0, rocketBottom: number | null = null;
   let active: TrickId | null = null, pendingLesson: Plan | null = null, lessonId = 0;
   let bs: BattleState = initialBattle();
   const dispatch = (a: BattleAction) => { bs = reduce(bs, a); };
@@ -294,7 +296,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   function ready() {
     bus.emit("ready", {});
     dispatch({ type: "ready" });
-    shownAt = lastActivity = performance.now();
+    shownAt = performance.now();
     setUi({ canFire: canAim(bs) });
   }
 
@@ -319,7 +321,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (kind === "clear") {
       bus.emit("orb_burst", { amount: planetClearOrbs(), reason: "planet_cleared" });
       const next = PLANETS_BY_TIER[Math.min(tier + 1, PLANETS_BY_TIER.length - 1)];
-      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${PLANET_NAMES[planet].toUpperCase()} CLEAR`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next } });
+      setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${planet === "earth" ? "Cadet Bay" : PLANET_NAMES[planet]} clear`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next } });
       bus.emit("battle_done", { kind });
       await say(opts.lines?.clear ?? theme.clear, { queue: true });
     } else {
@@ -407,7 +409,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const radar = route.radar ? radarChoices(w.a, w.b, seeded(mix(seed, w.a, w.b, misses))) : null;
     setUi({ radar: radar ?? ui.radar, invite: route.invite });
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
+    const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite" : errorType && errorType !== "wild_guess" ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
     climb(line);
     await sched.after(1.05);
     restore();
@@ -428,7 +430,6 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (sector.on && t === "big-small-split") return; // already cracking sectors: keep the locks made so far
     const pu = POWERUPS[t], fits = pu.fits(wave.a, wave.b);
     bus.emit("powerup_applied", { id: t, a: wave.a, b: wave.b, fits });
-    lastActivity = performance.now();
     if (!fits) { void say("nova_misfit"); return; }
     if (t !== "flip-it") active = t;
     applyPowerUp(t);
@@ -510,16 +511,21 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     fx.update(dt, bs.lessonOn);
     // the rocket sits under the fleet; the camera frames fleet + rocket inside the HUD's free area
     const m = measure(fv);
-    cannon.pose(T, m.bottom);
+    // the rocket rides the frame: its height eases at the camera's rate, so a new fleet never leaves
+    // it below the bottom edge while the camera catches up
+    rocketBottom = rocketBottom === null ? m.bottom : rocketBottom + (m.bottom - rocketBottom) * Math.min(1, dt * 3);
+    cannon.pose(T, rocketBottom);
     // Nova: in beside the fleet's top-left corner for a lesson, away otherwise; she lip-syncs to the voice
     const nv = nova.update(dt, T, m.w, m.h, bs.lessonOn);
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv));
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.axisPad));
+    // axis labels ("7 squads", "8 each") keep at least ~26 px on screen, on a phone too
+    const ppu = cam.pxPerUnit();
+    if (ppu > 0) {
+      const want = Math.min(2.2, Math.max(AXIS_H, AXIS_PX / ppu));
+      if (Math.abs(want - fv.axisH) / fv.axisH > 0.04) fv.axisSize(fv.axisH + (want - fv.axisH) * Math.min(1, dt * 4));
+    }
     backdrop.update(dt);
 
-    // idle for 10 s with nothing typed: the Radar slides in quietly
-    if (canAim(bs) && wave && !ui.radar && !ui.lesson && !sector.on && performance.now() - lastActivity > 10_000) {
-      setUi({ radar: radarChoices(wave.a, wave.b, seeded(mix(seed, wave.a, wave.b, 99))) });
-    }
   });
 
   backdrop.applyLook();
@@ -547,8 +553,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     voice: () => ({ ...player.stats, slow: player.slow }),
     selectSector(i: number) { if (sector.select(i)) setUi(sector.ui()); },
     lockSector(value: number) { const ok = sector.lock(value); if (ok) setUi(sector.ui()); return ok; },
-    /** The cadet is typing: the idle Radar waits. */
-    poke: () => { lastActivity = performance.now(); },
+    /** The cadet is typing (kept for callers; the Radar no longer comes on idle). */
+    poke: () => {},
     /** The digits being typed (null: cleared). Wave 2 draws them on the cannon; the bus gets a `charge` event. */
     setCharge(n: number | null) {
       dispatch({ type: "charge", n });
@@ -565,7 +571,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     declineJump() { declinedAt = state().waves; setUi({ offer: null }); void startWave(); },
     /** The HUD's footprint in px, so the fleet is framed in the free part of the screen. */
     setSafe(s: Partial<Safe>) { cam.safe = { ...cam.safe, ...s }; },
-    captionAt: (px: number) => overlay.captionAt(px),
+    captionAt: (px: number, side?: "centre" | "left") => overlay.captionAt(px, side),
     get ui() { return ui; },
     log: () => log,
     /** The battle's event bus: subscribe for fire, hit, miss, resolved, wave_cleared, hint_shown, charge… */

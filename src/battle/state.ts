@@ -84,7 +84,7 @@ export const canAim = (s: BattleState) => s.phase === "aiming" || s.phase === "l
 
 /** What a miss leads to, from the state just before it (`attempts` already counts this shot). */
 export function routeMiss(s: BattleState, a: number, b: number, guess: number, mash: boolean, tier: number): MissRoute {
-  const sc = scaffold(s.attempts, a, b, guess);
+  const sc = scaffold(s.attempts);
   if (s.lessons > 0 && !s.fallbackUsed && safetyNetApplies(tier, a, b)) return { kind: "safety-net", mash, radar: false, invite: false };
   if (sc.showMeHow && s.lessons === 0) return { kind: "show-me-how", mash, radar: false, invite: false };
   return { kind: "react", mash, radar: sc.radar, invite: sc.invite };
