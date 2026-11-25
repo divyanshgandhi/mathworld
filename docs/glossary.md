@@ -12,6 +12,7 @@ These are the canonical player-facing words. Use them in copy, labels, captions 
 | Academy | Where Nova shows any trick on a real fleet. | The Academy (on buttons), Trick films (as a place) |
 | Wave | One fleet to clear. A planet's mission is a few waves. | Round, level |
 | Squad | One row of ships in a fleet. `7 × 8` is 7 squads of 8 ships. | Squadron, row, group |
+| Pod | Ten ships of a squad stood up as one bigger ship, so a fleet's tens can be counted at a glance ("Count the pods"). A fleet with pods still has every one of its ships. | Squadron Pod (player-facing), ten-block |
 | Ships | What you shoot at. In Cadet Bay they are training drones. | Fighters, invaders, enemies |
 | Plasma balls | What you fire. You fire exactly as many as your answer. | Shots, cannonballs, plasma cannonballs, ammo |
 | Orbs | What you earn for first-try answers, Gold facts, clearing planets and the daily patrol. Spent in the Hangar. Drawn as a gold ring with a count beside it, never as a filled dot. | Orbs (capitalised mid-sentence), coins, stars, credits |

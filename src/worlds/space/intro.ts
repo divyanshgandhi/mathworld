@@ -111,7 +111,7 @@ const MORNING = [1.05, 1.0, 0.92] as const;
 /** One fade grammar, in seconds: out to the void, and back in. */
 const FADE = { out: 0.7, in: 0.9 };
 /** How long the class waits for a hand, when a classmate's goes up, and how long it waits for an answer before a classmate helps. */
-const WAIT = { hand: 7.5, rival: 4.5, answer: 8, launch: 20 };
+const WAIT = { hand: 5, rival: 3, answer: 8, launch: 20 };
 /** Skip is offered once the film has run this long. */
 const SKIP_AFTER = 3;
 /** The lens, in degrees of vertical field of view: for a wide screen, and for a tall phone (a wide setup, and a portrait of one person). */
@@ -368,10 +368,13 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
   /** What is being said now (the id of a baked line), so a still can be taken at a known word. */
   let saying = "";
   const fit = (who: string, t: string) => (fits ? fits(who, t) : t.length <= 84);
-  const put = (who: string, text: string) => { setUi({ caption: text ? { who, text } : null }); if (text) floor = played + readingTime(text); };
+  /** Is the line on screen being heard? With sound off (or no clip) a caption is read alone, at a young reader's pace. */
+  let heard = true;
+  const put = (who: string, text: string) => { setUi({ caption: text ? { who, text } : null }); if (text) floor = played + readingTime(text, heard); };
   /** Put a line on screen, in as many captions as it needs; returns how long it holds the screen. */
-  function say(who: string, text: string, spoken: number) {
-    const pieces = splitCaption(text, (t) => fit(who, t)), { starts, hold } = scheduleCaptions(pieces, spoken);
+  function say(who: string, text: string, spoken: number, voiced = true) {
+    heard = voiced && !audio.muted;
+    const pieces = splitCaption(text, (t) => fit(who, t)), { starts, hold } = scheduleCaptions(pieces, spoken, heard);
     line = { who, pieces, starts, t0: played, i: -1 };
     clearAt = Infinity;
     captions();
@@ -438,7 +441,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     let len: number;
     if (live) { void audio.play(live); len = audio.spokenLength(live); }
     else { void audio.say(id); len = audio.spoken(id); }
-    return { len, hold: say(who, text ?? FILM_LINES[id as FilmLineId] ?? audio.text(id), len) };
+    return { len, hold: say(who, text ?? FILM_LINES[id as FilmLineId] ?? audio.text(id), len, !!live || !!audio.text(id)) };
   };
 
   interface Beat { id: string; who: string; c: () => Who; gap?: number; go?: () => void; live?: () => AudioBuffer | null; text?: () => string; after?: (t: number, start: number, len: number) => void }
@@ -470,24 +473,25 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
 
   /**
    * A classroom question: the teacher asks and finishes; then the class waits for a hand (Space or
-   * the button). Raise yours and it goes up at once, she calls on you, and the two answers appear
+   * the button; a hand raised while she is still asking is taken the moment she stops). Raise yours and it goes up at once, she calls on you, and the two answers appear
    * under the sum. Wait, at either point, and a classmate's hand goes up and they answer: nobody is
    * left stuck, and nobody is told off. The teacher replies after a breath.
    */
   let phaseNow = "";
   function question(o: { name: string; eq: string; answer: number; options: number[]; ask: string; kid: number; kidClip: string; ok: string; close: string; open: () => void; during?: (since: number, len: number) => void }): Shot {
     type Phase = "ask" | "raise" | "called" | "choose" | "answer" | "reply" | "done";
-    let phase: Phase = "ask", at0 = 0, len = 0, hold = 0, result: "right" | "close" | "classmate" = "right", keen = false;
+    let phase: Phase = "ask", at0 = 0, len = 0, hold = 0, result: "right" | "close" | "classmate" = "right", keen = false, early = false, wait: number = WAIT.hand, last = 0;
     const to = (p: Phase) => { phase = p; phaseNow = p; at0 = director.t; };
     const prompt = (stage: "raise" | "called" | "choose") => setUi({ prompt: { eq: o.eq, options: o.options, stage } });
     const shot: Shot = {
       name: o.name, env: "class", chapter: "wake",
       enter() {
-        phase = "ask"; phaseNow = "ask"; at0 = 0; keen = false;
+        phase = "ask"; phaseNow = "ask"; at0 = 0; keen = false; early = false;
         room.write(o.eq);
         feel(people(), "neutral");
         lookAt(headOf(teacher), CLASS_CENTRE);
         ({ len, hold } = speak(o.ask, "Teacher", teacher));
+        last = line?.starts.at(-1) ?? 0; // when the question's last caption goes up
         o.open();
       },
       update(t) {
@@ -495,16 +499,19 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         if (since >= len && speaker !== null && phase !== "raise" && phase !== "choose") talk(null);
         if (phase === "ask") {
           o.during?.(since, len);
-          if (since >= hold + 0.3) {
+          // the invitation comes when her words stop and the question's last caption is up; a caption still being
+          // read (sound off) stays up, and the class waits for it
+          if (since >= Math.max(Math.min(len, hold), last) + 0.3) {
+            wait = Math.max(WAIT.hand, hold - since + 3);
             to("raise");
             talk(null);
             hush(); // the question is on the board and in the invitation now
-            prompt("raise");
-            show(SETUP.invite);
+            if (early) call();
+            else { prompt("raise"); show(SETUP.invite); }
           }
         } else if (phase === "raise") {
-          if (since > WAIT.rival && !keen) { keen = true; kids[o.kid].rig.raise = true; kids[o.kid].rig.mood = "happy"; } // someone else is keen too
-          if (since >= WAIT.hand) classmate();
+          if (since > wait - (WAIT.hand - WAIT.rival) && !keen) { keen = true; kids[o.kid].rig.raise = true; kids[o.kid].rig.mood = "happy"; } // someone else is keen too
+          if (since >= wait) classmate();
         } else if (phase === "called" && since >= hold + 0.2) {
           to("choose");
           hush();
@@ -537,20 +544,25 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       show(() => SETUP.child(who, who.group.position.x > 0 ? -1 : 1));
     }
     shot.raise = () => {
-      if (phase !== "raise" || director.current !== shot) return;
+      if (director.current !== shot) return;
+      // the sum is on the board from the start: a hand can go up while she is still asking, and she takes it when she stops
+      if (phase === "ask" && !early) { early = true; player.rig.raise = true; player.rig.r = Math.max(player.rig.r, 0.25); audio.sfx("blip_ok"); return; }
+      if (phase === "raise") call();
+    };
+    function call() {
       to("called");
       prompt("called");
       kids[o.kid].rig.raise = false;
       kids[o.kid].rig.mood = "neutral";
       player.rig.raise = true;
       player.rig.r = Math.max(player.rig.r, 0.25); // the arm is already moving on the frame of the press
-      audio.sfx("blip_ok");
+      if (!early) audio.sfx("blip_ok"); // an early hand had its blip when it went up
       lookAt(headOf(player));
       player.rig.look = headOf(teacher);
       feel([teacher], "happy"); // she is glad of the hand, and waits kindly for the answer
       ({ len, hold } = speak("teacher_yes", "Teacher", teacher));
       show(SETUP.called); // the cut lands on the arm going up
-    };
+    }
     shot.pick = (v: number) => {
       if (phase !== "choose" || director.current !== shot) return;
       to("answer");
@@ -750,7 +762,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
           }
           if (player.rig.s > 0.9) player.rig.mood = "cheer";
           // out to the void, and the cadet's new name on it
-          const out = start + Math.max(len + 2.0, readingTime(`And our fifth cadet is ${cadet || "you"}!`) + 0.2);
+          const out = start + Math.max(len + 2.0, readingTime(`And our fifth cadet is ${cadet || "you"}!`, heard) + 0.2);
           if (t > out) { fadeColor = COLOR.void; fade = fadeOut(t, out); hush(); }
           if (t > out + FADE.out && !cardShown) { cardShown = true; overlay.card("", `Cadet ${cadet || "you"}`, "Next stop: the Star Fleet hangar"); }
           if (t > out + FADE.out + 4.3) overlay.card("", "");

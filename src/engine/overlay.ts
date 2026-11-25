@@ -21,8 +21,18 @@ const alpha = (c: string, a: number) => `rgba(${parseInt(c.slice(1, 3), 16)},${p
 /** Every speaker's name is quiet ink; Nova's is her own colour. A name reads without its colour. */
 const NAME_INK: Record<string, string> = { Nova: COLOR.sky };
 
-/** The least time a caption stays on screen, in seconds: 1.5 plus 0.3 for every word. */
-export const readingTime = (text: string) => 1.5 + 0.3 * text.trim().split(/\s+/).filter(Boolean).length;
+/**
+ * The least time a caption stays on screen, in seconds. Heard (the voice is saying it): 1.5 plus 0.3
+ * for every word, since the ear carries the line and the eye only follows. Read alone (sound off, or no
+ * clip): 1 plus 0.67 for every word, the pace of a Grade 3 reader (about 90 words a minute).
+ */
+export const readingTime = (text: string, heard = true) => {
+  const n = text.trim().split(/\s+/).filter(Boolean).length;
+  return heard ? 1.5 + 0.3 * n : 1 + 0.67 * n;
+};
+
+/** A word with a hyphen in it ("co-pilot") is never broken across two lines: the hyphen becomes a non-breaking one. */
+export const keepWhole = (text: string) => text.replace(/(\p{L})-(?=\p{L})/gu, "$1\u2011");
 
 /**
  * Break a spoken line into captions that each fit their plate. `fits(piece)` says whether a piece
@@ -55,10 +65,10 @@ export function splitCaption(text: string, fits: (piece: string) => boolean): st
  * holds the screen in all. A caption gets its share of the speech and never less than its reading
  * time, so a slow reader is never cut off; `hold` is at least the length of the speech.
  */
-export function scheduleCaptions(pieces: string[], spoken: number) {
+export function scheduleCaptions(pieces: string[], spoken: number, heard = true) {
   const total = pieces.reduce((n, c) => n + c.length, 0) || 1;
   let t = 0;
-  const starts = pieces.map((c) => { const at = t; t += Math.max(readingTime(c), spoken * (c.length / total)); return at; });
+  const starts = pieces.map((c) => { const at = t; t += Math.max(readingTime(c, heard), spoken * (c.length / total)); return at; });
   return { starts, hold: Math.max(t, spoken) };
 }
 
