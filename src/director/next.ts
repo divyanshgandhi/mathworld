@@ -145,16 +145,16 @@ export function acceptHyperJump(s: PlayerState): Extract<EventInput, { type: "hy
 }
 
 /**
- * Scaffolding after a miss (SPEC 4.2, tightened by the overhaul's hint ladder): the first miss is
- * answered in the world and by Nova, with free input still open; a second miss invites a Power-Up,
- * the 4-choice Radar or Show Me How; a third miss starts Show Me How. The Radar never comes unasked
- * before that: four numbers on the first miss, or after a quiet spell, would turn the shot into
- * multiple choice and hand a known fact a hint it did not need.
+ * Scaffolding after a miss (SPEC 4.2, as the overhaul's hint ladder has it): the first miss is answered
+ * in the world and by Nova (the squad scan follows), with free input still open; a second miss invites a
+ * Power-Up or Show Me How (the each scan follows); a third miss starts Show Me How. There is no multiple
+ * choice: the four-answer Targeting Radar is gone for good (OVERHAUL.md, wave 2 decision 1), so `radar`
+ * is always false. The field stays so callers compile.
  */
 export function scaffold(misses: number) {
   return {
     nudge: misses >= 1,
-    radar: misses >= 2,
+    radar: false as const,
     invite: misses === 2,
     showMeHow: misses >= 3,
   };

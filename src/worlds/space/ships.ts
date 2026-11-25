@@ -25,10 +25,12 @@ const mix3 = (a: ColorName, b: ColorName, t: number, c: ColorName, u: number) =>
 /** A token colour as linear RGB scaled by `k`, for additive flames (kept under the bloom threshold). */
 const lin = (name: ColorName, k: number) => { const c = new THREE.Color(COLOR[name]); return [c.r * k, c.g * k, c.b * k] as const; };
 
-/** The invader family. `ember` and `apricot` alternate squad by squad; `shade` is the underside; gold is only for leaders. */
+/** The invader family. `ember` (deep) and `apricot` (pale sand) alternate squad by squad; `shade` is the underside; gold is only for leaders. */
 export const INVADER = {
-  ember: C("ember"),
-  apricot: mix3("ember", "gold", 0.5, "approach", 0.3),
+  // the two squad tones must part at phone size under the battle's gold key: a deep, hot red-orange and
+  // a pale warm sand differ in lightness as well as hue, so alternate squads read as bands at a glance
+  ember: mix3("ember", "recede", 0.35, "shadow", 0.16),
+  apricot: mix3("gold", "approach", 0.38, "ember", 0.14),
   shade: mix("ember", "shadow", 0.4),
   /** The dark tray of pods and big ships. */
   hull: mix("recede", "shadow", 0.72),

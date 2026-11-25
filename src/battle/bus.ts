@@ -21,8 +21,13 @@ export interface BattleEvents {
   };
   /** One ball leaves the cannon. `extra`: a ball with no ship left to hit. `t` is stage time. */
   launch: { extra: boolean; t: number };
-  /** One ball lands on a ship. `full`: the ship is destroyed. `t` is stage time. */
-  hit: { ship: number; amount: number; full: boolean; t: number };
+  /**
+   * One ball lands on a ship. `full`: the ship is destroyed. `t` is stage time. `step`: the ship's place
+   * along its squad in this volley (the hit tick climbs with it); `last`: the last ship of the fleet.
+   */
+  hit: { ship: number; amount: number; full: boolean; t: number; step?: number; last?: boolean };
+  /** A squad is fully cleared by this volley (`count`: squads cleared so far, top first). */
+  squad_cleared: { squad: number; count: number; t: number };
   /** The volley is over and missed: `value` ships still flying (under) or balls past (over). */
   miss: { kind: "under" | "over"; value: number; errorType: ErrorType | null; attempt: number; mash: boolean };
   /** A shot has been judged. */

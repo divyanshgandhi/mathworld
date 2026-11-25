@@ -3,6 +3,7 @@ import type { Sfx } from "@/engine/audio";
 import type { Plan, Step } from "@/rig/showme";
 import type { TrickId } from "@/rig/tricks";
 import { LOOK } from "./look";
+import { tens } from "./powerups/easy-5-10";
 import { doubleSide, jumpSplit, splitFive } from "./powerups/shared";
 import type { Scheduler } from "./scheduler";
 import { fmt, GAP, type FleetView, type ShipView } from "./systems/fleetView";
@@ -76,7 +77,9 @@ export function createLessonStage(ctx: LessonCtx) {
         }
         case "pods": {
           const big = views.filter((v) => v.kind !== "fighter"), unit = 10 ** (String(Math.max(a, b)).length - 1);
-          marks.plate(big.length ? big : views, "gold");
+          // up to 10 × 10 a 10 is ten single ships: each group of ten gets its own gold plate
+          if (!big.length && (a === 10 || b === 10)) tens(views, a, b).forEach((g) => marks.plate(g, "gold"));
+          else marks.plate(big.length ? big : views, "gold");
           marks.pulseAll(big.length ? big : views);
           marks.badge(t === "easy-5-10" ? `${fmt(sh.value)} Pods` : `${fmt(sh.value)} × ${fmt(unit)}`, marks.under());
           break;

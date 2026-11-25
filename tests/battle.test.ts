@@ -85,13 +85,13 @@ describe("battle phase machine", () => {
     expect(w.hint.level).toBe(0);
   });
 
-  it("misses follow scaffold(): Radar and invite on miss 2, Show Me How on miss 3", () => {
+  it("misses follow scaffold(): the invite on miss 2 (never a Radar), Show Me How on miss 3", () => {
     let s = shot(aiming(3, 8), 23); // close
     expect(s.lastMiss).toEqual({ kind: "react", mash: false, radar: false, invite: false });
     s = shot(aiming(3, 8), 2); // way off: still no Radar on the first miss
     expect(s.lastMiss).toMatchObject({ kind: "react", radar: false, invite: false });
     s = shot(reduce(shot(aiming(3, 8), 23), { type: "ready" }), 22);
-    expect(s.lastMiss).toMatchObject({ kind: "react", radar: true, invite: true });
+    expect(s.lastMiss).toMatchObject({ kind: "react", radar: false, invite: true });
     s = shot(reduce(s, { type: "ready" }), 21);
     expect(s.lastMiss?.kind).toBe("show-me-how");
     for (let misses = 1; misses <= 5; misses++) {
@@ -227,13 +227,6 @@ describe("Power-Up registry", () => {
   const multi: [number, number][] = [[6, 24], [24, 6], [19, 24], [24, 19], [16, 24], [342, 2647], [12, 12], [11, 9], [9, 11], [25, 4], [4, 25], [15, 6], [99, 7], [7, 99], [10, 12], [12, 10], [3, 12], [20, 5], [5, 20], [29, 3], [199, 4], [45, 8]];
   const facts: [number, number][] = [...multi];
   for (let a = 0; a <= 10; a++) for (let b = 0; b <= 10; b++) facts.push([a, b]);
-  /**
-   * Where the battle is stricter than the rig, on purpose: a side of exactly 10 is drawn as one row (or
-   * column) of Squadron Pods, so there are no squads of single ships to add up one at a time (Fast
-   * Adding with 10 squads) and no column of fighters to cut after 5 (Split & Add with a 10).
-   */
-  const podException = (t: string, a: number, b: number) =>
-    (t === "fast-adding" && a === 10) || (t === "split-and-add" && Math.max(a, b) === 10);
 
   it("has one entry per trick, named as its card", () => {
     expect(Object.keys(POWERUPS).sort()).toEqual([...TRICKS].sort());
@@ -243,12 +236,12 @@ describe("Power-Up registry", () => {
     }
   });
 
-  it("fits() agrees with powerUpFits over 0–10 × 0–10 and multi-digit facts", () => {
-    for (const t of TRICKS) for (const [a, b] of facts) {
-      const fits = POWERUPS[t].fits(a, b), rig = powerUpFits(t, a, b);
-      if (fits) expect(rig, `${t} ${a}×${b}`).toBe(true);
-      expect(fits, `${t} ${a}×${b}`).toBe(rig && !podException(t, a, b));
-    }
+  it("fits() is exactly powerUpFits over 0–10 × 0–10 and multi-digit facts: no battle-only exceptions", () => {
+    for (const t of TRICKS) for (const [a, b] of facts) expect(POWERUPS[t].fits(a, b), `${t} ${a}×${b}`).toBe(powerUpFits(t, a, b));
+    // the two old exceptions: a side of 10 is now ten real squads or ten real ships
+    expect(POWERUPS["fast-adding"].fits(10, 6)).toBe(true);
+    expect(POWERUPS["split-and-add"].fits(6, 10)).toBe(true);
+    expect(POWERUPS["split-and-add"].fits(10, 7)).toBe(true);
   });
 
   it("an empty fleet fits only Empty & Mirror", () => {

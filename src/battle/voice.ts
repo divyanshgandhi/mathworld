@@ -2,6 +2,7 @@ import { audio } from "@/engine/audio";
 import { createBeatPlayer } from "@/engine/beatPlayer";
 import type { Overlay } from "@/engine/overlay";
 import { BATTLE_LINES } from "@/worlds/space/lines";
+import { COMBAT_LINES } from "./lines";
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /** Captions-only pace when no voice clip is ready. */
@@ -14,7 +15,7 @@ export const readTime = (text: string) => 0.7 + text.split(/\s+/).length * 0.24;
  */
 export function createVoice(overlay: Overlay, teaching: () => boolean) {
   let voiceUntil = 0, captionTimer = 0;
-  const lineText = (id: string) => audio.text(id) || (BATTLE_LINES as Record<string, string>)[id] || "";
+  const lineText = (id: string) => audio.text(id) || (BATTLE_LINES as Record<string, string>)[id] || (COMBAT_LINES as Record<string, string>)[id] || "";
   const player = createBeatPlayer({ caption: (who, text) => { window.clearTimeout(captionTimer); overlay.caption(who, text); } });
   return {
     player,
@@ -36,6 +37,17 @@ export function createVoice(overlay: Overlay, teaching: () => boolean) {
       window.clearTimeout(captionTimer);
       captionTimer = window.setTimeout(() => overlay.caption("", ""), len * 1000 + 900);
       await wait(len * 1000 + 250);
+    },
+    /**
+     * A caption with no voice (a scan counting along). It holds Nova's place while it shows, so a
+     * reaction does not talk over it; `null` lets it go.
+     */
+    caption(text: string | null, holdMs = 1400) {
+      window.clearTimeout(captionTimer);
+      if (text === null) { overlay.caption("", ""); voiceUntil = 0; return; }
+      overlay.caption("Nova", text);
+      voiceUntil = performance.now() + Math.min(holdMs, 400);
+      captionTimer = window.setTimeout(() => overlay.caption("", ""), holdMs);
     },
     /** Silence: the caption goes and the next line may start at once. */
     hush() {
