@@ -7,8 +7,7 @@ import { flushed, history, post } from "@/engine/outbox";
 import type { Stage } from "@/engine/stage";
 import type { Bay, BayUi } from "@/worlds/space/cadetBay";
 import type { Chapter, Film, FilmCaption, FilmUi } from "@/worlds/space/intro";
-import { PLANET_NAMES } from "@/worlds/space/lines";
-import { BattleHud } from "./battle/BattleHud";
+import { BattleHud, planetName } from "./battle/BattleHud";
 import { CadetSignUp } from "./hub/CadetSignUp";
 
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
@@ -231,7 +230,7 @@ export function IntroFilm() {
           doneActions={(d) => (
             <>
               <Button variant="primary" onClick={() => void flushed().then(() => router.push("/bay"))}>Enter the Resting Bay</Button>
-              {d.next && <Button variant="secondary" onClick={() => void flushed().then(() => router.push(`/play/${d.next}`))}>Fly to {PLANET_NAMES[d.next]}</Button>}
+              {d.next && <Button variant="secondary" onClick={() => void flushed().then(() => router.push(`/play/${d.next}`))}>Fly to {planetName(d.next, true)}</Button>}
             </>
           )} />
       )}

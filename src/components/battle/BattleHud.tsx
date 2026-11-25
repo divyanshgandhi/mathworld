@@ -125,8 +125,9 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const unlock = unlocks[0] ?? null;
   const [jumping, setJumping] = useState<string | null>(null);
   const briefing = !!ui && launch && !ui.started && !ui.done;
-  const offer = !!ui?.offer && !jumping;
-  const done = !!ui?.done;
+  // one card at a time: a New Power-Up card is read first, then the offer or the clear card
+  const offer = !!ui?.offer && !jumping && !unlock;
+  const done = !!ui?.done && !unlock;
   const cardOpen = briefing || !!unlock || offer || done || !!jumping;
   // a card to read holds the game still (the next fleet waits for "Got it")
   useEffect(() => { if (unlock) hold.on("card"); else hold.off("card"); }, [unlock]);
