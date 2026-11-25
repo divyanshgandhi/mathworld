@@ -207,7 +207,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
             <div data-slot="daily-patrol" className="empty:hidden">{typeof patrol === "function" ? patrol({ state, log, emit }) : patrol}</div>
-            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, who, !!first, name, ps)}</NovaLine>
+            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, `\u2068${who}\u2069`, !!first, name, ps)}</NovaLine>
           </div>
         </section>
 
