@@ -20,16 +20,16 @@ export const FILM_PACE = {
   yawn: { d: 3.2 },
   turn: { d: 1.25, look: 1.1 },
   /** A classroom question: how long the class waits, when a classmate's hand goes up, and the breaths around the answer. */
-  question: { wait: PACE.wait, rival: 3, answer: PACE.wait, mime: 1.0, reply: 0.2, kidReply: 0.25, tail: 0.4 },
+  question: { wait: 3, rival: 1, answer: PACE.wait, mime: 1.0, reply: 0.2, kidReply: 0.25, tail: 0.4 },
   mult: { lead: 0.1, tail: 0.4 },
   knock: { sound: 1.0, door: 1.2, d: 1.9 },
-  officers: { lead: 0.9, walk: 2.1, behind: 0.35, gap: 0.4, tail: 0.1 },
+  officers: { lead: 0.5, walk: 2.1, behind: 0.35, gap: 0.4, tail: 0.1 },
   // a reply comes inside the last caption's linger, so one caption gives way to the next with no empty plate between them
   captain: { lead: 0.15, proud: 0.2, names: 0.25, tail: 0.1 },
   names: { lead: 0.15, tail: 0.25 },
   /** The cadet is picked: they stand at `stand` of the line, the name card rises `card` after it, the picture leaves `out` after it. */
-  picked: { lead: 0.25, stand: 0.8, card: 0.7, out: 2.9 },
-  hangar: { lead: 1.6, cardOff: 1.3, brief2: 0.45, nova: 0.5, tail: 0.2 },
+  picked: { lead: 0.25, stand: 0.8, card: 0.7, out: 2.4 },
+  hangar: { lead: 0.9, cardOff: 0.8, brief2: 0.45, nova: 0.5, tail: 0.2 },
   nova: { wait: PACE.wait },
   launch: { beat: 0.7, breath: 2.0, fire: 2.5, lift: 3.3, cloud: 4.85, end: 5.75 },
   arrival: { clear: 0.6, settle: 3.0, card: [1.0, 4.0], end: 4.5 },
@@ -59,7 +59,7 @@ export const ALLOWED: Record<string, { max: number; why: string }> = {
   yawn: { max: 3.2, why: "the yawn: a hand comes up and drops, timed to the yawn you hear" },
   turn: { max: 1.25, why: "the look across to the teacher, who speaks on the cut" },
   "knock>principal_sorry": { max: 2.0, why: "the door swings open and the two visitors walk in; the principal speaks while still walking" },
-  "teacher_pick_generic>captain_brief1": { max: 5.0, why: "the cadet stands and cheers, the name card rises over the cheer, a one second dip to the hangar, and the hangar is seen whole before the Captain speaks" },
+  "teacher_pick_generic>captain_brief1": { max: 3.9, why: "the cadet stands and cheers, the name card rises over the cheer, a one second dip to the hangar, and the hangar is seen whole before the Captain speaks" },
   launch: { max: 5.75, why: "the countdown: three lights with their beeps, a held breath, the fire, the climb into cloud" },
   arrive: { max: 4.5, why: "the cloud clears, the rocket climbs to its place over Earth, the mission's title is read" },
 };
