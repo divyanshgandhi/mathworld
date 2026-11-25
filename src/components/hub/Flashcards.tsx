@@ -45,6 +45,15 @@ export function Flashcards({ state, emit, onClose, table = null, facts, title: n
   const [entry, setEntry] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [done, setDone] = useState<Result[]>([]);
+  // the parent unmounts the sheet on close, so the dialog cannot hand focus back itself: the control
+  // that opened it (focused while this first renders) gets it back, if focus was left on the page body
+  const [opener] = useState(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
+  useEffect(() => () => {
+    requestAnimationFrame(() => {
+      const lost = !document.activeElement || document.activeElement === document.body;
+      if (lost && opener?.isConnected && opener !== document.body) opener.focus();
+    });
+  }, [opener]);
   const shown = useRef(0);
   const next = useRef<HTMLButtonElement>(null);
   useEffect(() => { shown.current = performance.now(); }, [i]);
