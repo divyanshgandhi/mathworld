@@ -6,7 +6,7 @@ import { dialogClass } from "@/components/kit/Dialog";
 import { buttonClass } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
 import type { TrickId } from "@/rig/tricks";
-import type { ConsoleLayout } from "./layout";
+import { useNarrow, type ConsoleLayout } from "./layout";
 import { POWERUP_DOES, PowerUpGlyph, SECTOR_LOCK_DOES } from "./PowerUpGlyph";
 import { css } from "./cockpit";
 
@@ -50,7 +50,7 @@ export function PowerUpsButton({ empty, disabled, orbit, reduced, onPress, butto
 }
 
 /**
- * The list the button opens. On a phone held upright it is the kit's bottom sheet; elsewhere a small
+ * The list the button opens. On a phone held upright (under 600 px wide) it is the kit's bottom sheet; elsewhere a small
  * dialog anchored to the button (above it on a wide screen, beside it on a phone on its side).
  * One row per Power-Up on the belt: glyph, name, what it does, and its state. A row that fits is a
  * button; one that does not is dim. Arrow keys move between rows, Enter or a tap runs one (once).
@@ -69,7 +69,9 @@ export function PowerUpList({ open, onClose, onPick, belt, hinted, layout, ancho
   useEffect(() => { if (open) picked.current = false; }, [open]);
   const rows = orderBelt(belt, hinted);
   const anyFits = rows.some((t) => t.fits);
-  const sheet = layout === "pad";
+  // a phone held upright: the kit's bottom sheet; a tablet held upright, a laptop, a phone on its side: beside the button
+  const narrow = useNarrow();
+  const sheet = layout === "pad" && narrow;
   const pick = (id: TrickId) => {
     if (picked.current) return;
     picked.current = true;
