@@ -3,7 +3,7 @@ import type { PlayerState } from "@/director/fold";
 import { hyperJumpStatus, mapStops } from "@/director/hub";
 import { band, type Band } from "@/rig/adaptive";
 import { factKey, MAX_TIER, PLANETS_BY_TIER, tierOf } from "@/rig/pools";
-import { jumpLine, lockedLine, STOP_WORDS, type StopId } from "./words";
+import { ACTION_WORDS, clearFirstLine, jumpLine, lockedLine, STATE_WORDS, STOP_WORDS, type StopId } from "./words";
 
 /**
  * The Star map's journey, read from the folded state: the ten stops in order from the Sun, each with the
@@ -22,22 +22,67 @@ export interface JourneyStop {
   locked: boolean;
   /** What opens a locked stop, in words. */
   lockedBy: string | null;
+  /** For a locked stop: the next planet on the route the cadet has to clear (never one two steps away). */
+  clearFirst: StopId | null;
   /** The one primary action, or null for a locked stop. */
   action: StopAction | null;
 }
 
 export function journey(s: PlayerState): JourneyStop[] {
   const stops = mapStops(s), here = Math.min(s.tier, MAX_TIER);
-  return stops.map((st): JourneyStop => {
+  const base = stops.map((st): JourneyStop => {
     const warmup = st.tier === null, locked = st.status === "locked", cleared = st.status === "cleared" || st.status === "ace";
     const isHere = st.tier === here;
     const prev = st.tier !== null && st.tier > 0 ? PLANETS_BY_TIER[st.tier - 1] : null;
     return {
       id: st.id, tier: st.tier, warmup, here: isHere, cleared, locked,
       lockedBy: locked && prev ? lockedLine(prev, st.id) : null,
+      clearFirst: null,
       action: locked ? null : warmup ? "warmup" : cleared && !isHere ? "practise" : "launch",
     };
   });
+  return base.map((st) => (st.locked ? { ...st, clearFirst: nextToClear(base, st) } : st));
+}
+
+/**
+ * The planet to clear next on the way to a locked stop: the cadet's own planet when it is before it on the
+ * route, else the nearest open planet before it that is not cleared yet, else the one just before it.
+ */
+function nextToClear(stops: JourneyStop[], st: JourneyStop): StopId | null {
+  if (st.tier === null) return null;
+  const t = st.tier, before = stops.filter((x) => x.tier !== null && x.tier < t);
+  const here = before.find((x) => x.here && !x.cleared);
+  if (here) return here.id;
+  const open = before.filter((x) => !x.locked && !x.cleared).pop();
+  return open?.id ?? before.pop()?.id ?? null;
+}
+
+/** The page the Star map opens on: `?at=<planet>` (a reload), else `?locked=<planet>`, else the cadet's planet. */
+export function openingPage(stops: JourneyStop[], params: { at?: string | null; locked?: string | null } = {}) {
+  for (const id of [params.at, params.locked]) {
+    const i = id ? stops.findIndex((x) => x.id === id) : -1;
+    if (i >= 0) return i;
+  }
+  return hereIndex(stops);
+}
+
+/** The chip above a stop's name on its card: what state it is in, in words, with the mark that goes with it. */
+export type ChipIcon = "rocket" | "check" | "lock" | null;
+export function chipOf(st: JourneyStop): { text: string; icon: ChipIcon } {
+  if (st.here) return { text: STATE_WORDS.here, icon: "rocket" };
+  if (st.locked) return { text: STATE_WORDS.locked, icon: "lock" };
+  if (st.cleared) return { text: STATE_WORDS.cleared, icon: "check" };
+  if (st.warmup) return { text: STATE_WORDS.warmup, icon: null };
+  return { text: STATE_WORDS.open, icon: null };
+}
+
+/** The card's one line: what the stop teaches, or for a locked stop which planet to clear first. */
+export const cardLine = (st: JourneyStop) => (st.locked ? (st.clearFirst ? clearFirstLine(st.clearFirst) : st.lockedBy ?? "") : STOP_WORDS[st.id].teaches);
+
+/** The card's one button: Launch (primary) on the cadet's planet, a quieter Practise or Warm up elsewhere, none when locked. */
+export function buttonOf(st: JourneyStop): { text: string; primary: boolean } | null {
+  if (!st.action) return null;
+  return { text: ACTION_WORDS[st.action], primary: st.action === "launch" };
 }
 
 /** The index of the stop the cadet is on (where the map opens). */
