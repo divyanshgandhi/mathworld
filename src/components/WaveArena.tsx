@@ -1,5 +1,4 @@
 "use client";
-import { Button } from "@ui-sdk/react/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { flushed, history, post } from "@/engine/outbox";
@@ -8,11 +7,10 @@ import type { PlanetId } from "@/rig/pools";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { fold } from "@/director/fold";
 import { canLaunch } from "@/director/hub";
-import { PLANET_NAMES } from "@/worlds/space/lines";
 import { BattleHud } from "./battle/BattleHud";
 import { PauseMenu } from "./battle/PauseMenu";
-import { CadetSignUp, ghost, lime, type Cadet } from "./battle/ui";
-import { RocketGlyph } from "./kit/Icon";
+import { CadetSignUp, type Cadet } from "./battle/ui";
+import { css } from "./battle/cockpit";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -23,7 +21,9 @@ const readQuery = () => {
 };
 
 /**
- * A planet battle as a full-screen game: the stage fills the viewport, the HUD floats over it.
+ * A planet battle as a full-screen game: the stage fills the viewport, the cockpit sits on its edges
+ * (BattleHud: the mission strip on top, the console at the bottom or right). Fleets start with their
+ * structure hidden (`structure: "discover"`): the hint ladder reveals squads and ships each.
  * Waves come from the cadet's folded event log; every action is appended to /api/events.
  * `?dev` shows shot timings and unlocks every Power-Up; `?dev&a=6&b=24` drills one exact fleet.
  */
@@ -53,7 +53,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere)
       if (!dev && !canLaunch(fold(log), planet)) return router.replace("/map");
       const stage = createStage(box.current, { fill: true });
-      const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force });
+      const a = mountArena(stage, { planet, history: log, onUi: setUi, onEvent: post, dev, force, structure: "discover" });
       const { audio } = await import("@/engine/audio");
       window.__mw = { stage, arena: a, audio };
       setArena(a);
@@ -67,17 +67,11 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
   const fly = async (to: PlanetId) => { await flushed(); router.push(`/play/${to}${dev ? "?dev" : ""}`); };
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
+    // the game root: focused on mount so the keyboard works without a click; no text selection, no zoom
+    <div className={css.root} data-cockpit tabIndex={-1} inputMode="none" autoFocus>
       <div ref={box} className="absolute inset-0" />
       {cadet === null && <CadetSignUp cta="Enlist" onDone={setCadet} />}
-      <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />}
-        doneActions={(d) => (
-          <>
-            {d.next && <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => void fly(d.next!)}>Fly to {PLANET_NAMES[d.next]}<RocketGlyph size={34} /></Button>}
-            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>
-            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
-          </>
-        )} />
+      <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />} />
     </div>
   );
 }
