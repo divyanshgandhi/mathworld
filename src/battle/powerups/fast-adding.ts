@@ -3,10 +3,10 @@ import { CARD, powerUpFits } from "@/rig/tricks";
 import { fmt } from "../systems/fleetView";
 import type { PowerUp } from "./types";
 
-/** Squads light up one at a time with a running total; the last one stays a question. */
+/** Squads light up one at a time with a running total; the last one stays a question. 10 squads are 10 real rows (src/battle/formation.ts). */
 export const fastAdding: PowerUp = {
   id: "fast-adding", name: CARD["fast-adding"],
-  fits: (a, b) => powerUpFits("fast-adding", a, b) && a <= 9 && a >= 2,
+  fits: (a, b) => powerUpFits("fast-adding", a, b),
   apply({ a, b, fv, marks, time }) {
     fv.rowPulse = { rows: a, t0: time };
     for (let r = 0; r < a; r++) {

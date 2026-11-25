@@ -6,7 +6,7 @@
 /** `end` is where the speech stops, before the clip's trailing silence (measured at bake time). */
 export interface Clip { voice: string; text: string; duration: number; end?: number; src: string }
 export type Mood = "space" | "classroom" | "heroic" | "hangar" | "battle";
-export type Sfx = "dive" | "chime" | "knock" | "door" | "blip_ok" | "blip_close" | "fanfare" | "nova_chirp" | "ignition" | "yawn" | "shot" | "burst" | "flyby" | "shield" | "clear";
+export type Sfx = "dive" | "chime" | "knock" | "door" | "blip_ok" | "blip_close" | "fanfare" | "nova_chirp" | "ignition" | "yawn" | "shot" | "burst" | "flyby" | "shield" | "clear" | "tick";
 
 class SoundEngine {
   manifest: Record<string, Clip> = {};
@@ -177,7 +177,8 @@ class SoundEngine {
     return s;
   }
 
-  sfx(name: Sfx) {
+  /** One sound effect. `o.step` raises a `tick` by whole tones (the hit tick climbs along a squad). */
+  sfx(name: Sfx, o: { step?: number } = {}) {
     const a = this.ctx;
     if (!a) return;
     const t = a.currentTime;
@@ -249,6 +250,13 @@ class SoundEngine {
         break;
       }
       case "yawn": this.yawn(t); break;
+      case "tick": {
+        // a short wooden tick that steps up a whole tone per ship along a squad (capped an octave and a half up)
+        const f = 520 * Math.pow(2, Math.min(9, o.step ?? 0) / 6);
+        tone(f, "triangle", 0.09, 0.003, 0.07);
+        tone(f * 2, "sine", 0.03, 0.002, 0.04);
+        break;
+      }
       case "shot": {
         const o = a.createOscillator();
         o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.12);

@@ -73,24 +73,25 @@ describe("persistence from the bus", () => {
 });
 
 describe("sound cues from the bus", () => {
-  it("throttles shots and bursts on the stage clock; extras fly silently; every sound has an event", () => {
+  it("throttles shots and hit ticks on the stage clock; ticks climb along a squad; the last ship bursts", () => {
     const bus = createBus(), played: string[] = [];
-    attachSound(bus, (s) => played.push(s));
+    attachSound(bus, (s, o) => played.push(o ? `${s}:${o.step}` : s));
     bus.emit("wave_started", { a: 3, b: 8, index: 0, role: "anchor" });
     bus.emit("launch", { extra: false, t: 1.0 });
     bus.emit("launch", { extra: false, t: 1.03 }); // inside 0.06 s: no second shot
     bus.emit("launch", { extra: false, t: 1.1 });
     bus.emit("launch", { extra: true, t: 2 });
-    bus.emit("hit", { ship: 0, amount: 1, full: true, t: 1.42 });
-    bus.emit("hit", { ship: 1, amount: 1, full: true, t: 1.45 });
-    bus.emit("hit", { ship: 2, amount: 1, full: true, t: 1.5 });
+    bus.emit("hit", { ship: 0, amount: 1, full: true, t: 1.42, step: 0 });
+    bus.emit("hit", { ship: 1, amount: 1, full: true, t: 1.45, step: 1 }); // inside 0.035 s: no second tick
+    bus.emit("hit", { ship: 2, amount: 1, full: true, t: 1.5, step: 2 });
+    bus.emit("hit", { ship: 3, amount: 1, full: true, t: 1.51, step: 3, last: true }); // the last ship always lands
     bus.emit("resolved", { correct: false, n: 20, product: 24, attempt: 1 });
     bus.emit("regroup", {});
     bus.emit("resolved", { correct: true, n: 24, product: 24, attempt: 2 });
     bus.emit("cue", { sfx: "blip_ok" });
     bus.emit("battle_done", { kind: "academy" });
     bus.emit("battle_done", { kind: "clear" });
-    expect(played).toEqual(["flyby", "shot", "shot", "burst", "burst", "shield", "clear", "blip_ok", "clear"]);
+    expect(played).toEqual(["flyby", "shot", "shot", "tick:0", "tick:2", "burst", "shield", "clear", "blip_ok", "clear"]);
   });
 });
 

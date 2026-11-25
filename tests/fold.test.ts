@@ -151,7 +151,7 @@ describe("scaffolding", () => {
     expect(scaffold(1)).toMatchObject({ nudge: true, radar: false, showMeHow: false });
     // way off on the first miss is answered in the world, not with four answers to pick from
     expect(scaffold(1)).toMatchObject({ radar: false });
-    expect(scaffold(2)).toMatchObject({ radar: true, invite: true });
+    expect(scaffold(2)).toMatchObject({ radar: false, invite: true }); // no Radar: multiple choice is gone (wave 2)
     expect(scaffold(3)).toMatchObject({ showMeHow: true });
     expect(scaffold(0).radar).toBe(false);
   });

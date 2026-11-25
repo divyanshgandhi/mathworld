@@ -8,17 +8,19 @@ import { warmVoice } from "@/engine/voice";
 import { fold, type LoggedEvent, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, type Wave } from "@/director/next";
 import { band } from "@/rig/adaptive";
-import { classifyError, radarChoices } from "@/rig/errors";
-import { volley } from "@/rig/fleet";
+import { classifyError } from "@/rig/errors";
 import { factKey, PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/pools";
 import { FLIP_SEC, planShowMeHow, safetyNetApplies, SHOT, WHY, type Plan } from "@/rig/showme";
 import { CARD, selectTrick, type TrickId } from "@/rig/tricks";
 import { createBus } from "@/battle/bus";
+import { planVolley, targetOrder, volleySchedule } from "@/battle/formation";
+import { reducedMotion, sairaReady } from "@/battle/look";
 import { nextHint, type HintStep } from "@/battle/hints";
 import { createLessonStage } from "@/battle/lessonBeats";
 import { attachPersistence } from "@/battle/persistence";
 import { themeOf } from "@/battle/planets";
 import { POWERUPS } from "@/battle/powerups";
+import { INVADER, INVADER_TONES } from "./ships";
 import { planetClearOrbs, waveClearOrbs } from "@/battle/rewards";
 import { createScheduler } from "@/battle/scheduler";
 import { createSectorLock } from "@/battle/sectorLock";
@@ -27,15 +29,24 @@ import { canAim, hintState, initialBattle, reduce, type BattleAction, type Battl
 import { createBackdrop } from "@/battle/systems/backdrop";
 import { createCameraRig, frameBox, measure, type Safe } from "@/battle/systems/camera";
 import { createCannon } from "@/battle/systems/cannon";
+import { createCharge } from "@/battle/systems/charge";
 import { AXIS_H, createFleetView, fmt, type AxisShow } from "@/battle/systems/fleetView";
-/** On-screen height (px) the axis label pills keep, so their words read at about 16 px. */
-const AXIS_PX = 26;
 import { createFx } from "@/battle/systems/fx";
+import { createKillFx } from "@/battle/systems/kill";
+import { createMisses } from "@/battle/systems/misses";
+import { createScan } from "@/battle/systems/scan";
 import { createMarks } from "@/battle/systems/marks";
 import { createNovaFigure } from "@/battle/systems/nova";
 import { attachTelemetry } from "@/battle/telemetry";
 import { createVoice } from "@/battle/voice";
 import { ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, unlockLine } from "./lines";
+
+/** On-screen height (px) the axis label pills keep, so their words read at about 16 px. */
+const AXIS_PX = 26;
+/** The rocket's height on screen as a share of its band, and its model's height at scale 1 (tilted, flame included). */
+const ROCKET_SHARE = 0.44, ROCKET_MODEL_H = 2.1, ROCKET_Z = 1.8;
+/** The last kill's hit-stop (s) and the miss beats: survivors gather, the bracket lands, the fleet comes back. */
+const HIT_STOP = 0.065, GATHER = 0.45, RESTORE_AT = 1.65, READY_AFTER = 0.35;
 
 /**
  * The battle (SPEC §1, §3, §4): one wave at a time from the director, a Base-10 fleet laid out
@@ -47,8 +58,9 @@ import { ERROR_LINE, EXACT_LINES, jumpLine, PLANET_NAMES, unlockLine } from "./l
  * and the drawing is split into systems under `src/battle/systems/`. Power-Ups, hints, rewards and planet
  * themes are registries under `src/battle/`.
  *
- * Shot budget: the volley is capped at ~1.5 s however big the number, the outcome holds ~1 s, Nova's
- * line is one short sentence, and the fleet regroups in ~0.4 s, so fire → ready stays under ~5 s.
+ * Shot budget (wave 2): the volley lands inside ~3.4 s however big the number, squad by squad; a miss
+ * shows in the world for ~1.6 s (survivors gather and are counted, or the extras fizz out and are
+ * counted), then the full fleet is back and the keypad is live ~2 s after the outcome.
  */
 export interface ArenaUi {
   planet: PlanetId;
@@ -59,6 +71,7 @@ export interface ArenaUi {
   canFire: boolean;
   /** `last`: the shields are back up, so the chip now reports the previous shot, not the fleet on screen. */
   outcome: { kind: "exact" | "under" | "over"; value: number; orbs?: number; last?: boolean } | null;
+  /** Always null: the Targeting Radar (multiple choice) is gone for good. Kept so callers compile. */
   radar: number[] | null;
   invite: boolean;
   belt: { id: TrickId; card: string; fits: boolean; active: boolean }[];
@@ -82,7 +95,7 @@ export interface ArenaUi {
    * labels ("soft" is an unprompted first-sight hint). `powerUp`: the Power-Up that fits, flagged on miss 2.
    */
   hint?: { level: number; squads: AxisShow; each: AxisShow; powerUp: TrickId | null } | null;
-  /** The digits being typed (wave 2 draws them on the cannon). */
+  /** The digits being typed (drawn on the rocket's nose). */
   charge?: number | null;
 }
 
@@ -106,8 +119,9 @@ export interface ArenaOpts {
    */
   academy?: { film: boolean; onSolved?: () => void };
   /**
-   * "labels" (default): the "N squads" / "N each" labels are always shown. "discover": they start hidden
-   * and the hint ladder (src/battle/hints) reveals them. In dev, `?discover` in the URL turns it on.
+   * "discover" (default): the structure labels start hidden; the formation shows the groups and the hint
+   * ladder (src/battle/hints) reveals the labels with scans. "labels": the "N squads" / "N in each squad"
+   * labels are always shown. In dev, `?labels` in the URL turns labels on.
    */
   structure?: Structure;
 }
@@ -115,12 +129,12 @@ export interface ArenaOpts {
 export function mountArena(stage: Stage, opts: ArenaOpts) {
   const { scene, camera } = stage, rnd = seeded(5), seed = opts.seed ?? 7;
   const planet = opts.planet, tier = tierOfPlanet(planet), theme = themeOf(planet);
-  // temporary dev switch until a screen passes `structure` (wave 2)
-  const structure: Structure = opts.structure ?? (opts.dev && typeof location !== "undefined" && new URLSearchParams(location.search).has("discover") ? "discover" : "labels");
+  const structure: Structure = opts.structure ?? (opts.dev && typeof location !== "undefined" && new URLSearchParams(location.search).has("labels") ? "labels" : "discover");
   const origin = opts.origin?.clone() ?? new THREE.Vector3(0, 0, 0);
   const overlay = createOverlay(stage.container, stage.renderer.domElement);
   const log: LoggedEvent[] = [...(opts.history ?? [])];
   void audio.preload();
+  void sairaReady();
 
   // ---- the world: the systems, in the draw order the battle has always had ----
   const backdrop = createBackdrop(stage, planet, origin, opts.sky !== false);
@@ -137,11 +151,16 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   const marks = createMarks(stage, fv);
   const cam = createCameraRig(camera, stage.renderer.domElement, origin);
   const sched = createScheduler(stage);
+  const kill = createKillFx(stage, root, rnd);
+  /** Formation units per CSS px (scans, brackets and counts keep their size on screen). */
+  const unitsPerPx = () => { const p = cam.pxPerUnit(0) * fv.scale; return p > 0 ? 1 / p : 0.02; };
+  const misses = createMisses(stage, fv, { unitsPerPx });
+  const charge = createCharge(stage, root, (out) => cannon.rocket.noseWorld(out));
 
   // ---- state ----
   let mode: ArenaUi["mode"] = opts.academy ? "academy" : opts.force || s0.tier !== tier ? "practice" : "campaign";
   let practiceK = 0, declinedAt = -1, started = false, disposed = false;
-  let wave: Wave | null = null, shownAt = 0, rocketBottom: number | null = null;
+  let wave: Wave | null = null, shownAt = 0;
   let active: TrickId | null = null, pendingLesson: Plan | null = null, lessonId = 0;
   let bs: BattleState = initialBattle();
   const dispatch = (a: BattleAction) => { bs = reduce(bs, a); };
@@ -164,6 +183,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
 
   // ---- Nova ----
   const voice = createVoice(overlay, () => bs.lessonOn), say = voice.say, player = voice.player;
+  const scan = createScan(stage, fv, { unitsPerPx, caption: (t) => voice.caption(t, 1600) });
 
   const sector = createSectorLock(fv, marks, { say: (id) => void say(id), cue });
   const lesson = createLessonStage({ fv, marks, at: sched, powerUp: (t) => applyPowerUp(t), cue, current: (id) => id === lessonId });
@@ -205,22 +225,32 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const h = bs.hint;
     return { level: h.level, squads: h.squads ? (h.level >= 1 ? "on" : "soft") : "off", each: h.each ? "on" : "off", powerUp: h.powerUp ? fittingPowerUp() : null };
   }
+  /**
+   * Show a rung. Its label settles at the end of a scan (squads: the bracket steps down the fleet; each:
+   * along the first squad), and only then does the HUD hear about it (`ui.hint`), so nothing is spoiled
+   * early. Show Me How reveals both labels at once (the lesson is the show).
+   */
   function showHint(step: HintStep) {
     if (!wave) return;
+    const before = hintUi();
     dispatch({ type: "hint", step });
-    const h = hintUi();
-    fv.showAxis(h.squads, h.each);
-    setUi({ hint: h });
+    const h = hintUi(), wn = bs.waveNo;
     bus.emit("hint_shown", { id: step.id, level: step.level, a: wave.a, b: wave.b, soft: step.soft, trigger: step.trigger, reveal: step.reveal, powerUp: h.powerUp });
+    const reveal = () => { if (disposed || bs.waveNo !== wn) return; const now = hintUi(); fv.showAxis(now.squads, now.each); setUi({ hint: now }); };
+    if (step.id === "show-me-how") { scan.skip(); return reveal(); }
+    // what was already up stays up while the new label is scanned
+    fv.showAxis(before.squads, before.each);
+    const [ra, rb] = fv.flipped ? [wave.b, wave.a] : [wave.a, wave.b];
+    scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal, { soft: step.soft });
   }
-  /** Climb the ladder if it has a rung for now. `afterLine`: Nova's reaction, which rung 1 waits for. */
-  function climb(afterLine?: Promise<void>) {
+  /** Climb the ladder if it has a rung for now. `afterLine`: Nova's reaction (and the regroup), which rung 1 waits for. */
+  function climb(afterLine?: Promise<unknown>) {
     if (structure !== "discover" || !wave) return;
     const step = nextHint(hintState(bs), factBand(wave));
     if (!step) return;
     if (!step.afterLine || !afterLine) return showHint(step);
-    const wn = bs.waveNo, misses = bs.attempts;
-    void afterLine.then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === misses) showHint(step); });
+    const wn = bs.waveNo, missed = bs.attempts;
+    void afterLine.then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && canAim(bs)) showHint(step); });
   }
 
   // ---- the director: which wave comes next ----
@@ -270,6 +300,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       : practiceDraw(s);
     wave = w;
     lastKey = factKey(w.a, w.b);
+    scan.reset(); misses.clear(); kill.clear(); cannon.clearBalls();
     endLesson();
     player.cancel(); // a new fleet: lines for the last one are no longer wanted
     dispatch({ type: "wave", a: w.a, b: w.b });
@@ -285,13 +316,16 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     });
     bus.emit("wave_started", { a: w.a, b: w.b, index, role: w.role });
     prefetchLesson(false); // Beat 1 of this fleet's Show Me How, while the cadet thinks
-    climb(); // a fact never met: the squads label, softly
+    const wn = bs.waveNo;
     if (s.waves === 0 && mode === "campaign" && opts.lines?.intro) await say(opts.lines.intro, { queue: true });
     else if (index === 0 && mode !== "academy") void say(theme.briefing);
     // an empty fleet is a strange picture the first time: Nova says what it shows (never the answer)
     if ((w.a === 0 || w.b === 0) && mode !== "academy" && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
-    await sched.after(0.75); // the fleet flies in
+    // the fleet warps in squad by squad (the first structure cue); the keypad goes live as the last squad lands
+    await sched.after(Math.max(0.3, fv.landed - stage.time - 0.15));
+    if (disposed || bs.waveNo !== wn) return;
     ready();
+    climb(); // a fact never met: a soft, quick squad scan
     if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });
   }
 
@@ -299,6 +333,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     bus.emit("ready", {});
     dispatch({ type: "ready" });
     shownAt = performance.now();
+    charge.set(bs.charge); // digits typed while the last shot played out show now
     setUi({ canFire: canAim(bs) });
   }
 
@@ -321,6 +356,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     wave = null;
     dispatch({ type: "done" });
     if (kind === "clear") {
+      backdrop.clearRing(); // the planet takes its gold ring, behind the HUD's clear card
       bus.emit("orb_burst", { amount: planetClearOrbs(), reason: "planet_cleared" });
       const next = PLANETS_BY_TIER[Math.min(tier + 1, PLANETS_BY_TIER.length - 1)];
       setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${planet === "earth" ? "Cadet Bay" : PLANET_NAMES[planet]} clear`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next } });
@@ -335,14 +371,14 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
 
   // ---- firing ----
-  type FireOpts = { radar?: boolean };
-  async function fire(n: number, o: FireOpts = {}) {
-    const f = fv.fleet;
-    if (!wave || !f || !canAim(bs)) return;
+  async function fire(n: number) {
+    const f = fv.fleet, l = fv.layout;
+    if (!wave || !f || !l || !canAim(bs)) return;
     const w = wave, p = w.a * w.b, latency = Math.round(performance.now() - shownAt);
     const typed = bs.charge;
-    dispatch({ type: "fire", radar: !!o.radar });
-    setUi({ canFire: canAim(bs), outcome: null, radar: o.radar ? null : ui.radar });
+    scan.skip(); // firing skips a scan to its end
+    dispatch({ type: "fire", radar: false });
+    setUi({ canFire: canAim(bs), outcome: null, radar: null });
     if (typed !== null) bus.emit("charge", { n: null }); // the digits are spent
     let unlocked: TrickId[] = [];
     if (pendingLesson) {
@@ -359,22 +395,59 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     }
     const errorType = classifyError(w.a, w.b, n);
     bus.emit("fire", {
-      n, a: w.a, b: w.b, planet, latencyMs: latency, attempt: bs.attempts, radar: !!o.radar, usedRadar: bs.usedRadar, errorType, powerUp: active,
+      n, a: w.a, b: w.b, planet, latencyMs: latency, attempt: bs.attempts, radar: false, usedRadar: bs.usedRadar, errorType, powerUp: active,
       isTransferCheck: w.isTransferCheck, waveRole: mode === "campaign" ? w.role : "practice",
     });
 
-    // the volley: every ball pops exactly its ship's worth; the whole thing takes at most ~1.5 s
-    const plan = volley(f, n);
-    const dur = cannon.volley(plan, fv.views, sched, rnd, fv.formation, {
-      onLaunch: (extra) => bus.emit("launch", { extra, t: stage.time }),
-      onLand: (v, amount, full, ship) => {
-        fv.land(v, amount, full);
-        bus.emit("hit", { ship, amount, full, t: stage.time });
-        fx.burst(v.g.getWorldPosition(new THREE.Vector3()));
+    // the volley: one ball per ship (a pod takes its 10 in one ball), in reading order squad by squad;
+    // the number on the nose counts down as they leave, so the answer IS the number of balls
+    const order = targetOrder(l, fv.flipped), plan = planVolley(f, n, order);
+    const squadOf = (h: { ship: number }) => (fv.flipped ? Math.round(l.slots[h.ship].x * 100) : l.slots[h.ship].row);
+    const { shots, end } = volleySchedule(plan, squadOf, { reduced: reducedMotion() });
+    charge.set(n);
+    const seen = fv.flipped ? [w.b, w.a] : [w.a, w.b];
+    const spots = misses.extraSpots(plan.extra, seen[1]);
+    const top = (l.H > 0 ? l.H / 2 : fv.fh / fv.scale / 2);
+    const rowSize = new Map<number, number>();
+    for (const id of order) rowSize.set(squadOf({ ship: id }), (rowSize.get(squadOf({ ship: id })) ?? 0) + 1);
+    let cleared = 0;
+    const lastHit = plan.remaining === 0 ? plan.hits.length - 1 : -1, reduced = reducedMotion();
+    const wp = new THREE.Vector3();
+    cannon.fire(shots, plan, fv.views, sched, {
+      onLaunch: (shot) => { charge.take(shot.worth); bus.emit("launch", { extra: shot.hit === null, t: stage.time }); if (shot.hit === null && shot.step === 0) cue("flyby"); },
+      onIncoming: (v, at) => fv.incoming(v, at),
+      onLand: (i) => {
+        const h = plan.hits[i], v = fv.views[h.ship], last = i === lastHit, hold = last && !reduced ? HIT_STOP : 0;
+        fv.land(v, h.amount, h.full, hold);
+        root.worldToLocal(v.g.getWorldPosition(wp));
+        const size = fv.scale * Math.max(v.size.x, v.size.y) * (v.kind === "fighter" ? 0.78 : 0.45);
+        kill.burst(wp, shardColours(v), { size, delay: hold, big: last });
+        const shot = shots.find((x) => x.hit === i);
+        bus.emit("hit", { ship: h.ship, amount: h.amount, full: h.full, t: stage.time, step: shot?.step ?? 0, last });
+        if (last) cam.nudge(0, -0.12 * fv.scale);
+        // a squad fully cleared: its pennant drops and one count ticks (the squads, counted again without a word)
+        const key = squadOf(h);
+        if (h.full && rowSize.has(key)) {
+          rowSize.set(key, rowSize.get(key)! - 1);
+          if (rowSize.get(key) === 0) {
+            const slot = l.slots[h.ship];
+            cleared = fv.flipped ? cleared + 1 : slot.squad + slot.span;
+            bus.emit("squad_cleared", { squad: key, count: cleared, t: stage.time });
+            squadBeat(key, cleared, squadOf);
+          }
+        }
       },
-      onExtras: () => cue("flyby"),
+      extraTo: (i) => {
+        if (spots && spots[i]) return fv.formation.localToWorld(spots[i].clone());
+        return fv.formation.localToWorld(new THREE.Vector3((rnd() - 0.5) * Math.max(2, l.W), top + 2.5 + rnd() * 2, -14));
+      },
+      onFizz: (i, at) => {
+        kill.fizz(root.worldToLocal(at.clone()), 0.35 * fv.scale);
+        if (spots && spots[i]) misses.dot(spots[i]);
+      },
     });
-    await sched.after(dur);
+    await sched.after(end);
+    charge.release();
 
     if (n === p) {
       dispatch({ type: "exact" });
@@ -385,48 +458,75 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       dispatch({ type: "cleared" });
       bus.emit("wave_cleared", { a: w.a, b: w.b, attempts: bs.attempts, firstTry: bs.attempts === 1, streak: bs.streak });
       void say(unlocked.length ? unlockLine(unlocked[unlocked.length - 1]) : EXACT_LINES[(state().waves + bs.attempts) % EXACT_LINES.length]);
-      await sched.after(0.9);
+      await sched.after(0.8);
       if (mode === "academy") return academyDone(w);
       if (mode === "practice") practiceK++;
       return startWave();
     }
 
-    // a miss: the outcome is visible in the world, then shields shimmer back on for another try
+    // a miss, shown in the world: too few and the survivors gather into true rows and are counted;
+    // too many and the extras' fizz marks are counted. Then the full fleet is back for another try.
     const over = n > p, value = over ? plan.extra : plan.remaining;
     bus.emit("resolved", { correct: false, n, product: p, attempt: bs.attempts });
     setUi({ outcome: { kind: over ? "over" : "under", value } });
-    fv.wink();
+    if (over) misses.over(value);
+    else {
+      const alive = fv.gather(order), gathered = alive.length > 0 && alive.every((v) => v.kind === "fighter");
+      fv.wink(GATHER);
+      sched.at(GATHER + 0.05, () => { if (wave === w && !bs.lessonOn) misses.under(alive, value, gathered); });
+    }
     dispatch({ type: "miss", guess: n, errorType, latencyMs: latency, now: performance.now(), tier });
-    const route = bs.lastMiss!, misses = bs.attempts;
-    bus.emit("miss", { kind: over ? "over" : "under", value, errorType, attempt: misses, mash: route.mash });
+    const route = bs.lastMiss!, missed = bs.attempts;
+    bus.emit("miss", { kind: over ? "over" : "under", value, errorType, attempt: missed, mash: route.mash });
     // predictive pre-fetch (SPEC §6): a miss makes Show Me How likely, so voice all its lines now
-    if (misses === 1) prefetchLesson(true);
+    if (missed === 1) prefetchLesson(true);
     if (route.kind !== "react") {
       // stuck after a trick on an early level: the safety net drops to Fast Adding (once a wave);
-      // third miss: no reaction line (Nova's lesson is the reaction), shields up, straight into Show Me How
-      await sched.after(SHOT.pause);
+      // third miss: the miss shows, then no reaction line (Nova's lesson is the reaction), straight into Show Me How
+      await sched.after(Math.max(SHOT.pause, RESTORE_AT - 0.4));
       restore();
       return void showMeHow({ auto: true, fallback: route.kind === "safety-net" });
     }
-    const radar = route.radar ? radarChoices(w.a, w.b, seeded(mix(seed, w.a, w.b, misses))) : null;
-    setUi({ radar: radar ?? ui.radar, invite: route.invite });
+    setUi({ radar: null, invite: route.invite });
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
-    const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite" : errorType && errorType !== "wild_guess" ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
-    climb(line);
-    await sched.after(1.05);
+    const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite_v2" : errorType === "wild_guess" ? "nova_err_way_off" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
+    const back = sched.after(RESTORE_AT + READY_AFTER);
+    climb(Promise.all([line, back]));
+    await sched.after(RESTORE_AT);
+    if (wave !== w) return;
     restore();
     if (ui.outcome) setUi({ outcome: { ...ui.outcome, last: true } });
-    await sched.after(0.4);
+    await sched.after(READY_AFTER);
+    if (wave !== w) return;
     ready();
+  }
+
+  /** The colours a ship breaks into: its squad tone and its dark parts. */
+  function shardColours(v: { gRow: number }) {
+    return [INVADER[INVADER_TONES[v.gRow % 2]], INVADER.shade, INVADER.visor];
+  }
+  /** A squad is cleared: the leader's pennant drops from its place and one small count ticks beside the squad. */
+  function squadBeat(key: number, count: number, squadOf: (h: { ship: number }) => number) {
+    const row = fv.views.filter((v) => squadOf({ ship: v.ship.id }) === key);
+    if (!row.length || (wave && Math.max(wave.a, wave.b) > 40)) return;
+    const lead = row.reduce((m, v) => (v.slot.index < m.slot.index ? v : m), row[0]);
+    const p = fv.formation.localToWorld(fv.placeOf(lead));
+    root.worldToLocal(p);
+    const isLeader = lead.kind === "fighter" && !!lead.g.children[0]?.userData.leader;
+    if (isLeader) kill.pennant(p.clone().add(new THREE.Vector3(0, 0.5 * fv.scale, 0.2)), fv.scale * 0.78);
+    const h = 20 * unitsPerPx() * fv.scale;
+    kill.tick(p.clone().add(new THREE.Vector3(-(lead.size.x / 2 + 0.45) * fv.scale, 0, 0.6)), fmt(count), h);
+    if (key >= 0) cue("tick");
   }
 
   /** Shields back up: every ship returns, so the next shot is at the whole fleet again. */
   function restore() {
     bus.emit("regroup", {});
+    misses.clear();
     fv.regroup();
   }
 
-  // ---- Radar, Power-Ups, Show Me How ----
+  // ---- Power-Ups, Show Me How ----
   function powerUp(t: TrickId) {
     if (!wave || !canAim(bs)) return;
     if (sector.on && t === "big-small-split") return; // already cracking sectors: keep the locks made so far
@@ -506,28 +606,37 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
 
   // ---- the frame ----
+  const rocketAt = new THREE.Vector3();
   const stop = stage.onUpdate((dt, T) => {
     sched.tick();
     fv.update(dt, T);
     cannon.update();
     fx.update(dt, bs.lessonOn);
-    // the rocket sits under the fleet; the camera frames fleet + rocket inside the HUD's free area
+    kill.update(dt);
+    scan.update();
+    misses.update();
+    // the camera frames the fleet (and the labels on show) in the HUD's free area, above the rocket's band
     const m = measure(fv);
-    // the rocket rides the frame: its height eases at the camera's rate, so a new fleet never leaves
-    // it below the bottom edge while the camera catches up
-    rocketBottom = rocketBottom === null ? m.bottom : rocketBottom + (m.bottom - rocketBottom) * Math.min(1, dt * 3);
-    cannon.pose(T, rocketBottom);
-    // Nova: in beside the fleet's top-left corner for a lesson, away otherwise; she lip-syncs to the voice
     const nv = nova.update(dt, T, m.w, m.h, bs.lessonOn);
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.axisPad));
-    // axis labels ("7 squads", "8 each") keep at least ~26 px on screen, on a phone too
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, fv.visiblePad()), !bs.lessonOn);
+    // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
+    const ppuR = cam.pxPerUnit(ROCKET_Z);
+    if (ppuR > 0) {
+      cannon.scale = (cam.band * ROCKET_SHARE) / ppuR / ROCKET_MODEL_H;
+      cam.bottomCentre(cam.band * 0.36, ROCKET_Z, rocketAt);
+      cannon.pose(T, rocketAt);
+    }
+    // the typed number rides the nose: its figures 32 px tall on a phone, 44 px on a larger screen
+    const ppuN = cam.pxPerUnit(ROCKET_Z + 0.4), phone = (stage.renderer.domElement.clientWidth || 800) < 600;
+    if (ppuN > 0) charge.update(1 / ppuN, phone ? 32 : 44);
+    // axis labels ("7 squads", "8 in each squad") keep at least ~26 px on screen, on a phone too
     const ppu = cam.pxPerUnit();
     if (ppu > 0) {
       const want = Math.min(2.2, Math.max(AXIS_H, AXIS_PX / ppu));
       if (Math.abs(want - fv.axisH) / fv.axisH > 0.04) fv.axisSize(fv.axisH + (want - fv.axisH) * Math.min(1, dt * 4));
     }
-    backdrop.update(dt);
-
+    const fr = cam.free;
+    backdrop.update(dt, { at: (dx, dy, z) => cam.at(dx, dy, z), ppu: (z) => cam.pxPerUnit(z), fw: fr.fw, fh: fr.fh });
   });
 
   backdrop.applyLook();
@@ -546,7 +655,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       void startWave();
     },
     fire: (n: number) => fire(n),
-    radar: (n: number) => fire(n, { radar: true }),
+    /** The Targeting Radar is gone (no multiple choice); kept as an alias of `fire` so callers compile. */
+    radar: (n: number) => fire(n),
     powerUp,
     showMeHow: () => void showMeHow(),
     /** Dev: the lesson plan this fleet would get now. */
@@ -557,10 +667,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     lockSector(value: number) { const ok = sector.lock(value); if (ok) setUi(sector.ui()); return ok; },
     /** The cadet is typing (kept for callers; the Radar no longer comes on idle). */
     poke: () => {},
-    /** The digits being typed (null: cleared). Wave 2 draws them on the cannon; the bus gets a `charge` event. */
+    /**
+     * The digits being typed (null: cleared). They show on the rocket's nose (while a shot plays out they
+     * wait, and show when the keypad is live again); typing skips a scan to its end. The bus gets `charge`.
+     */
     setCharge(n: number | null) {
       dispatch({ type: "charge", n });
       cannon.setCharge(n);
+      if (canAim(bs) || !wave) charge.set(n);
+      if (n !== null) scan.skip();
       bus.emit("charge", { n });
     },
     acceptJump() {
@@ -586,6 +701,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       endLesson();
       player.cancel();
       stop();
+      scan.reset();
+      misses.dispose();
       clearFleet();
       overlay.dispose();
       audio.stopVoice();
@@ -594,6 +711,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       backdrop.dispose();
       cannon.dispose();
       fx.dispose();
+      kill.dispose();
+      charge.dispose();
     },
   };
 }
