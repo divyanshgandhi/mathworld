@@ -127,7 +127,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
           )}
           {ui.unlock && (
             <div role="status" className="flex items-center gap-2 rounded-pill border border-gold bg-void px-4 py-1.5 type-label-sm text-gold">
-              <Icon name="trick" size={18} />Trick card unlocked · {ui.unlock.cards.join(" + ")} · on your belt
+              <Icon name="trick" size={18} />New Power-Up on your belt: {ui.unlock.cards.join(" + ")}
             </div>
           )}
           {o && (

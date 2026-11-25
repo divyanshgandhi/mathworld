@@ -48,7 +48,7 @@ export function CadetSignUp({ onDone, cta = "Start" }: { onDone: (p: Cadet) => v
       </Field>
       <Field name="avatar">
         <FieldLabel className="type-name text-[17px] text-ink-2">Pick your colour</FieldLabel>
-        <RadioGroup value={avatar} onValueChange={(v) => setAvatar(String(v))} className="mt-3 flex flex-wrap gap-3">
+        <RadioGroup value={avatar} onValueChange={(v) => setAvatar(String(v))} className="mt-3 grid w-fit grid-cols-3 gap-3 sm:grid-cols-6">
           {AVATARS.map((a) => (
             <label key={a.id} data-slot="label" className="cursor-pointer">
               <Radio value={a.id} aria-label={NAME_OF[a.id] ?? a.id}

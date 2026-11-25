@@ -34,10 +34,10 @@ export function Flashcards({ state, emit, onClose }: { state: PlayerState; emit:
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Quick Flashcards" className="absolute inset-0 z-30 grid place-items-center bg-scrim p-3">
+    <div role="dialog" aria-modal="true" aria-label="Flashcards" className="fixed inset-0 z-30 grid place-items-center bg-void p-3">
       <div className={`${glass} flex w-[min(96vw,620px)] flex-col gap-4 p-5 md:flex-row md:items-stretch`}>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-          <p className="type-label-sm text-ink-2">Quick flashcards · {Math.min(i + 1, DECK_SIZE)} of {deck.length}</p>
+          <p className="type-label-sm text-ink-2">Flashcards · {Math.min(i + 1, DECK_SIZE)} of {deck.length}</p>
           {!done && card && (
             <div className={`grid min-h-40 w-full place-items-center rounded-panel border px-6 py-6 transition ${result ? (result.ok ? "border-gold" : "border-sky") : "border-line-2"}`}>
               <p className="type-display type-number text-6xl md:text-7xl" aria-live="polite">{card.a}<span className="mx-3 text-ink-3">×</span>{card.b}</p>

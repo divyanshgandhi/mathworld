@@ -146,7 +146,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   let bs: BattleState = initialBattle();
   const dispatch = (a: BattleAction) => { bs = reduce(bs, a); };
   let ui: ArenaUi = {
-    planet, planetName: opts.academy ? "The Academy" : PLANET_NAMES[planet], mode, started: false, wave: null, canFire: false, outcome: null, radar: null, invite: false,
+    planet, planetName: opts.academy ? "Academy" : PLANET_NAMES[planet], mode, started: false, wave: null, canFire: false, outcome: null, radar: null, invite: false,
     belt: [], sectors: null, lockTotal: null, lesson: null, unlock: null, offer: null, done: null, orbs: s0.orbs, shots: [], lessons: [],
     structure, hint: null, charge: null,
   };

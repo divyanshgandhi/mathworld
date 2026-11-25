@@ -1,3 +1,4 @@
+import { COLOR, hex } from "@/design/tokens";
 import { applyLook } from "@/worlds/looks";
 import * as THREE from "three";
 import { canvasTexture } from "@/engine/materials";
@@ -9,7 +10,7 @@ import { makeBody, starfield, type Body } from "./planets";
 /**
  * The Solar System map (SPEC §2.5): the Sun on the left, then Mercury and Venus (warm-ups) and the
  * frontier from Earth out to Deep Space, in a line the camera glides along. Locked planets are dark
- * silhouettes with a faint rim, cleared ones glow warm with a gold ring, the frontier has a lime ring.
+ * silhouettes with a faint rim, cleared ones and the frontier wear a gold ring (warm-ups a sky one).
  * The HUD scrolls it (wheel, drag, arrows, swipe) and pins a label under each planet: `stop:<id>`.
  */
 const SPACING = 10;
@@ -73,7 +74,7 @@ export function mountSolarMap(stage: Stage, init: Stop[]) {
       });
       v.rim.visible = locked;
       v.ring.visible = s.status !== "locked" && s.status !== "open";
-      (v.ring.material as THREE.SpriteMaterial).color.set(s.status === "frontier" ? 0xbef264 : warm ? 0xfbbf24 : 0x7dd3fc);
+      (v.ring.material as THREE.SpriteMaterial).color.set(hex(s.status === "warmup" ? COLOR.sky : COLOR.gold)); // one ring colour for the campaign; the label says which
     });
   }
   setStops(init);
@@ -104,7 +105,7 @@ export function mountSolarMap(stage: Stage, init: Stop[]) {
     get index() { return Math.round(x / SPACING); },
     anchor(id: string): THREE.Vector3 | null {
       const v = views.find((w) => `stop:${w.stop.id}` === id);
-      return v ? new THREE.Vector3(v.x, -v.body.radius - 1.1, 0) : null;
+      return v ? new THREE.Vector3(v.x, -v.body.radius * 1.7 - 0.8, 0) : null; // below the ring, so the ring never strikes the name
     },
     dispose() { stop(); scene.remove(root); },
   };

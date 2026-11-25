@@ -74,7 +74,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
         doneActions={(d) => (
           <>
             {d.next && <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => void fly(d.next!)}>Fly to {PLANET_NAMES[d.next]}<RocketGlyph size={34} /></Button>}
-            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Solar map</Button>
+            <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
           </>
         )} />

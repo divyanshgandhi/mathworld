@@ -135,7 +135,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
           <p className="type-display text-4xl">Warm-up done</p>
           <p className="flex items-center gap-2 type-child text-ink-2">{score} of {WARMUP_LENGTH} first try · <Icon name="orb" size={20} className="text-gold" />{state.orbs} orbs</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Solar map</Button>
+            <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Star map</Button>
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => { setSeed((x) => x + 7); setI(0); setScore(0); setOutcome(null); }}>Again</Button>
           </div>
         </div>

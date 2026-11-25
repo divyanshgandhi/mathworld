@@ -27,7 +27,7 @@ export const CATALOG: Record<Slot, Item[]> = {
     { id: "starlight-comet", name: "Starlight Comet", cost: 80, blurb: "A white comet with gold sparks" },
   ],
 };
-export const SLOT_NAMES: Record<Slot, string> = { hull: "Hull Paint", blaster: "Blaster FX", thruster: "Thruster Trail" };
+export const SLOT_NAMES: Record<Slot, string> = { hull: "Paint", blaster: "Blasters", thruster: "Thrusters" }; // one word each: three tabs fit one row on any screen
 export const STARTER: Record<Slot, string> = { hull: "cadet-white", blaster: "plasma-ball", thruster: "amber-flame" };
 
 export const itemOf = (slot: Slot, id: string) => CATALOG[slot].find((i) => i.id === id) ?? null;

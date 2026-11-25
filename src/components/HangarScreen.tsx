@@ -48,7 +48,7 @@ export function HangarScreen() {
         <>
           <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
             <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
-            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">The Hangar</span>
+            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">Hangar</span>
           </div>
           {flash && <div role="status" className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-pill border border-gold bg-void px-5 py-1.5 type-name text-[15px] text-gold"><Icon name="check" size={18} />{flash}</div>}
 
@@ -70,7 +70,7 @@ export function HangarScreen() {
                     const afford = price <= state.orbs;
                     return (
                       <div key={item.id} className={`flex items-center gap-2 rounded-chip border px-3 py-2 transition ${looking ? "border-line-3 bg-raised" : "border-line-1"}`}>
-                        <Button aria-label={`Preview ${item.name}`} aria-pressed={looking} onClick={() => setPreview((p) => ({ ...p, [s]: item.id }))} className="min-w-0 flex-1 rounded-[8px] text-left">
+                        <Button aria-label={`Preview ${item.name}`} aria-pressed={looking} onClick={() => setPreview((p) => ({ ...p, [s]: item.id }))} className="min-h-11 min-w-0 flex-1 rounded-[8px] text-left">
                           <span className="block truncate type-name text-[16px]">{item.name}</span>
                           <span className="block truncate text-xs text-ink-2">{item.blurb}</span>
                         </Button>
