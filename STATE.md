@@ -1,6 +1,6 @@
-# STATE: mathworld, branch `overhaul/void-and-gold`
+# STATE: mathworld, branch `main`
 
-_Updated 26 Nov 2026, after the review round's fix pass. `main` still holds the previous version, untouched._
+_Updated 26 Nov 2026, after the review round, the shipping work and the repository clean-up. `main` is the one version: every round is merged into it and the working branches are gone._
 
 ## What changed
 - **Review round** (the owner's seven points in `OVERHAUL.md` "Review round"). Five tracks merged; their notes are `docs/overhaul/r1-*.md`, indexed in `docs/overhaul/README.md`. Six testers then judged the merged build, and this fix pass followed:
