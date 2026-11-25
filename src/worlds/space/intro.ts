@@ -121,6 +121,10 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
 
   /** A phone held upright sees a narrow slice of the room, so two setups stand further back for it. */
   const tall = () => camera.aspect < 1;
+  /** The names beat on a phone: which of its three follow shots have been taken. */
+  let phoneShot = [false, false, false];
+  /** Extra degrees on the tall lens, for the one phone shot that must hold a whole row of desks. */
+  let lensBoost = 0;
   // the standing setups of the classroom, by name
   const SETUP = {
     /** The teacher at the board, from among the desks: she and what she has written are both in frame. */
@@ -290,9 +294,10 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
       lookAt(headOf(player));
       player.rig.look = headOf(teacher);
       len = speak("teacher_yes", "Teacher", teacher);
-      // push in on the cadet, hand in the air
+      // the cadet from the front, on the side of the raised arm, so the hand goes up in clear space
+      // above the shoulder (from behind, the head hid it); the head sits high, clear of the answers
       const h = headOf(player);
-      cam.shot([h.x + 0.9, h.y + 0.85, h.z + 2.6], [h.x - 0.3, h.y - 0.35, h.z - 1.6], 1.4);
+      setup([h.x - 0.85, h.y + 0.2, h.z - 1.75], [h.x - 0.05, h.y - 0.12, h.z], [h.x - 0.75, h.y + 0.18, h.z - 1.6], [h.x - 0.05, h.y - 0.1, h.z], 0.3);
     };
     shot.pick = (v: number) => {
       if (phase === "raise") shot.raise?.(); // answering straight away still raises the hand first
@@ -424,16 +429,32 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
         { id: "captain_names", who: "Captain", c: CAP, gap: 0.5, go: () => { lookAt(headOf(captain)); captain.rig.look = headOf(teacher); SETUP.captain(); } },
       ] }),
     talkShot({ name: "names", env: "class", chapter: "knock", lead: 0.4, tail: 1.5,
-      enter() { lookAt(headOf(teacher), CLASS_CENTRE); gaze([captain, principal], CLASS_CENTRE); feel([teacher], "happy"); SETUP.names(); },
+      enter() {
+        phoneShot = [false, false, false];
+        lookAt(headOf(teacher), CLASS_CENTRE); gaze([captain, principal], CLASS_CENTRE); feel([teacher], "happy");
+        if (tall()) { lensBoost = 18; const a = named()[0].group.position, b = named()[1].group.position; setup([(a.x + b.x) / 2 + 0.3, 2.5, 4.75], [(a.x + b.x) / 2, 0.95, a.z], [(a.x + b.x) / 2 + 0.2, 2.45, 4.6], [(a.x + b.x) / 2, 0.95, a.z], 0.15); }
+        else SETUP.names();
+      },
       beats: [{ id: "teacher_names", who: "Teacher", c: T_, after: (t, start, len) => {
         // the four names fill the last half of the line: each child stands as theirs is called
         named().forEach((kid, i) => {
-          if (t > start + len * (0.47 + i * 0.13) && kid.rig.stand === 0) { kid.rig.stand = 1; kid.rig.mood = "happy"; kid.rig.look = headOf(teacher); teacher.rig.look = headOf(kid); gaze(kids.filter((k) => k.rig.stand === 0), headOf(kid)); }
+          if (t > start + len * (0.47 + i * 0.13) && kid.rig.stand === 0) {
+            kid.rig.stand = 1; kid.rig.mood = "happy"; kid.rig.look = headOf(teacher); teacher.rig.look = headOf(kid); gaze(kids.filter((k) => k.rig.stand === 0), headOf(kid));
+          }
+          // a phone held upright cannot hold the whole room: the front pair is seen from the back wall on a
+          // wider lens as Maya and Leo rise, then a cut to the back pair, from the front, as Aarav and Zoe do
+          if (tall() && i === 2 && !phoneShot[2] && t > start + len * (0.47 + i * 0.13) - 0.15) {
+            phoneShot[2] = true;
+            lensBoost = 0;
+            const p = kid.group.position, q = named()[3].group.position, cx = (p.x + q.x) / 2;
+            setup([cx + 0.6, 1.75, p.z - 4.6], [cx, 1.05, p.z], [cx + 0.5, 1.75, p.z - 4.4], [cx, 1.08, p.z], 0.25);
+          }
         });
       } }] }),
     talkShot({ name: "picked", env: "class", chapter: "knock", lead: 0.5, tail: 4.9,
       enter() {
         cardShown = false;
+        lensBoost = 0;
         lookAt(headOf(player));
         player.rig.look = headOf(teacher);
         SETUP.child(player, 1);
@@ -442,9 +463,10 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
         go: () => audio.sfx("fanfare"),
         after: (t, start, len) => {
           if (t > start + len * 0.8 && player.rig.stand === 0) { player.rig.stand = 1; player.rig.mood = "happy"; }
-          // the camera stays on the cadet's face as they rise
+          // the camera stays on the cadet's face as they rise, from a little below eye height: the
+          // classmates standing behind sit lower in the frame than the cheering hands
           const h = headOf(player);
-          cam.shot([h.x + 0.72, h.y + 0.1, h.z - 1.32], [h.x, h.y - 0.02, h.z], 6);
+          cam.shot([h.x + 0.8, h.y - 0.22, h.z - 1.45], [h.x, h.y + 0.04, h.z], 6);
           if (player.rig.s > 0.9) player.rig.mood = "cheer";
           // out to the void, and the cadet's new name on it
           const out = start + len + 1.9;
@@ -502,6 +524,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
   }
 
   function jump(chapter: Chapter) {
+    lensBoost = 0;
     reset();
     const first = { orbit: "orbit", dive: "dive", wake: "wake", knock: "knock", hangar: "hangar" }[chapter];
     const i = Math.max(0, director.find(first));
@@ -537,7 +560,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd }: { onUi?: (ui: FilmUi) 
     // a rumble, not noise: two slow sines per axis, fading at the same rate at any frame rate
     shake *= Math.exp(-dt * 5);
     // a tall phone frame gets a wider lens, so a shot composed for a wide screen still holds its subject
-    const fov = FOV + (FOV_TALL - FOV) * smooth((1.5 - camera.aspect) / 0.9);
+    const fov = FOV + (FOV_TALL + lensBoost - FOV) * smooth((1.5 - camera.aspect) / 0.9);
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
     cam.sway = env === "class" && !firstPerson && !calm ? 1 : 0;
     cam.apply(camera, dt, time);

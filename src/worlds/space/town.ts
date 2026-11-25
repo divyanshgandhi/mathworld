@@ -121,11 +121,14 @@ export function buildTown(scene: THREE.Scene, M: Materials, rnd: Rng, at: THREE.
     add(g, new THREE.BoxGeometry(0.9, 1.6, 0.1), matte(SET.bark), 0, 0.8, -2.52);
     add(g, new THREE.BoxGeometry(0.9, 0.9, 0.1), glass, 1.4, 2, -2.52, noCast);
   }
+  // clouds: a phone's taller lens sees them from below, where a plain matte sphere goes storm grey.
+  // Their shadow side is lifted toward the pale sky, so from any angle they stay fair-weather white.
+  const cloud = M.clay(hex(COLOR.approach), { roughness: 1, emissive: mix(COLOR.approach, COLOR.sky, 0.35), emissiveIntensity: 0.62 });
   for (let i = 0; i < 7; i++) {
     const g = new THREE.Group();
     g.position.set(-90 + i * 32, 32 + rnd() * 14, -40 - rnd() * 60);
     town.add(g);
-    for (let k = 0; k < 5; k++) add(g, new THREE.SphereGeometry(3 + rnd() * 3, 16, 12), matte(hex(COLOR.approach), 1), k * 3.2 - 6, rnd() * 2, rnd() * 3, off);
+    for (let k = 0; k < 5; k++) add(g, new THREE.SphereGeometry(3 + rnd() * 3, 16, 12), cloud, k * 3.2 - 6, rnd() * 2, rnd() * 3, off);
   }
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * 6.28;

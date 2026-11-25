@@ -146,7 +146,8 @@ export function IntroFilm() {
 
       {prompt && (
         <div key={prompt.eq} ref={arrive} className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-4 px-5 pt-24 text-center" style={{ ...VARS, fontFamily: FAMILY, paddingBottom: "max(104px, 13vh)", background: `linear-gradient(0deg, ${COLOR.void} 0%, ${COLOR.void} 22%, transparent 100%)` }}>
-          <p style={{ ...display, margin: 0, letterSpacing: "0.08em", fontSize: "clamp(34px, 6vw, 56px)" }}>{prompt.eq}</p>
+          {/* the sum is on the board while the camera can see it; once the camera turns to the cadet, it comes down here */}
+          {prompt.stage === "choose" && <p style={{ ...display, margin: 0, letterSpacing: "0.08em", fontSize: "clamp(34px, 6vw, 56px)" }}>{prompt.eq}</p>}
           {prompt.stage !== "choose" ? (
             <>
               <Primary glyph={HAND} armed={prompt.stage === "called"} aria-label="Raise your hand" aria-pressed={prompt.stage === "called"} onClick={() => film.current?.raise()}>

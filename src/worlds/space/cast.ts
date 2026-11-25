@@ -353,7 +353,7 @@ export function setExpression(c: Character, e: Expression, snap = false) {
 }
 
 /** How long the sit-to-stand move takes, in seconds. */
-export const STAND_TIME = 1.25;
+export const STAND_TIME = 1.5; // the push itself takes about 0.8 s of this: a child rising, not springing
 const smooth = (k: number) => { k = clamp(k); return k * k * (3 - 2 * k); };
 
 /**
@@ -369,7 +369,7 @@ export function standPose(s: number, d: { L: number; Ht: number; A: number }, st
   const K = (keys: [number, number][]) => keyframes(keys)(s);
   const lean = K([[0, 0], [0.08, 0], [0.32, 0.34], [0.46, 0.3], [0.82, -0.03], [1, 0]]);
   const hip = K([[0, st.hip], [0.2, st.hip], [0.74, d.L + 0.008], [1, d.L]]);
-  const fwd = K([[0, 0], [0.3, 0.02], [0.62, 0.07], [1, 0.05]]);
+  const fwd = K([[0, 0], [0.3, 0.01], [0.62, 0.035], [1, 0.02]]); // a small shift over the feet; never into the desk
   // the hand: off the desk edge and back first, then down to hang under the shoulder
   const kk = K([[0, 0], [0.02, 0], [0.36, 1], [1, 1]]);
   const restZ = st.edge + 0.03 - fwd, restY = st.desk + 0.076 - hip;
@@ -490,7 +490,7 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   u.shoulders.forEach((sh, i) => {
     const side = i === 0 ? -1 : 1, lift = Math.max(side === 1 ? u.r : 0, u.cheer);
     const g1 = gest * (0.3 + 0.16 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + u.va * 0.4);
-    const top = u.cheer > 0.02 ? Math.PI * 0.8 : Math.PI * 0.9;
+    const top = u.cheer > 0.02 ? Math.PI * 0.88 : Math.PI * 0.9; // a cheer is a tall V: hands above the head, not across the faces behind
     sh.rotation.x = (-arm.first - g1 * 0.35) * (1 - lift);
     sh.rotation.z = side * (0.14 + splay + (top - 0.14 - splay) * lift) + (lift ? Math.sin(T * 9 + i) * 0.05 * lift : 0);
     u.elbows[i].rotation.x = (-arm.bend - g1) * (1 - lift) - 0.22 * lift;
