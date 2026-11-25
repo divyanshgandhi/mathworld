@@ -1,26 +1,94 @@
 import * as THREE from "three";
-import { add, canvasTexture, fitText, outline, PALETTE, type Materials } from "@/engine/materials";
+import { COLOR, hex, TYPE, type ColorName } from "@/design/tokens";
+import { add, canvasTexture, fitText, outline, type Materials } from "@/engine/materials";
 
 /**
- * Hangar upgrades (SPEC §2.6), as styling hooks: the hull paint and thruster trail change the rocket,
- * the blaster changes the plasma balls the arena fires. Ids match `upgrade_purchased` item ids.
+ * Every ship in Math World, in the Void and Gold language (see OVERHAUL.md and docs/overhaul/ships.md).
+ *
+ * The colour story: the player's side is cool, the invaders are warm.
+ * - The cadet's rocket: an approach-white body, gold and sky trim, a dark porthole and an ember flame.
+ * - Invaders: the ember family, matte, with a dark visor and light eyes. Silly, never scary.
+ *   Squads alternate two warm tones row by row, and each squad has a leader with a gold pennant.
+ *
+ * Counting the ships IS the maths, so every invader is a solid, outlined blob with a clear gap
+ * around it, and every big ship shows its worth as a grid you could count (10 sockets, 100 cells).
+ * Everything is matte: emissive stays well under the bloom threshold of every look.
  */
+
+// ---- colour, built only from tokens ----
+const C = (name: ColorName) => hex(COLOR[name]);
+/** A tone between two token colours (mixed in linear light, like the renderer does). */
+const mix = (a: ColorName, b: ColorName, t: number) => new THREE.Color(COLOR[a]).lerp(new THREE.Color(COLOR[b]), t).getHex();
+/** Three-way tone: mix two tokens, then mix the result towards a third (all in linear light). */
+const mix3 = (a: ColorName, b: ColorName, t: number, c: ColorName, u: number) =>
+  new THREE.Color(COLOR[a]).lerp(new THREE.Color(COLOR[b]), t).lerp(new THREE.Color(COLOR[c]), u).getHex();
+/** A token colour as linear RGB scaled by `k`, for additive flames (kept under the bloom threshold). */
+const lin = (name: ColorName, k: number) => { const c = new THREE.Color(COLOR[name]); return [c.r * k, c.g * k, c.b * k] as const; };
+
+/** The invader family. `ember` and `apricot` alternate squad by squad; `shade` is the underside; gold is only for leaders. */
+export const INVADER = {
+  ember: C("ember"),
+  apricot: mix3("ember", "gold", 0.5, "approach", 0.3),
+  shade: mix("ember", "shadow", 0.4),
+  /** The dark tray of pods and big ships. */
+  hull: mix("recede", "shadow", 0.72),
+  visor: C("shadow"),
+  eye: C("approach"),
+  crest: C("gold"),
+} as const;
+export type InvaderTone = "ember" | "apricot";
+export const INVADER_TONES: readonly InvaderTone[] = ["ember", "apricot"];
+
+/**
+ * How one invader looks inside its squad. Additive options on every invader builder:
+ * - `tone`: the squad's warm tone (alternate by squad: `squadStyle` does it for you).
+ * - `leader`: the same drone with a gold pennant on a taller antenna, one per squad.
+ */
+export interface DroneOpts { tone?: InvaderTone; leader?: boolean }
+
+/**
+ * The battle's squad styling in one place: squad `squad` (0-based row in the formation, i.e. `gRow`)
+ * gets the alternating tone, and ship `index` 0 in that squad (`gCol === 0`, where counting starts)
+ * is the leader. For pods and bigger ships pass the squad and the ship's index within the squad.
+ */
+export function squadStyle(squad: number, index: number): Required<DroneOpts> {
+  return { tone: INVADER_TONES[((squad % 2) + 2) % 2], leader: index === 0 };
+}
+
+// ---- Hangar upgrades: styling hooks (ids match `upgrade_purchased` item ids in director/hangar.ts) ----
+type RGB = readonly [number, number, number];
+
+/** Hull paints: `hull` is the body, `trim` the nose cap and porthole rim, `accent` the fins and band. */
 export const HULLS = {
-  "cadet-white": { hull: PALETTE.clay, trim: PALETTE.coral },
-  "solar-gold": { hull: 0xf6d57a, trim: 0xd9822b },
-  "nebula-violet": { hull: 0xc4b0ff, trim: 0x6a4fd0 },
-  "obsidian-stealth": { hull: 0x3b3e55, trim: 0x5fd4e6 },
+  "cadet-white": { hull: C("approach"), trim: C("gold"), accent: C("sky") },
+  "solar-gold": { hull: C("gold"), trim: C("ember"), accent: C("approach") },
+  "nebula-violet": { hull: mix("disk", "recede", 0.22), trim: C("gold"), accent: C("approach") },
+  "obsidian-stealth": { hull: C("horizon"), trim: C("sky"), accent: C("sky") },
 } as const;
-export const THRUSTERS = {
-  "amber-flame": { outer: [2.6, 2.8, 1.4], inner: [4, 3.6, 2.4] },
-  "cyan-ion": { outer: [0.9, 2.4, 3.2], inner: [2.6, 3.6, 4] },
-  "starlight-comet": { outer: [2.4, 1.6, 3.4], inner: [4, 3.8, 4] },
-} as const;
+
+/**
+ * Thruster trails, all additive and dim enough to stay under the bloom threshold:
+ * `outer`/`inner` are linear RGB, `length` and `width` shape the flame, `sparks` adds a comet tail.
+ */
+export const THRUSTERS: Record<"amber-flame" | "cyan-ion" | "starlight-comet", { outer: RGB; inner: RGB; length: number; width: number; sparks: boolean }> = {
+  // the classic: a short, round ember burn with a gold heart
+  "amber-flame": { outer: lin("ember", 0.62), inner: lin("gold", 0.55), length: 1, width: 1, sparks: false },
+  // a cool blue jet: long and narrow
+  "cyan-ion": { outer: lin("sky", 0.62), inner: lin("approach", 0.5), length: 1.45, width: 0.7, sparks: false },
+  // a white comet with a gold heart and a trail of sparks
+  "starlight-comet": { outer: lin("approach", 0.45), inner: lin("gold", 0.5), length: 1.25, width: 1.1, sparks: true },
+};
+
+/**
+ * Blaster effects: the plasma balls the cadet fires. `color` is the ball, `glow` the emissive
+ * intensity to use with it (under the bloom threshold), `size`, `twin` (two side by side) and
+ * `stretch` (a long bolt along the flight). Use `makePlasmaBall` to build one.
+ */
 export const BLASTERS = {
-  "plasma-ball": { color: PALETTE.shot, size: 1, twin: false, stretch: 1 },
-  "twin-plasma": { color: PALETTE.shot, size: 0.8, twin: true, stretch: 1 },
-  "ion-arc": { color: 0x7dfcff, size: 0.9, twin: false, stretch: 1.8 },
-  "nova-beam": { color: 0xd9f99d, size: 0.85, twin: false, stretch: 3 },
+  "plasma-ball": { color: C("approach"), size: 1, twin: false, stretch: 1, glow: 0.45 },
+  "twin-plasma": { color: C("sky"), size: 0.8, twin: true, stretch: 1, glow: 0.5 },
+  "ion-arc": { color: mix("sky", "disk", 0.35), size: 0.85, twin: false, stretch: 2.2, glow: 0.55 },
+  "nova-beam": { color: C("gold"), size: 0.75, twin: false, stretch: 3.4, glow: 0.4 },
 } as const;
 export type HullId = keyof typeof HULLS;
 export type ThrusterId = keyof typeof THRUSTERS;
@@ -28,194 +96,399 @@ export type BlasterId = keyof typeof BLASTERS;
 export interface RocketStyle { hull?: string; thruster?: string }
 const pickOf = <T extends object>(table: T, id: string | undefined, fallback: keyof T): T[keyof T] => table[(id && id in table ? id : fallback) as keyof T];
 
-/** The cadet's rocket: a clay body with coral trim, a glowing porthole and a flickering flame. */
+/** The blaster for an equipped id (unknown ids fall back to the starter). */
+export const blasterOf = (id?: string) => pickOf(BLASTERS, id, "plasma-ball");
+
+const ballGeo = new THREE.SphereGeometry(0.14, 16, 12);
+/**
+ * One plasma ball in a blaster's style: matte with a soft emissive, never a halo. `size` multiplies
+ * the style's own size (the arena scales balls by ship class). The mesh points along +z: call
+ * `lookAt(target)` and a stretched bolt flies nose first. Geometry is shared: do not dispose it.
+ */
+export function makePlasmaBall(M: Materials, blaster?: string, size = 1) {
+  const b = blasterOf(blaster);
+  const m = new THREE.Mesh(ballGeo, M.glow(b.color, b.glow, { roughness: 0.4 }));
+  m.scale.set(1, 1, b.stretch).multiplyScalar(b.size * size);
+  m.castShadow = false;
+  return m;
+}
+
+// ---- the cadet's rocket ----
+const V = (x: number, y: number) => new THREE.Vector2(x, y);
+const BODY_Y = -1.5; // the body sits so the group's origin is at its middle: it tilts and recoils about its centre
+const NOSE_Y = 3.02 + BODY_Y;
+
+/** Alpha along a flame, tip (v = 0) to nozzle (v = 1): it fades out towards the tip instead of ending in a hard edge. */
+const flameFade = (() => {
+  const n = 64, d = new Uint8Array(n * 4);
+  for (let i = 0; i < n; i++) { const v = i / (n - 1), a = Math.round(255 * Math.min(1, Math.pow(v, 1.6) * 1.25)); d.set([a, a, a, 255], i * 4); }
+  const t = new THREE.DataTexture(d, 1, n);
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
+/** A flame profile hanging down from its top (the nozzle), so scaling it never detaches it. */
+function flameGeo(r: number, len: number) {
+  const g = new THREE.LatheGeometry([V(0, -len), V(r * 0.36, -len * 0.8), V(r * 0.78, -len * 0.45), V(r, -len * 0.16), V(r * 0.85, 0), V(0, 0.04)], 32);
+  return g;
+}
+
+/**
+ * The cadet's rocket: a chubby toy with a strong silhouette (gold nose, dark porthole, three big
+ * splayed fins) that still reads at 40 px. Matte, no glow; only the flame is additive.
+ *
+ * Pivots: `group` is the rocket (origin at its middle: aim and bank it by rotating the group);
+ * `body` holds the model (`recoil(k)` squashes it backwards for a shot). The flame hangs from the
+ * nozzle, so `flicker` only ever lengthens it downwards.
+ */
 export function makeRocket(M: Materials, style: RocketStyle = {}) {
   const rocket = new THREE.Group(), body = new THREE.Group();
   rocket.add(body);
-  body.position.y = -1.5; // pivot near the middle, so it can tilt and recoil naturally
-  const V = (x: number, y: number) => new THREE.Vector2(x, y);
+  body.position.y = BODY_Y;
   const paint = pickOf(HULLS, style.hull, "cadet-white"), flame = pickOf(THRUSTERS, style.thruster, "amber-flame");
-  const hull = M.clay(paint.hull, { roughness: 0.55, metalness: 0.05 }), trim = M.clay(paint.trim, { roughness: 0.55 }), dark = M.clay(PALETTE.slate);
-  outline(add(body, new THREE.LatheGeometry([V(0, 0), V(0.42, 0), V(0.5, 0.25), V(0.58, 0.9), V(0.6, 1.5), V(0.56, 2.0), V(0.47, 2.35)], 48), hull), M);
-  outline(add(body, new THREE.LatheGeometry([V(0.47, 2.35), V(0.36, 2.65), V(0.2, 2.9), V(0.05, 3.02), V(0, 3.04)], 48), trim), M);
-  const band = add(body, new THREE.TorusGeometry(0.6, 0.06, 12, 48), trim, 0, 1.15, 0);
+  const hull = M.clay(paint.hull, { roughness: 0.72 }), trim = M.clay(paint.trim, { roughness: 0.66 }), accent = M.clay(paint.accent, { roughness: 0.66 });
+  const dark = M.clay(C("shadow"), { roughness: 0.8 }), glass = M.clay(C("void"), { roughness: 0.35 });
+
+  // body: a round-bellied ogive, then a gold nose cap
+  outline(add(body, new THREE.LatheGeometry([V(0, 0), V(0.44, 0), V(0.56, 0.3), V(0.64, 0.95), V(0.64, 1.45), V(0.58, 1.95), V(0.46, 2.32)], 48), hull), M);
+  outline(add(body, new THREE.LatheGeometry([V(0.46, 2.32), V(0.36, 2.6), V(0.22, 2.84), V(0.08, 2.99), V(0, 3.02)], 48), trim), M);
+  const band = add(body, new THREE.TorusGeometry(0.645, 0.05, 10, 48), accent, 0, 0.62, 0);
   band.rotation.x = Math.PI / 2;
-  add(body, new THREE.SphereGeometry(0.2, 24, 16), M.glow(PALETTE.sky, 0.55), 0, 1.65, 0.52, { cast: false });
-  add(body, new THREE.TorusGeometry(0.22, 0.045, 10, 32), dark, 0, 1.65, 0.53);
-  outline(add(body, new THREE.CylinderGeometry(0.3, 0.42, 0.32, 32), dark, 0, -0.12, 0), M);
+  // the porthole: dark glass in a gold rim, with one small highlight so it reads as a window
+  const port = new THREE.Group();
+  port.position.set(0, 1.62, 0.6);
+  port.rotation.x = -0.08;
+  body.add(port);
+  const pane = add(port, new THREE.SphereGeometry(0.25, 24, 16), glass, 0, 0, 0.0, { cast: false });
+  pane.scale.set(1, 1, 0.45);
+  add(port, new THREE.TorusGeometry(0.27, 0.055, 10, 36), trim, 0, 0, 0.02);
+  add(port, new THREE.SphereGeometry(0.055, 10, 8), M.clay(C("approach"), { roughness: 0.5 }), -0.09, 0.09, 0.1, { cast: false });
+  // the nozzle
+  outline(add(body, new THREE.CylinderGeometry(0.32, 0.42, 0.3, 32), dark, 0, -0.1, 0), M);
+  // three big splayed fins (two read left and right from the front, one behind)
   const fin = new THREE.Shape();
-  fin.moveTo(0, 0.95); fin.lineTo(0.7, 0.2); fin.lineTo(0.78, -0.35); fin.lineTo(0.36, -0.12); fin.lineTo(0, 0); fin.closePath();
-  const finGeo = new THREE.ExtrudeGeometry(fin, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 2 });
-  finGeo.translate(0, 0, -0.04);
+  fin.moveTo(0, 1.0); fin.quadraticCurveTo(0.62, 0.62, 0.9, -0.1); fin.lineTo(0.92, -0.5); fin.quadraticCurveTo(0.6, -0.3, 0.3, -0.18); fin.lineTo(0, -0.04); fin.closePath();
+  const finGeo = new THREE.ExtrudeGeometry(fin, { depth: 0.09, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 10 });
+  finGeo.translate(0, 0, -0.045);
   for (let k = 0; k < 3; k++) {
-    const a = (k * Math.PI * 2) / 3 - Math.PI / 2, f = add(body, finGeo, trim, Math.cos(a) * 0.5, 0.05, Math.sin(a) * 0.5);
+    const a = (k * Math.PI * 2) / 3 - Math.PI / 2, f = add(body, finGeo, accent, Math.cos(a) * 0.5, 0.06, Math.sin(a) * 0.5);
     f.rotation.y = -a;
     outline(f, M);
   }
+
+  // the flame: two additive layers hanging from the nozzle, plus comet sparks for that trail
   const [or, og, ob] = flame.outer, [ir, ig, ib] = flame.inner;
-  const outer = M.additive(or, og, ob, 0.85), inner = M.additive(ir, ig, ib, 0.95);
-  const flameOut = add(body, new THREE.ConeGeometry(0.3, 1.5, 24, 1, true), outer, 0, -1.0, 0, { cast: false });
-  const flameIn = add(body, new THREE.ConeGeometry(0.16, 0.9, 24, 1, true), inner, 0, -0.72, 0, { cast: false });
-  flameOut.rotation.x = flameIn.rotation.x = Math.PI;
+  const outer = M.additive(or, og, ob, 0.9), inner = M.additive(ir, ig, ib, 0.95);
+  // front faces only: a double-sided flame stacks four layers and crosses the bloom threshold
+  outer.side = inner.side = THREE.FrontSide;
+  outer.alphaMap = inner.alphaMap = flameFade;
+  const flameOut = add(body, flameGeo(0.3 * flame.width, 1.35 * flame.length), outer, 0, -0.24, 0, { cast: false, recv: false });
+  const flameIn = add(body, flameGeo(0.15 * flame.width, 0.8 * flame.length), inner, 0, -0.22, 0, { cast: false, recv: false });
+  flameOut.renderOrder = flameIn.renderOrder = 3;
+  const sparks: THREE.Mesh[] = [];
+  const sparkMat = M.additive(ir, ig, ib, 0.9);
+  if (flame.sparks) for (let i = 0; i < 5; i++) {
+    const s = add(body, new THREE.SphereGeometry(0.05 - i * 0.006, 8, 6), sparkMat, 0, -0.6, 0, { cast: false, recv: false });
+    sparks.push(s);
+  }
+
+  /** The tip of the nose: anchor the cadet's typed number here (see `noseWorld`). Rides with recoil. */
+  const nose = new THREE.Object3D();
+  nose.position.set(0, NOSE_Y + 0.08, 0);
+  rocket.add(nose);
+  let power = 1;
   return {
     group: rocket,
-    /** The two flame materials (additive, HDR): battle dims them under the bloom threshold. */
+    /** The model inside `group` (recoil moves this, never the group). */
+    body,
+    /** The two flame materials (additive): scenes may dim them further, never brighten them past the threshold. */
     flames: [outer, inner] as const,
+    /** An empty at the nose tip, a child of `group`. */
+    nose,
+    /** The nose tip in world space (for the number readout above the cannon). */
+    noseWorld: (out = new THREE.Vector3()) => nose.getWorldPosition(out),
     /** Where shots leave from, in world space. */
     muzzle: () => rocket.localToWorld(new THREE.Vector3(0, 1.6, 0)),
-    flicker(T: number, power = 1) {
-      const f = (1 + Math.sin(T * 40) * 0.08 + Math.sin(T * 23) * 0.06) * power;
-      flameOut.scale.set(Math.min(1.6, 0.6 + power * 0.4), f, Math.min(1.6, 0.6 + power * 0.4));
-      flameIn.scale.set(1, f * 1.05, 1);
-      flameOut.visible = flameIn.visible = power > 0.02;
+    /** Recoil, 0 (rest) to 1 (full kick): the body squashes and slides back along its axis. Drive it with an envelope. */
+    recoil(k: number) {
+      const q = Math.max(0, Math.min(1, k));
+      body.position.y = BODY_Y - q * 0.22;
+      body.scale.set(1 + q * 0.06, 1 - q * 0.09, 1 + q * 0.06);
+    },
+    flicker(T: number, p = 1) {
+      power = p;
+      const f = (1 + Math.sin(T * 38) * 0.07 + Math.sin(T * 23.3) * 0.05) * p, w = Math.min(1.5, 0.65 + p * 0.35);
+      flameOut.scale.set(w, Math.max(0.01, f), w);
+      flameIn.scale.set(w, Math.max(0.01, f * 1.04), w);
+      flameOut.visible = flameIn.visible = p > 0.02;
+      sparks.forEach((s, i) => {
+        const k = ((T * 1.6 + i / sparks.length) % 1);
+        s.position.set(Math.sin(i * 2.4 + T * 3) * 0.08 * k, -0.4 - k * 1.7 * flame.length * Math.max(0.4, power), Math.cos(i * 1.7 + T * 2) * 0.08 * k);
+        s.scale.setScalar(Math.max(0.01, 1 - k));
+        s.visible = power > 0.02;
+      });
     },
   };
 }
 
-/** One invader: a green clay saucer with a toon ink outline, glass dome, neon eyes and a ring of running lights. */
-export function makeInvader(M: Materials) {
-  const g = new THREE.Group(), noCast = { cast: false };
-  const body = new THREE.SphereGeometry(0.55, 32, 16);
-  body.scale(1, 0.5, 1);
-  outline(add(g, body, M.clay(PALETTE.invader, { roughness: 0.5 })), M);
-  add(g, new THREE.SphereGeometry(0.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.clay(0xb8f5ff, { transparent: true, opacity: 0.7, roughness: 0.2 }), 0, 0.12, 0);
-  const eye = M.glow(PALETTE.cyan, 0.6), running = M.glow(PALETTE.cyan, 0.35); // all under the bloom threshold: no halo in battle
-  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(0.075, 12, 8), eye, s * 0.12, 0.26, 0.2, noCast);
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2;
-    add(g, new THREE.SphereGeometry(0.05, 8, 6), running, Math.cos(a) * 0.52, 0, Math.sin(a) * 0.52, noCast);
+// ---- invaders ----
+const bodyGeo = (() => { const g = new THREE.SphereGeometry(0.5, 32, 18); g.scale(1.08, 0.78, 0.9); return g; })();
+// the visor: a goggle wrapped round the front of the body, a hair proud of it
+const visorGeo = (() => { const g = new THREE.SphereGeometry(0.515, 32, 10, Math.PI / 2 - 0.88, 1.76, 0.72, 0.58); g.scale(1.08, 0.78, 0.9); return g; })();
+const rimGeo = (() => { const g = new THREE.TorusGeometry(0.5, 0.062, 10, 40); g.rotateX(Math.PI / 2); g.scale(1.04, 1, 0.88); return g; })();
+const eyeGeo = (() => { const g = new THREE.SphereGeometry(0.09, 14, 10); g.scale(0.9, 1.15, 0.5); return g; })();
+const footGeo = new THREE.SphereGeometry(0.09, 12, 8);
+const stalkGeo = new THREE.CylinderGeometry(0.022, 0.026, 1, 8);
+const knobGeo = new THREE.SphereGeometry(0.065, 12, 8);
+const pennantGeo = (() => {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0); s.lineTo(0.3, -0.09); s.lineTo(0, -0.2); s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.035, bevelEnabled: false });
+  g.translate(0.02, 0, -0.0175);
+  return g;
+})();
+
+/** The antenna: a short stalk and knob, or for a leader a taller stalk with a gold pennant and knob. */
+function antenna(M: Materials, parent: THREE.Object3D, leader: boolean, top: number, scale = 1) {
+  const h = (leader ? 0.36 : 0.16) * scale, nc = { cast: false };
+  const stalk = add(parent, stalkGeo, M.clay(leader ? INVADER.crest : INVADER.shade), 0, top + h / 2, 0, nc);
+  stalk.scale.set(scale, h, scale);
+  const knob = add(parent, knobGeo, M.clay(leader ? INVADER.crest : INVADER.shade, { roughness: 0.6 }), 0, top + h, 0, nc);
+  knob.scale.setScalar(scale);
+  if (leader) {
+    const flag = add(parent, pennantGeo, M.clay(INVADER.crest, { roughness: 0.6 }), 0, top + h - 0.02 * scale, 0, nc);
+    flag.scale.setScalar(scale);
+    outline(flag, M);
   }
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2 + 0.5, leg = add(g, new THREE.ConeGeometry(0.07, 0.3, 8), M.clay(PALETTE.slate), Math.cos(a) * 0.28, -0.3, Math.sin(a) * 0.28);
-    leg.rotation.x = Math.PI;
-  }
+}
+
+/**
+ * One invader drone: a chubby ember bun with a saucer rim, a dark goggle visor, two light eyes,
+ * stubby feet and an antenna. Front is +z. About 1.1 wide and 0.8 tall (plus its antenna).
+ * `opts.tone` picks the squad tone, `opts.leader` adds the gold pennant.
+ */
+export function makeInvader(M: Materials, opts: DroneOpts = {}) {
+  const g = new THREE.Group(), nc = { cast: false };
+  const tone = INVADER[opts.tone ?? "ember"];
+  outline(add(g, bodyGeo, M.clay(tone, { roughness: 0.78 }), 0, 0, 0, nc), M);
+  add(g, rimGeo, M.clay(INVADER.shade, { roughness: 0.8 }), 0, -0.06, 0, nc);
+  add(g, visorGeo, M.clay(INVADER.visor, { roughness: 0.42 }), 0, 0, 0, nc);
+  const eye = M.clay(INVADER.eye, { roughness: 0.6 });
+  for (const s of [-1, 1]) add(g, eyeGeo, eye, s * 0.14, 0.2, 0.375, nc);
+  for (const s of [-1, 1]) add(g, footGeo, M.clay(INVADER.shade, { roughness: 0.8 }), s * 0.22, -0.36, 0.02, nc);
+  antenna(M, g, !!opts.leader, 0.37);
+  g.userData.leader = !!opts.leader;
   return g;
 }
 
-/** A cheaper fighter for very large armadas (Saturn and up): same silhouette, a handful of meshes. */
-export function makeFighterLite(M: Materials) {
-  const g = new THREE.Group(), body = new THREE.SphereGeometry(0.55, 20, 10);
-  body.scale(1, 0.5, 1);
-  outline(add(g, body, M.clay(PALETTE.invader, { roughness: 0.5 }), 0, 0, 0, { cast: false }), M);
-  add(g, new THREE.SphereGeometry(0.3, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.clay(0xb8f5ff, { roughness: 0.25 }), 0, 0.12, 0, { cast: false });
+/**
+ * The cheap fighter for very large fleets (over ~140 ships): the same silhouette and colours in
+ * three draws (body with its outline, visor), plus the pennant for a leader. Same options.
+ */
+export function makeFighterLite(M: Materials, opts: DroneOpts = {}) {
+  const g = new THREE.Group(), nc = { cast: false };
+  outline(add(g, bodyGeo, M.clay(INVADER[opts.tone ?? "ember"], { roughness: 0.78 }), 0, 0, 0, nc), M);
+  add(g, visorGeo, M.clay(INVADER.visor, { roughness: 0.42 }), 0, 0, 0, nc);
+  if (opts.leader) antenna(M, g, true, 0.37);
+  g.userData.leader = !!opts.leader;
   return g;
 }
 
+// ---- hull numbers ----
 const emblems = new Map<string, THREE.MeshBasicMaterial>();
-/** A crisp hull number ("10", "100", "1K"): ink on a cream plate, drawn once per label. */
-export function emblem(text: string, w = 0.42, h = 0.24, colors: [string, string] = ["#f6f1e4", "#141a33"]) {
-  const key = text + colors.join();
+/**
+ * A crisp hull number ("10", "100", "1K"): a token-coloured plate with the number in Saira, drawn
+ * once per label (and redrawn when the font arrives). `colors`: [plate, ink].
+ */
+export function emblem(text: string, w = 0.42, h = 0.24, colors: [string, string] = [COLOR.approach, COLOR.void]) {
+  const key = text + colors.join() + w / h;
   if (!emblems.has(key)) {
-    const { texture, ctx } = canvasTexture(256, 144);
-    ctx.fillStyle = colors[0];
-    ctx.beginPath(); ctx.roundRect(6, 6, 244, 132, 36); ctx.fill();
-    ctx.fillStyle = colors[1];
-    fitText(ctx, text, 128, 76, 210, 108, "800", "ui-sans-serif, system-ui, sans-serif");
-    emblems.set(key, new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false }));
+    const W = 256, H = Math.round(Math.max(96, Math.min(256, (256 * h) / w)));
+    const { texture, ctx } = canvasTexture(W, H);
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = colors[0];
+      ctx.beginPath(); ctx.roundRect(4, 4, W - 8, H - 8, (H - 8) / 2); ctx.fill();
+      ctx.fillStyle = colors[1];
+      if ("fontStretch" in ctx) (ctx as CanvasRenderingContext2D & { fontStretch: string }).fontStretch = "semi-expanded";
+      fitText(ctx, text, W / 2, H / 2 + H * 0.03, W * 0.8, H * 0.74, "600", `${TYPE.family}, sans-serif`);
+      texture.needsUpdate = true;
+    };
+    draw();
+    if (typeof document !== "undefined" && document.fonts) void document.fonts.load("600 64px Saira").then(draw, () => {});
+    emblems.set(key, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
   }
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), emblems.get(key)!);
   m.renderOrder = 2;
   return m;
 }
 
-function microFighter(M: Materials) {
-  const g = new THREE.Group(), body = new THREE.SphereGeometry(0.13, 14, 8);
-  body.scale(1, 0.55, 0.8);
-  add(g, body, M.clay(PALETTE.invader, { roughness: 0.5 }), 0, 0, 0, { cast: false });
-  add(g, new THREE.SphereGeometry(0.065, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M.clay(0xb8f5ff, { roughness: 0.25 }), 0, 0.03, 0, { cast: false });
+// ---- pods and big ships ----
+/** A rounded slab (the trays of pods and carriers), centred, front face at +depth/2. */
+function slab(w: number, h: number, depth: number, r: number) {
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 6 });
+  g.translate(0, 0, -depth / 2);
+  return g;
+}
+/** Where an "h" layout point lands when the frame is stood up ("v": turned a quarter clockwise, so reading order runs top-down). */
+const stand = (orient: "h" | "v", x: number, y: number) => (orient === "v" ? new THREE.Vector3(y, -x, 0) : new THREE.Vector3(x, y, 0));
+const TRAY = { w: 2.16, h: 0.84, d: 0.16 }; // a BIG cell is 2.4: this leaves a clear gap between neighbours
+const microBody = (() => { const g = new THREE.SphereGeometry(0.135, 16, 10); g.scale(1.08, 0.8, 0.85); return g; })();
+const microVisor = (() => { const g = new THREE.SphereGeometry(0.14, 16, 6, Math.PI / 2 - 0.9, 1.8, 0.7, 0.6); g.scale(1.08, 0.8, 0.85); return g; })();
+const socketGeo = new THREE.CircleGeometry(0.15, 24);
+
+/**
+ * A gold pennant on a stalk at (x, y) of a big ship (pods, carriers, flagships). Only for "h" ships:
+ * a stood-up ship spans ten squads, so it has no single squad to lead.
+ */
+function leaderCrest(M: Materials, g: THREE.Object3D, x: number, y: number) {
+  const crest = new THREE.Group();
+  crest.position.set(x, y, 0);
+  antenna(M, crest, true, 0, 0.9);
+  g.add(crest);
+}
+
+function microFighter(M: Materials, tone: InvaderTone) {
+  const g = new THREE.Group(), nc = { cast: false };
+  add(g, microBody, M.clay(INVADER[tone], { roughness: 0.78 }), 0, 0, 0, nc);
+  add(g, microVisor, M.clay(INVADER.visor, { roughness: 0.42 }), 0, 0, 0, nc);
   return g;
 }
 
 /**
- * The 10 Squadron Pod: an elongated cyan twin-rail pod visibly holding 2 × 5 micro-fighters, with a
- * crisp "10" on its hull. Each micro-fighter pops on its own, so a partial hit shows exactly how many fell.
- * "v" stands the pod up (the tens come from the squads, as in 10 × 4).
+ * The 10 Squadron Pod: a dark tray holding ten mini fighters in two rows of five (a ten-frame),
+ * with a "10" plate at its head. Each mini fighter pops on its own and leaves an empty dark
+ * socket, so a partial hit shows exactly how many fell and how many are left.
+ * "v" stands the pod up (the tens come from the squads, as in 10 × 4): the "10" goes on top.
+ * `micro` is in reading order (row by row, left to right; top to bottom when stood up).
+ * Options: `tone` for the mini fighters, `leader` adds a gold pennant at the pod's head ("h" only).
  */
-export function makeTenSquadPod(M: Materials, orient: "h" | "v" = "h") {
-  const g = new THREE.Group(), frame = new THREE.Group(), noCast = { cast: false };
+export function makeTenSquadPod(M: Materials, orient: "h" | "v" = "h", opts: DroneOpts = {}) {
+  const g = new THREE.Group(), frame = new THREE.Group(), nc = { cast: false };
   g.add(frame);
-  const shell = new THREE.CapsuleGeometry(0.4, 1.45, 6, 20);
-  shell.rotateZ(Math.PI / 2);
-  shell.scale(1, 1, 0.45);
-  outline(add(frame, shell, M.clay(0x6cc9dc, { roughness: 0.5 }), 0, 0, -0.05, noCast), M);
-  const rail = M.clay(0x2f5f78, { roughness: 0.45 });
-  for (const y of [-0.37, 0.37]) {
-    const r = add(frame, new THREE.CylinderGeometry(0.045, 0.045, 2.05, 10), rail, 0, y, 0.12, noCast);
-    r.rotation.z = Math.PI / 2;
-  }
+  if (orient === "v") frame.rotation.z = -Math.PI / 2;
+  outline(add(frame, slab(TRAY.w, TRAY.h, TRAY.d, 0.3), M.clay(INVADER.hull, { roughness: 0.85 }), 0, 0, -0.06, nc), M);
+  const socket = M.clay(C("void"), { roughness: 0.9 });
   const micro: THREE.Group[] = [];
   for (let row = 0; row < 2; row++) for (let c = 0; c < 5; c++) {
-    const m = microFighter(M);
-    m.position.set((c - 2) * 0.34, row === 0 ? 0.15 : -0.15, 0.2);
+    const x = -0.4 + c * 0.32, y = row === 0 ? 0.19 : -0.19;
+    add(frame, socketGeo, socket, x, y, 0.05, nc);
+    const m = microFighter(M, opts.tone ?? "ember");
+    m.position.set(x, y, 0.13);
+    if (orient === "v") m.rotation.z = Math.PI / 2; // stood up, the mini fighters still stand upright
     frame.add(m);
     micro.push(m);
   }
-  const tag = emblem("10", 0.4, 0.24);
-  if (orient === "v") { frame.rotation.z = Math.PI / 2; tag.position.set(0.48, 0.92, 0.25); }
-  else tag.position.set(-1.18, 0.32, 0.25);
+  const tag = emblem("10", 0.42, 0.26);
+  tag.position.copy(stand(orient, -0.8, 0)).setZ(0.12);
   g.add(tag);
+  if (opts.leader && orient === "h") leaderCrest(M, g, -0.8, TRAY.h / 2 - 0.02);
   return { group: g, micro, tag };
 }
 
-/** The 100 Carrier: a violet twin-deck cruiser holding 10 cyan 10-strips (100 cells) and a "100" emblem. */
-export function makeCarrier(M: Materials, orient: "h" | "v" = "h") {
-  const g = new THREE.Group(), frame = new THREE.Group(), noCast = { cast: false };
+/**
+ * The 100 Carrier: a dark tray with a "100" plate at its head and a hundred-square of matte cells,
+ * ten strips of ten with a gap between strips, so it reads as ten tens.
+ * `popped(n)` hides the first `n` cells: whole strips first, then cells of the next strip.
+ */
+export function makeCarrier(M: Materials, orient: "h" | "v" = "h", opts: DroneOpts = {}) {
+  const g = new THREE.Group(), frame = new THREE.Group(), nc = { cast: false };
   g.add(frame);
-  const deck = new THREE.BoxGeometry(2.15, 0.42, 0.5, 1, 1, 1);
-  const violet = M.clay(0x8d6fe0, { roughness: 0.5 }), dark = M.clay(0x3a2c6e, { roughness: 0.55 });
-  outline(add(frame, deck, violet, 0, 0.23, -0.05, noCast), M);
-  outline(add(frame, deck, violet, 0, -0.23, -0.05, noCast), M);
-  add(frame, new THREE.BoxGeometry(2.25, 0.06, 0.56), dark, 0, 0, -0.05, noCast);
-  const cells = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.056, 0.05), M.glow(0x3dd6e6, 0.55), 100);
+  if (orient === "v") frame.rotation.z = -Math.PI / 2;
+  outline(add(frame, slab(TRAY.w, TRAY.h, TRAY.d, 0.18), M.clay(INVADER.hull, { roughness: 0.85 }), 0, 0, -0.06, nc), M);
+  // ten dark strip wells, then the cells
+  const well = M.clay(C("void"), { roughness: 0.9 });
+  for (let s = 0; s < 10; s++) add(frame, new THREE.PlaneGeometry(0.13, 0.72), well, -0.41 + s * 0.15, 0, 0.05, nc);
+  const cells = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.055, 0.05), M.clay(INVADER[opts.tone ?? "ember"], { roughness: 0.75 }), 100);
+  cells.castShadow = false;
   const o = new THREE.Object3D();
   for (let s = 0; s < 10; s++) for (let c = 0; c < 10; c++) {
-    o.position.set((s - 4.5) * 0.205, (c - 4.5) * 0.074, 0.22);
+    o.position.set(-0.41 + s * 0.15, 0.3015 - c * 0.067, 0.08);
     o.updateMatrix();
     cells.setMatrixAt(s * 10 + c, o.matrix);
   }
   frame.add(cells);
-  const tag = emblem("100", 0.5, 0.26);
-  if (orient === "v") { frame.rotation.z = Math.PI / 2; tag.position.set(0.62, 1.0, 0.3); }
-  else tag.position.set(0, 0.6, 0.3);
+  const tag = emblem("100", 0.46, 0.26);
+  tag.position.copy(stand(orient, -0.8, 0)).setZ(0.12);
   g.add(tag);
-  /** Hide the first `n` cells (a partial hit: whole strips first, then cells of the next strip). */
+  if (opts.leader && orient === "h") leaderCrest(M, g, -0.8, TRAY.h / 2 - 0.02);
   const base = Array.from({ length: 100 }, (_, i) => { const m = new THREE.Matrix4(); cells.getMatrixAt(i, m); return m; });
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  /** Hide the first `n` cells (a partial hit). */
   const popped = (n: number) => { for (let i = 0; i < 100; i++) cells.setMatrixAt(i, i < n ? zero : base[i]); cells.instanceMatrix.needsUpdate = true; };
   return { group: g, cells, popped, tag };
 }
 
-/** The 1,000+ Dreadnought: a gold and crimson flagship with reactor rings and a core badge (1K, 10K, 1M…). */
-export function makeDreadnought(M: Materials, label: string, orient: "h" | "v" = "h") {
-  const g = new THREE.Group(), frame = new THREE.Group(), noCast = { cast: false };
+/**
+ * The 1,000+ Flagship: a big drone of the same family (ember body, dark visor, light eyes) with
+ * gold fins, its worth on a plate (1K, 10K, 1M…) and a damage meter of ten light segments on its
+ * belly. `damaged(f)` switches off the first `round(f × 10)` segments (tenths of the ship).
+ */
+export function makeDreadnought(M: Materials, label: string, orient: "h" | "v" = "h", opts: DroneOpts = {}) {
+  const g = new THREE.Group(), frame = new THREE.Group(), nc = { cast: false };
   g.add(frame);
-  const hullGeo = new THREE.SphereGeometry(1, 32, 16);
-  hullGeo.scale(1.08, 0.4, 0.3);
-  outline(add(frame, hullGeo, M.clay(0xf0c058, { roughness: 0.45, metalness: 0.1 }), 0, 0, -0.05, noCast), M);
-  const crimson = M.clay(0xc2414b, { roughness: 0.5 });
-  const keel = add(frame, new THREE.BoxGeometry(1.7, 0.12, 0.34), crimson, 0, -0.28, 0, noCast);
-  outline(keel, M);
-  for (const x of [-0.62, 0.62]) add(frame, new THREE.TorusGeometry(0.19, 0.05, 10, 28), crimson, x, 0.02, 0.3, noCast);
+  if (orient === "v") frame.rotation.z = -Math.PI / 2;
+  const hullGeo = new THREE.CapsuleGeometry(0.38, 1.36, 8, 28);
+  hullGeo.rotateZ(Math.PI / 2);
+  hullGeo.scale(1, 1, 0.62);
+  outline(add(frame, hullGeo, M.clay(INVADER[opts.tone ?? "ember"], { roughness: 0.78 }), 0, 0, -0.04, nc), M);
+  // fins: two gold swept fins on the back
+  const fin = new THREE.Shape();
+  fin.moveTo(0, 0); fin.lineTo(0.34, 0); fin.lineTo(0.5, 0.2); fin.lineTo(0.16, 0.12); fin.closePath();
+  const finGeo = new THREE.ExtrudeGeometry(fin, { depth: 0.05, bevelEnabled: false });
+  for (const x of [0.2, 0.62]) outline(add(frame, finGeo, M.clay(INVADER.crest, { roughness: 0.7 }), x, 0.3, -0.05, nc), M);
+  // the face: a long visor with two big eyes, at the head (left)
+  const visor = new THREE.CapsuleGeometry(0.13, 0.62, 6, 16);
+  visor.rotateZ(Math.PI / 2);
+  visor.scale(1, 1, 0.5);
+  add(frame, visor, M.clay(INVADER.visor, { roughness: 0.42 }), -0.48, 0.08, 0.2, nc);
+  for (const x of [-0.68, -0.3]) add(frame, eyeGeo, M.clay(INVADER.eye, { roughness: 0.6 }), x, 0.09, 0.27, nc).scale.setScalar(1.25);
+  // the damage meter: ten segments on a dark strip
+  add(frame, new THREE.BoxGeometry(1.62, 0.12, 0.04), M.clay(INVADER.visor, { roughness: 0.8 }), 0, -0.2, 0.2, nc);
+  const seg = M.clay(INVADER.eye, { roughness: 0.6 }), segGeo = new THREE.BoxGeometry(0.12, 0.07, 0.04);
   const segs: THREE.Mesh[] = [];
-  for (let i = 0; i < 10; i++) segs.push(add(frame, new THREE.BoxGeometry(0.1, 0.07, 0.04), M.glow(0xff7a59, 0.5), (i - 4.5) * 0.13, -0.15, 0.31, noCast));
-  const tag = emblem(label, 0.52, 0.28, ["#2a0f1a", "#ffd88a"]);
-  if (orient === "v") { frame.rotation.z = Math.PI / 2; tag.position.set(0, 0, 0.42); }
-  else tag.position.set(0, 0.1, 0.38);
+  for (let i = 0; i < 10; i++) segs.push(add(frame, segGeo, seg, -0.72 + i * 0.16, -0.2, 0.225, nc));
+  const tag = emblem(label, 0.5, 0.28, [COLOR.gold, COLOR.void]);
+  tag.position.copy(stand(orient, 0.62, 0.08)).setZ(0.26);
   g.add(tag);
+  if (opts.leader && orient === "h") leaderCrest(M, g, -0.95, 0.3);
   /** Show a partial hit as tenths of the hull's meter. */
   const damaged = (fraction: number) => segs.forEach((s, i) => { s.visible = i >= Math.round(fraction * 10); });
   return { group: g, damaged, tag };
 }
 
-/** A dashed ghost fighter (Borrow & Take Back): shows the borrowed ship, clearly not a real one. */
+/** The look of every ghost (borrowed, pretend) ship: thick approach-white dashes over a very faint fill. */
+export const GHOST = { color: C("approach"), line: 0.9, fill: 0.02, dashes: 18, width: 0.07 } as const;
+
+/**
+ * A dashed ghost fighter (Borrow & Take Back): the drone's front silhouette drawn as thick dashes
+ * (real meshes, so they read at battle size, unlike 1 px lines), clearly a pretend ship. Flat,
+ * facing +z (keep it upright like the fighters). Its meshes have their own `color` materials, so a
+ * scene may recolour them (the arena turns taken-back ghosts ember).
+ */
 export function makeGhost() {
-  const body = new THREE.SphereGeometry(0.55, 16, 8);
-  body.scale(1, 0.5, 1);
-  const edges = new THREE.EdgesGeometry(body, 20);
-  const line = new THREE.LineSegments(edges, new THREE.LineDashedMaterial({ color: 0x9fe8ff, dashSize: 0.08, gapSize: 0.06, transparent: true, opacity: 0.9 }));
-  line.computeLineDistances();
-  const fill = new THREE.Mesh(body, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.12, depthWrite: false }));
-  const g = new THREE.Group();
-  g.add(fill, line);
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: GHOST.color, transparent: true, opacity: GHOST.line, depthWrite: false });
+  const rx = 0.56, ry = 0.4, at = (t: number) => new THREE.Vector2(Math.cos(t) * rx, Math.sin(t) * ry);
+  const dash = (a: THREE.Vector2, b: THREE.Vector2) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(a.distanceTo(b), GHOST.width), mat);
+    m.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, 0.01);
+    m.rotation.z = Math.atan2(b.y - a.y, b.x - a.x);
+    g.add(m);
+  };
+  for (let i = 0; i < GHOST.dashes; i++) {
+    const t0 = (i / GHOST.dashes) * Math.PI * 2, t1 = t0 + (Math.PI * 2 / GHOST.dashes) * 0.55;
+    dash(at(t0), at(t1));
+  }
+  // the antenna and a goggle line, so it is a ghost of a drone, not of a plate
+  dash(new THREE.Vector2(0, ry + 0.05), new THREE.Vector2(0, ry + 0.2));
+  for (const x of [-0.26, 0, 0.26]) dash(new THREE.Vector2(x - 0.08, 0.1), new THREE.Vector2(x + 0.08, 0.1));
+  const shape = new THREE.Shape();
+  shape.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0);
+  g.add(new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), new THREE.MeshBasicMaterial({ color: GHOST.color, transparent: true, opacity: GHOST.fill, depthWrite: false })));
   return g;
 }
