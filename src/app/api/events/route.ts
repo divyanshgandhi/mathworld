@@ -12,9 +12,12 @@ export async function POST(req: Request) {
   const raw = (await req.json().catch(() => null)) as { ids?: unknown } | null;
   const parsed = EventBody.safeParse(raw);
   if (!parsed.success) return badRequest(parsed.error.issues);
-  // a retried batch (same client ids) whose first try was stored is not stored twice; one that failed to store is let through again
+  // A retried batch carries the same client ids. The database stores each id once for a cadet (a unique
+  // index), which holds on any server. The in-memory list in front of it only saves the round trip.
   const list = "events" in parsed.data ? parsed.data.events : [parsed.data];
-  return Response.json({ events: await storeOnce(seenIds, player.id, list, raw?.ids, (fresh) => appendEvents(db, player.id, fresh)) }, { status: 201 });
+  const ids = Array.isArray(raw?.ids) && raw.ids.length === list.length ? (raw.ids as unknown[]) : undefined;
+  const at = new Map(list.map((e, i) => [e, ids?.[i]] as const));
+  return Response.json({ events: await storeOnce(seenIds, player.id, list, ids, (fresh) => appendEvents(db, player.id, fresh, ids ? fresh.map((e) => at.get(e)) : undefined)) }, { status: 201 });
 }
 
 /**

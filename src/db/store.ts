@@ -21,11 +21,21 @@ export async function touchPlayer(db: DB, id: string) {
   await db.update(players).set({ lastSeenAt: sql`now()` }).where(eq(players.id, id));
 }
 
-/** Appends validated events in order. Correctness is recomputed here, never trusted from the client. */
-export async function appendEvents(db: DB, playerId: string, list: EventInput[]) {
+/** A client's id for an event, if it sent a usable one. */
+const clientIdOf = (ids: unknown, i: number) => { const id = Array.isArray(ids) ? ids[i] : undefined; return typeof id === "string" && id.length > 0 && id.length <= 64 ? id : null; };
+
+/**
+ * Appends validated events in order. Correctness is recomputed here, never trusted from the client.
+ * `ids` are the client's ids, one for each event: an event whose id this cadet has already stored is
+ * skipped by the database itself, so a retried save is stored once on any server, in any order.
+ * Returns the rows that were stored.
+ */
+export async function appendEvents(db: DB, playerId: string, list: EventInput[], ids?: unknown) {
+  const paired = Array.isArray(ids) && ids.length === list.length ? ids : undefined;
   return db
     .insert(events)
-    .values(list.map((e) => normalize(e)).map((e) => ({ playerId, type: e.type, payload: e.payload as Record<string, unknown> })))
+    .values(list.map((e) => normalize(e)).map((e, i) => ({ playerId, type: e.type, payload: e.payload as Record<string, unknown>, clientId: clientIdOf(paired, i) })))
+    .onConflictDoNothing({ target: [events.playerId, events.clientId] })
     .returning({ id: events.id, type: events.type, createdAt: events.createdAt });
 }
 
