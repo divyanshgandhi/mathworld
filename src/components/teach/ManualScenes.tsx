@@ -114,7 +114,7 @@ function Fire({ squads, each, active }: { squads: number; each: number; active: 
   const f = fireFrame(ships, nose.x, nose.y, useLoop(firePeriod(n), active));
   return (
     <Picture label={`${say(n)} ships and ${say(n)} plasma balls: one ball for each ship.`}>
-      {ships.map((s) => <Ship key={s.i} s={s} cell={cell} art={art} popped={f.popped[s.i]} opacity={f.back} />)}
+      {ships.map((s) => <Ship key={s.i} s={s} cell={cell} art={art} popped={f.popped[s.i]} opacity={f.back ?? 1} />)}
       <Balls balls={f.balls} />
       <Rocket x={nose.x} y={168} n={n} />
       <FirePill x={232} y={151} n={n} pressed={f.pressed && f.balls.length > 0} />
@@ -132,7 +132,7 @@ function Miss({ squads, each, under, over, active }: { squads: number; each: num
       <line x1={SCENE_W / 2} y1={18} x2={SCENE_W / 2} y2={190} className="stroke-line-1" strokeWidth={1} vectorEffect="non-scaling-stroke" />
       {left.map((s) => {
         const hit = f.under.popped[s.i], away = s.i >= under;
-        return <Ship key={s.i} s={s} cell={cell} art={art} popped={hit} y={away ? s.y - f.escape : s.y} opacity={away ? Math.max(0, 1 - f.escape / 80) : 1} />;
+        return <Ship key={s.i} s={s} cell={cell} art={art} popped={hit} y={away ? s.y - f.escape : s.y} opacity={away ? Math.max(0, 1 - f.escape / 60) : 1} />;
       })}
       <Balls balls={f.under.balls} />
       <Rocket x={80} y={164} size={40} n={under} />

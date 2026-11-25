@@ -98,12 +98,13 @@ export function fireFrame(ships: ShipCell[], nx: number, ny: number, t: number |
   if (t === null) {
     // the still frame: each ball just under its ship, one for each, before it lands
     const balls = ships.map((s) => ({ x: s.x, y: s.y + 22, on: true }));
-    return { typed: n, pressed: true, balls, popped: ships.map(() => false), escaped: 0, past: 0, back: 1 };
+    return { typed: n, pressed: true, balls, popped: ships.map(() => false), escaped: 0, past: 0, back: null as number | null };
   }
   const end = volleyEnd(n) + FIRE.hold;
   const v = volleyFrame(ships, n, nx, ny, t < end ? t : null);
-  const back = t < end ? 0 : clamp01((t - end) / FIRE.back);
-  return { ...v, balls: t < end ? v.balls : [], popped: back > 0 ? ships.map(() => false) : v.popped, back };
+  // `back`: null during the volley; then 0 to 1 as the ships fade back in for the next loop
+  const back = t < end ? null : clamp01((t - end) / FIRE.back);
+  return { ...v, balls: t < end ? v.balls : [], popped: back !== null && back > 0 ? ships.map(() => false) : v.popped, back };
 }
 
 /* ---------- 4. Too few and too many: two volleys side by side ---------- */
