@@ -2,7 +2,7 @@
 import { Field, FieldError, FieldLabel } from "@ui-sdk/react/field";
 import { Input } from "@ui-sdk/react/input";
 import { Radio, RadioGroup } from "@ui-sdk/react/radio";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
 import { CADET, CADET_NAME, type CadetColor } from "@/design/tokens";
@@ -44,6 +44,10 @@ export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
   const { problem } = checkName(name);
   // symbols show at once (the child can see them); an empty field only after they press Begin
   const shown = problem === "symbols" || (problem === "empty" && tried) ? NAME_WORDS[problem] : null;
+
+  // The kit reads a name error out through one hidden live region on <body>, which outlives this
+  // form: empty it once the error is gone or the form leaves, so a stale error never follows the cadet into the game.
+  useEffect(() => () => document.querySelectorAll("[data-ui-sdk-announcer]").forEach((r) => { r.textContent = ""; }), [shown]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
