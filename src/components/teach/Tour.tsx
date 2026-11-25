@@ -86,6 +86,8 @@ function viewBox(probe: HTMLElement | null, margin = 8): Box {
 /* ---------- the hook ---------- */
 
 type How = "done" | "skipped" | "nothing" | "interrupted";
+/** How long the screen must stay calm before a tour starts, and how long it looks for anchors. */
+const SETTLE_MS = 600, LOOK_MS = 2500;
 
 export function useTour({ id, steps, seen, when = true, hold: holdGame = false, force = false, onDone }: {
   id: string; steps: readonly TourStep[]; seen?: SeenSource; when?: boolean; hold?: boolean; force?: boolean; onDone?: (how: How) => void;
@@ -108,15 +110,16 @@ export function useTour({ id, steps, seen, when = true, hold: holdGame = false, 
   // wait for the screen to settle, then start on the anchors that are there
   useEffect(() => {
     if (!want || run || !when) return;
-    let calm = 0, waited = 0;
+    // timed by the clock, not by ticks: a hidden tab runs intervals slowly
+    let calmSince = performance.now(), lookSince = -1;
     const iv = setInterval(() => {
-      if (pageBusy()) { calm = 0; return; }
-      calm += 200;
-      if (calm < 600) return;
+      const now = performance.now();
+      if (pageBusy()) { calmSince = now; lookSince = -1; return; }
+      if (now - calmSince < SETTLE_MS) return;
       const order = steps.flatMap((s, i) => (findAnchor(s.anchor) ? [i] : []));
       if (order.length) { mark(); setRun({ order, at: 0 }); return; }
-      waited += 200;
-      if (waited >= 3000) end("nothing"); // nothing to show: not marked seen
+      if (lookSince < 0) lookSince = now;
+      if (now - lookSince >= LOOK_MS) end("nothing"); // nothing to show: not marked seen
     }, 200);
     return () => clearInterval(iv);
   }, [want, run, when, steps, mark, end]);
@@ -157,6 +160,9 @@ export function useTour({ id, steps, seen, when = true, hold: holdGame = false, 
 
 const PAD = 6;
 const PLATE_W = 340;
+/** A short screen (a phone on its side) gets a wide, low plate: one row. */
+const COMPACT_W = 580, COMPACT_BELOW_H = 480;
+const isCompact = (view: Box) => view.h < COMPACT_BELOW_H && view.w >= 520;
 
 function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour>) {
   const reduced = useReducedMotion();
@@ -178,20 +184,29 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
   // follow the target and the screen every frame (resize, scroll, rotation, a target that moves)
   useLayoutEffect(() => {
     let raf = 0, prev = "";
-    const tick = () => {
+    const measure = () => {
       const el = findAnchor(anchor);
       if (el) {
         const view = viewBox(probe.current);
         const r = el.getBoundingClientRect();
         const ring = clipTo(ringOf({ x: r.left, y: r.top, w: r.width, h: r.height }, PAD), { x: 0, y: 0, w: innerWidth, h: innerHeight });
-        const size = { w: Math.min(PLATE_W, view.w), h: plate.current?.offsetHeight ?? 120 };
+        const size = { w: Math.min(isCompact(view) ? COMPACT_W : PLATE_W, view.w), h: plate.current?.offsetHeight ?? 120 };
         const key = [ring.x, ring.y, ring.w, ring.h, view.w, view.h, size.w, size.h].map((n) => Math.round(n)).join(",");
         if (key !== prev) { prev = key; setGeo({ ring, view, size }); }
       }
-      raf = requestAnimationFrame(tick);
     };
+    const tick = () => { measure(); raf = requestAnimationFrame(tick); };
     tick();
-    return () => cancelAnimationFrame(raf);
+    // frames stop in a hidden tab: scroll, resize and a slow clock keep it honest there too
+    const opts = { capture: true, passive: true } as const;
+    addEventListener("scroll", measure, opts);
+    addEventListener("resize", measure);
+    addEventListener("orientationchange", measure);
+    const iv = setInterval(measure, 250);
+    return () => {
+      cancelAnimationFrame(raf); clearInterval(iv);
+      removeEventListener("scroll", measure, opts); removeEventListener("resize", measure); removeEventListener("orientationchange", measure);
+    };
   }, [anchor]);
 
   // focus stays in the plate; keys belong to the tour while it shows
@@ -199,14 +214,15 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
     const before = document.activeElement as HTMLElement | null;
     return () => { if (before?.isConnected) before.focus({ preventScroll: true }); };
   }, []);
-  useEffect(() => { nextBtn.current?.focus({ preventScroll: true }); }, [anchor]);
+  const placed = !!geo;
+  useEffect(() => { if (placed) nextBtn.current?.focus({ preventScroll: true }); }, [anchor, placed]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const inPlate = !!plate.current?.contains(e.target as Node);
+      const inPlate = e.target instanceof Node && !!plate.current?.contains(e.target);
       e.stopPropagation();
       if (e.key === "Escape") { e.preventDefault(); skip(); return; }
       if (e.key === "Enter" || e.key === " ") {
-        if (inPlate && (e.target as HTMLElement).tagName === "BUTTON") return; // the focused button acts
+        if (inPlate && e.target instanceof HTMLButtonElement) return; // the focused button acts
         e.preventDefault(); if (e.key === "Enter") next(); return;
       }
       if (e.key === "Tab") {
@@ -224,7 +240,31 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
   }, [next, skip]);
 
   const place = geo ? placePlate(geo.ring, geo.size, geo.view) : null;
+  const compact = geo ? isCompact(geo.view) : false;
+
+  // no side has room (a big target on a short screen): bring the target to the top once, so the plate fits below it
+  const tried = useRef("");
+  const cramped = place ? !place.fits : false;
+  useEffect(() => {
+    if (!cramped || tried.current === anchor) return;
+    tried.current = anchor;
+    findAnchor(anchor)?.scrollIntoView({ block: "start", inline: "nearest", behavior: reduced ? "auto" : "smooth" });
+  }, [cramped, anchor, reduced]);
   const move = reduced ? "none" : `left ${MOTION.route}ms ${MOTION.ease}, top ${MOTION.route}ms ${MOTION.ease}, width ${MOTION.route}ms ${MOTION.ease}, height ${MOTION.route}ms ${MOTION.ease}`;
+
+  const dots = count > 1 && (
+    <span className="mr-auto flex items-center gap-2 pl-1" role="img" aria-label={`Step ${index + 1} of ${count}`}>
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className={`block size-2 rounded-full border ${i === index ? "border-approach bg-approach" : "border-line-3"}`} />
+      ))}
+    </span>
+  );
+  const buttons = (
+    <>
+      {!last && <Button variant="quiet" size="sm" onClick={skip} className={count > 1 || compact ? "" : "mr-auto"}>Skip</Button>}
+      <Button ref={nextBtn} size="sm" onClick={next} className={`min-w-[96px] justify-center ${count > 1 || !last || compact ? "" : "ml-auto"}`}>{last ? "Got it" : "Next"}</Button>
+    </>
+  );
 
   return createPortal(
     <div data-tour className="fixed inset-0 z-[60]">
@@ -236,23 +276,17 @@ function Spotlight({ step, index, count, next, skip }: ReturnType<typeof useTour
           style={{ left: geo.ring.x, top: geo.ring.y, width: geo.ring.w, height: geo.ring.h, borderRadius: RADIUS.chip, boxShadow: "0 0 0 200vmax var(--color-scrim)", transition: move }} />
       )}
       <div ref={plate} role="dialog" aria-modal="true" aria-label="Show me around"
-        className="fixed flex flex-col gap-3 rounded-panel border border-line-2 bg-panel p-4 text-approach"
+        className={`fixed flex flex-col gap-3 rounded-panel border border-line-2 bg-panel text-approach ${compact ? "px-4 py-3" : "p-4"}`}
         style={{ left: place?.x ?? 0, top: place?.y ?? 0, width: geo?.size.w ?? PLATE_W, visibility: place ? "visible" : "hidden", transition: move }}>
-        <div className="flex items-start gap-3">
+        <div className={`flex gap-3 ${compact ? "items-center" : "items-start"}`}>
           <NovaPortrait size={40} />
-          <p key={anchor} className="m-0 min-w-0 flex-1 pt-1.5 type-child text-[19px] leading-snug text-balance" aria-live="polite">{step?.line}</p>
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <p key={anchor} className="m-0 type-child text-[19px] leading-snug text-balance" aria-live="polite">{step?.line}</p>
+            {compact && dots}
+          </div>
+          {compact && buttons}
         </div>
-        <div className="flex items-center gap-2">
-          {count > 1 && (
-            <span className="mr-auto flex items-center gap-2 pl-1" role="img" aria-label={`Step ${index + 1} of ${count}`}>
-              {Array.from({ length: count }, (_, i) => (
-                <span key={i} className={`block size-2 rounded-full border ${i === index ? "border-approach bg-approach" : "border-line-3"}`} />
-              ))}
-            </span>
-          )}
-          {!last && <Button variant="quiet" size="sm" onClick={skip} className={count > 1 ? "" : "mr-auto"}>Skip</Button>}
-          <Button ref={nextBtn} size="sm" onClick={next} className={`min-w-[96px] justify-center ${count > 1 || !last ? "" : "ml-auto"}`}>{last ? "Got it" : "Next"}</Button>
-        </div>
+        {!compact && <div className="flex items-center gap-2">{dots}{buttons}</div>}
       </div>
     </div>,
     document.body,
