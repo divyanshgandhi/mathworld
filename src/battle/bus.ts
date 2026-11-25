@@ -48,7 +48,7 @@ export interface BattleEvents {
   lesson_completed: { tricks: TrickId[]; a: number; b: number; mode: "full" | "fast"; wedoCorrect: boolean };
   /** Show Me How's last line was said, `ms` after it began. */
   lesson_spoken: { ms: number };
-  /** Orbs earned. */
+  /** Orbs earned, as the fold's ledger counts them (never written to the log). */
   orb_burst: { amount: number; reason: "wave_clear" | "planet_cleared" };
   /** The planet (or the practice run) is finished. */
   battle_done: { kind: "clear" | "practice" | "academy" };

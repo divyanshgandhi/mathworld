@@ -26,7 +26,8 @@ const DRONES = { one: "drone", many: "drones" };
 /**
  * Mercury (adding) and Venus (taking away) warm-ups, up to 20: five quick sums on the battle stage,
  * with the battle's own cockpit (the mission strip and the console). Each answer appends
- * `warmup_answered`; a first-try answer earns an orb.
+ * `warmup_answered`. Warm-ups pay no orbs (the fold's rules table: they are always open, so paying
+ * for them could be farmed); the counter shows the folded total.
  */
 export function WarmupDrill({ planet }: { planet: "mercury" | "venus" }) {
   const cadet = useCadet();
@@ -90,7 +91,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
     const o = await (drill as Warmup).fire(n);
     setOutcome(o);
     if (o.kind === "exact") {
-      if (tries === 0) { setScore((s) => s + 1); emit({ type: "orb_earned", payload: { amount: 1, reason: "warmup" } }); }
+      if (tries === 0) setScore((s) => s + 1);
       await new Promise((r) => setTimeout(r, 900));
       setTries(0); setOutcome(null);
       if (i + 1 >= WARMUP_LENGTH) { (drill as Warmup).clear(); setI(WARMUP_LENGTH); return; }
@@ -108,7 +109,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
 
   const sign = op === "add" ? "+" : "−";
   let lineA: ReactNode = null;
-  if (outcome?.kind === "exact") lineA = <span className={css.exact}><Icon name="check" size={20} className={css.icon} />Exactly right{tries === 0 ? <> · <b>+1</b> orb</> : null}</span>;
+  if (outcome?.kind === "exact") lineA = <span className={css.exact}><Icon name="check" size={20} className={css.icon} />Exactly right</span>;
   else if (outcome) lineA = <span className={css.miss}>{missLine(outcome.kind, outcome.value, DRONES)}</span>;
   const lineB: ReactNode = p && !done ? (op === "add"
     ? <><b>{p.a}</b> {p.a === 1 ? "drone" : "drones"}, and <b>{p.b}</b> more {p.b === 1 ? "flies" : "fly"} in</>

@@ -5,7 +5,7 @@ import { createOverlay } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { seeded } from "@/engine/util";
 import { warmVoice } from "@/engine/voice";
-import { fold, type LoggedEvent, type PlayerState } from "@/director/fold";
+import { fold, orbsBetween, type LoggedEvent, type PlayerState } from "@/director/fold";
 import { acceptHyperJump, housekeeping, mix, nextWave, practiceWave, PRACTICE_WAVES, type Wave } from "@/director/next";
 import { band } from "@/rig/adaptive";
 import { classifyError } from "@/rig/errors";
@@ -22,7 +22,6 @@ import { themeOf } from "@/battle/planets";
 import { POWERUPS } from "@/battle/powerups";
 import { INVADER, INVADER_TONES, makeInvader, makePlasmaBall } from "./ships";
 import { createInstancedFleet } from "@/battle/systems/instanced";
-import { planetClearOrbs, waveClearOrbs } from "@/battle/rewards";
 import { createScheduler } from "@/battle/scheduler";
 import { createSectorLock } from "@/battle/sectorLock";
 import { attachSound } from "@/battle/sound";
@@ -175,8 +174,6 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   // ---- the bus: persistence first (the log is folded right after), then UI, sound, telemetry ----
   const bus = createBus();
   attachPersistence(bus, (e) => { log.push({ ...e, at: Date.now() }); opts.onEvent?.(e); });
-  bus.on("orb_burst", (p) => setUi({ orbs: ui.orbs + p.amount }));
-  bus.on("record", ({ event: e }) => { if (e.type === "orb_earned") setUi({ orbs: ui.orbs + e.payload.amount }); });
   bus.on("charge", (p) => setUi({ charge: p.n }));
   attachSound(bus, (s) => audio.sfx(s));
   attachTelemetry(bus, (t) => setUi(t));
@@ -260,6 +257,15 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
 
   // ---- the director: which wave comes next ----
   const state = () => fold(log);
+  /**
+   * Orbs are the fold's, never the battle's (decision 4): the counter is set to the folded total, and the
+   * reward is what the log written since `from` earned by the rules table (first try, streak, new Gold…).
+   */
+  const settleOrbs = (from: number) => {
+    const earned = orbsBetween(log.slice(0, from), log).earned;
+    setUi({ orbs: state().orbs });
+    return earned;
+  };
   function beltFor(s: PlayerState, w: Wave | null): ArenaUi["belt"] {
     if (!w) return [];
     const unlocked = TRICKS.filter((t) => opts.dev || (s.seenTricks[t] ?? 0) > 0);
@@ -294,7 +300,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         return;
       }
       const hk = housekeeping(s);
-      if (hk.length) { hk.forEach((event) => bus.emit("record", { event })); return finish("clear"); }
+      if (hk.length) { const from = log.length; hk.forEach((event) => bus.emit("record", { event })); return finish("clear", from); }
       if (s.tier !== tier) { mode = "practice"; setUi({ mode }); }
     }
     if (mode === "practice" && practiceK >= PRACTICE_WAVES && !opts.force) return finish("practice");
@@ -353,7 +359,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     opts.academy?.onSolved?.();
   }
 
-  async function finish(kind: "clear" | "practice") {
+  async function finish(kind: "clear" | "practice", from = log.length) {
     const s = state();
     if (planet === "earth" && !s.introCompleted) bus.emit("record", { event: { type: "intro_completed", payload: {} } });
     clearFleet();
@@ -362,7 +368,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     dispatch({ type: "done" });
     if (kind === "clear") {
       backdrop.clearRing(); // the planet takes its gold ring, behind the HUD's clear card
-      bus.emit("orb_burst", { amount: planetClearOrbs(), reason: "planet_cleared" });
+      const orbs = settleOrbs(from);
+      if (orbs) bus.emit("orb_burst", { amount: orbs, reason: "planet_cleared" });
       const next = PLANETS_BY_TIER[Math.min(tier + 1, PLANETS_BY_TIER.length - 1)];
       setUi({ wave: null, canFire: canAim(bs), outcome: null, radar: null, done: { title: `${planet === "earth" ? "Cadet Bay" : PLANET_NAMES[planet]} clear`, sub: tier === 7 ? "A bigger sector opens" : `${PLANET_NAMES[next]} is open`, next: tier === 7 ? planet : next } });
       bus.emit("battle_done", { kind });
@@ -380,7 +387,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const f = fv.fleet, l = fv.layout;
     if (!wave || !f || !l || !canAim(bs)) return;
     const w = wave, p = w.a * w.b, latency = Math.round(performance.now() - shownAt);
-    const typed = bs.charge;
+    const typed = bs.charge, from = log.length; // the reward is what this shot's events earn in the fold
     scan.skip(); // firing skips a scan to its end
     dispatch({ type: "fire", radar: false });
     setUi({ canFire: canAim(bs), outcome: null, radar: null });
@@ -401,7 +408,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const errorType = classifyError(w.a, w.b, n);
     bus.emit("fire", {
       n, a: w.a, b: w.b, planet, latencyMs: latency, attempt: bs.attempts, radar: false, usedRadar: bs.usedRadar, errorType, powerUp: active,
-      isTransferCheck: w.isTransferCheck, waveRole: mode === "campaign" ? w.role : "practice",
+      isTransferCheck: w.isTransferCheck, waveRole: mode === "campaign" ? w.role : mode === "academy" ? "academy" : "practice",
     });
 
     // the volley: one ball per ship (a pod takes its 10 in one ball), in reading order squad by squad;
@@ -457,7 +464,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     if (n === p) {
       dispatch({ type: "exact" });
       bus.emit("resolved", { correct: true, n, product: p, attempt: bs.attempts });
-      const orbs = waveClearOrbs(mode, bs.attempts);
+      const orbs = settleOrbs(from);
       if (orbs) bus.emit("orb_burst", { amount: orbs, reason: "wave_clear" });
       setUi({ outcome: { kind: "exact", value: p, orbs }, radar: null, invite: false, sectors: null, lockTotal: null });
       dispatch({ type: "cleared" });

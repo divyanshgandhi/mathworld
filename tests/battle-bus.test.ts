@@ -39,7 +39,7 @@ describe("persistence from the bus", () => {
     const { bus, log } = record();
     bus.emit("lesson_completed", { tricks: ["flip-it", "fast-adding"], a: 8, b: 3, mode: "full", wedoCorrect: true });
     bus.emit("fire", fire({ errorType: "undershoot_close", n: 20, attempt: 2, usedRadar: true, powerUp: "flip-it", waveRole: "practice" }));
-    bus.emit("orb_burst", { amount: 5, reason: "wave_clear" });
+    bus.emit("orb_burst", { amount: 5, reason: "wave_clear" }); // a HUD signal: orbs are derived, never written
     bus.emit("powerup_applied", { id: "double-it", a: 3, b: 8, fits: false });
     bus.emit("lesson_started", { tricks: ["easy-5-10"], a: 5, b: 6, mode: "fast", auto: true, fallback: false });
     bus.emit("record", { event: { type: "intro_completed", payload: {} } });
@@ -54,7 +54,6 @@ describe("persistence from the bus", () => {
         type: "attempt_submitted",
         payload: { a: 3, b: 8, planetId: "moon", guess: 20, latencyMs: 4100, errorType: "undershoot_close", attemptIndex: 2, usedRadar: true, powerUpUsed: "flip-it", isTransferCheck: false, waveRole: "practice" },
       },
-      { type: "orb_earned", payload: { amount: 5, reason: "wave_clear" } },
       { type: "powerup_used", payload: { trickId: "double-it", a: 3, b: 8, valid: false } },
       { type: "explanation_started", payload: { trickId: "easy-5-10", a: 5, b: 6, mode: "fast" } },
       { type: "intro_completed", payload: {} },
