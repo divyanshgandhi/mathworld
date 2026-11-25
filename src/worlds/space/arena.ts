@@ -533,11 +533,14 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     bus.emit("resolved", { correct: false, n, product: p, attempt: bs.attempts });
     setUi({ outcome: { kind: over ? "over" : "under", value } });
     kill.clearTicks(); // the volley's squad counts go before the miss is counted in the world
+    // one voice at a time (decision 3): when a scan follows this miss, the strip's line is the miss's only
+    // words; the survivors still gather, but the "12 left" label is not drawn (it is set just below)
+    let scanDue = false;
     if (over) misses.over(value);
     else {
       const alive = fv.gather(order), gathered = alive.length > 0 && fv.views.every((v) => v.kind === "fighter");
       fv.wink(GATHER);
-      sched.at(GATHER + 0.05, () => { if (wave === w && !bs.lessonOn) misses.under(alive, value, gathered); });
+      sched.at(GATHER + 0.05, () => { if (wave === w && !bs.lessonOn && !scanDue) misses.under(alive, value, gathered); });
     }
     dispatch({ type: "miss", guess: n, errorType, latencyMs: latency, now: performance.now(), tier });
     const route = bs.lastMiss!, missed = bs.attempts;
@@ -559,6 +562,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       : w.a === 0 || w.b === 0 ? (w.a === 0 ? "nova_zero_squads" : "nova_zero_each") : missLine(errorType, over, n, w);
     const back = sched.after(Math.max(RESTORE_AT + READY_AFTER, SCAN_AFTER_STRIP));
     const rung = pendingHint();
+    scanDue = !route.mash && !!rung && !rung.showMeHow;
     if (route.mash || !rung || rung.showMeHow) climb(say(id, { queue: route.mash }), back); // the calming line waits its turn
     else climb(null, back, REPEATS_STRIP.has(id) ? undefined : () => { if (wave === w && !bs.lessonOn) void say(id); });
     await sched.after(RESTORE_AT);
