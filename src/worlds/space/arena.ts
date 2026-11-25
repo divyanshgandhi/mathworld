@@ -52,6 +52,8 @@ const ROCKET_SHARE = 0.44, ROCKET_MODEL_H = 2.1, ROCKET_Z = 1.8;
 const HIT_STOP = 0.065, GATHER = 0.45, RESTORE_AT = 1.65, READY_AFTER = 0.35;
 /** A scan never starts sooner than this after the strip's miss line (s). */
 const SCAN_AFTER_STRIP = 0.6;
+/** Px kept clear above a small rocket band for the number on its nose (phones). */
+const NOSE_ROOM = 30;
 /** Nova's reactions that only say again what the strip and the world already show (dropped before a scan). */
 const REPEATS_STRIP = new Set<string>(["nova_too_few", "nova_too_many", "nova_err_way_off"]);
 /** Two presses of Power-Ups closer than this are one press (a double tap on a touch screen). */
@@ -717,7 +719,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     // the room for the axis words is kept from the first frame (structure "discover" reveals them later)
     // and, with no words beside the fleet (a phone), the lanes a scan's one number needs (src/battle/lanes.ts)
     const pad = structure === "discover" ? lanePad(fv.wordsPad()) : fv.visiblePad();
-    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift);
+    // a small band leaves the number on the nose reaching above it: the fleet keeps clear of that number too
+    cam.follow(dt, frameBox(m, bs.lessonOn, nv, pad), !bs.lessonOn, cellMax / fv.scale, rocketLift + (cam.band < 70 ? NOSE_ROOM : 0));
     // the rocket rests at the bottom centre of the free area, the same size on screen whatever the fleet
     const ppuR = cam.pxPerUnit(ROCKET_Z);
     if (ppuR > 0) {
