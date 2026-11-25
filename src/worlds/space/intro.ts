@@ -3,7 +3,7 @@ import { COLOR } from "@/design/tokens";
 import { audio } from "@/engine/audio";
 import { CameraRig, type V3 } from "@/engine/camera";
 import { Director, type Step } from "@/engine/director";
-import { createOverlay, readingTime, scheduleCaptions, splitCaption } from "@/engine/overlay";
+import { createOverlay, scheduleCaptions, splitCaption } from "@/engine/overlay";
 import type { Stage } from "@/engine/stage";
 import { approach, clamp, ease, keyframes, seeded } from "@/engine/util";
 import { prepare, warmVoice } from "@/engine/voice";
@@ -14,6 +14,7 @@ import { BOARD_TEXT, buildClassroom, CHAIR_BACK, DESK_DEPTH, DESK_HEIGHT, DOOR_P
 import { buildEarth, EARTH_RADIUS } from "./earth";
 import { makeHand } from "./hand";
 import { FILM_LINES, type FilmLineId } from "./lines";
+import { FILM_PACE as F } from "./pace";
 import { buildHangar, PAD } from "./hangar";
 import { makeRocket } from "./ships";
 import { buildTown } from "./town";
@@ -56,10 +57,10 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "earth", chapter: "orbit", title: "Earth from orbit", purpose: "Where we are: one blue planet on the void, the frame the film will come back to", seconds: 4.6, how: [["go", "orbit"], ["wait", 2.4]] },
   { id: "dive", chapter: "dive", title: "The dive", purpose: "Down through cloud toward one town", seconds: 2.6, how: [["go", "dive"], ["wait", 1.0]] },
   { id: "town", chapter: "dive", title: "Over Maple Hill", purpose: "An ordinary morning: gold light, long shadows, the bus at the gate", seconds: 4.2, how: [["go", "town"], ["wait", 1.6]] },
-  { id: "school", chapter: "dive", title: "The school door", purpose: "The crane comes to rest on the name of the place", seconds: 2.2, how: [["go", "town"], ["wait", 5.4]] },
+  { id: "school", chapter: "dive", title: "The school door", purpose: "The crane comes to rest on the name of the place", seconds: 2.2, how: [["go", "town"], ["wait", 4.9]] },
   { id: "wake", chapter: "wake", title: "Eyes open", purpose: "We are the cadet: the desk, then the room, through sleepy eyes", seconds: 3.1, how: [["go", "wake"], ["wait", 2.8]] },
   { id: "yawn", chapter: "wake", title: "The yawn", purpose: "A hand in the cadet's own colour: this is you", seconds: 3.2, how: [["go", "yawn"], ["wait", 1.4]] },
-  { id: "turn", chapter: "wake", title: "The look to the teacher", purpose: "The eyeline that hands the scene to her", seconds: 1.8, how: [["go", "turn"], ["wait", 1.6]] },
+  { id: "turn", chapter: "wake", title: "The look to the teacher", purpose: "The eyeline that hands the scene to her", seconds: 1.8, how: [["go", "turn"], ["wait", 1.1]] },
   { id: "ask", chapter: "wake", title: "The teacher asks", purpose: "Her face and the sum she has written, both lit by the window", seconds: 7, how: [["go", "q1"], ["wait", 2.6]] },
   { id: "board", chapter: "wake", title: "The sum on the board", purpose: "On a phone the question gets the frame to itself", seconds: 3, tallOnly: true, how: [["go", "q1"], ["wait", 5.6]] },
   { id: "invite", chapter: "wake", title: "The class waits", purpose: "The cadet among the class, the board ahead, one clear thing to do", seconds: 7.5, how: [["go", "q1"], ["until", "raise"], ["wait", 1.2]] },
@@ -71,21 +72,21 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "classmate", chapter: "wake", title: "A classmate answers", purpose: "Nobody is left waiting: a friend's hand goes up", seconds: 2.6, how: [["go", "q2"], ["until", "answer"], ["wait", 1.1]] },
   { id: "lesson", chapter: "wake", title: "Today's word", purpose: "Multiplication goes up on the board, over the heads of the class", seconds: 4.6, how: [["go", "mult"], ["wait", 2.4]] },
   { id: "heard", chapter: "knock", title: "The knock", purpose: "The sound first, on the faces that hear it", seconds: 1.6, how: [["go", "knock"], ["wait", 0.9]] },
-  { id: "door", chapter: "knock", title: "The door", purpose: "It opens into the room and the cooler light of the hall comes in", seconds: 4, how: [["go", "knock"], ["wait", 2.9]] },
+  { id: "door", chapter: "knock", title: "The door", purpose: "It opens into the room and the cooler light of the hall comes in", seconds: 4, how: [["go", "knock"], ["wait", 1.8]] },
   { id: "officers", chapter: "knock", title: "The visitors", purpose: "The principal and the Captain, side by side", seconds: 6, how: [["go", "officers"], ["wait", 5.2]] },
   { id: "captain", chapter: "knock", title: "The Captain", purpose: "A steady face for a serious line", seconds: 8, how: [["go", "captain"], ["wait", 3.0]] },
   { id: "proud", chapter: "knock", title: "The teacher is proud", purpose: "Surprise, then pride", seconds: 5.5, how: [["go", "captain"], ["until", "teacher_proud"], ["wait", 3.4]] },
   { id: "names", chapter: "knock", title: "The names", purpose: "Each child stands as their name is called", seconds: 7.5, how: [["go", "names"], ["wait", 3.6]] },
-  { id: "names-back", chapter: "knock", title: "The back row", purpose: "On a phone the back pair get a frame of their own", seconds: 3, tallOnly: true, how: [["go", "names"], ["wait", 5.3]] },
+  { id: "names-back", chapter: "knock", title: "The back row", purpose: "On a phone the back pair get a frame of their own", seconds: 3, tallOnly: true, how: [["go", "names"], ["wait", 4.9]] },
   { id: "picked", chapter: "knock", title: "The fifth cadet", purpose: "The cadet's name, the stand, the cheer", seconds: 6, how: [["go", "picked"], ["wait", 4.3]] },
   { id: "nave", chapter: "hangar", title: "The hangar", purpose: "A cathedral for one rocket: the aisle leads to it, the window behind draws the journey", seconds: 2.4, how: [["go", "hangar"], ["wait", 1.5]] },
   { id: "briefing", chapter: "hangar", title: "The Captain's welcome", purpose: "Gold key on his face, the rocket soft behind him", seconds: 5.5, how: [["go", "hangar"], ["until", "captain_brief1"], ["wait", 2.2]] },
-  { id: "ship", chapter: "hangar", title: "Your ship", purpose: "The rocket from low down, as tall as it will ever look", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief2"], ["wait", 2.4]] },
+  { id: "ship", chapter: "hangar", title: "Your ship", purpose: "The rocket from low down, as tall as it will ever look", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief2"], ["wait", 0.8]] },
   { id: "nova", chapter: "hangar", title: "Nova", purpose: "Your co-pilot, close, with the one button under her", seconds: 9, how: [["go", "nova"], ["until", "cta"], ["wait", 0.8]] },
   { id: "countdown", chapter: "hangar", title: "The countdown", purpose: "Anticipation: the pad's lights come on one by one, then a held breath", seconds: 2.5, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 1.8]] },
   { id: "ignition", chapter: "hangar", title: "Ignition", purpose: "Release: the one glow in the film", seconds: 0.8, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 3.0]] },
   { id: "liftoff", chapter: "hangar", title: "Lift-off", purpose: "The camera tips back to follow the rocket up to the oculus, and into cloud", seconds: 2.4, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 4.45]] },
-  { id: "arrive", chapter: "hangar", title: "Orbit", purpose: "The last frame, and the first of the battle: the rocket at bottom centre, Earth's horizon below", seconds: 5.9, how: [["go", "arrive"], ["wait", 5.6]] },
+  { id: "arrive", chapter: "hangar", title: "Orbit", purpose: "The last frame, and the first of the battle: the rocket at bottom centre, Earth's horizon below", seconds: 5.9, how: [["go", "arrive"], ["wait", 4.3]] },
 ];
 export const SETUPS: Setup[] = SHOTS.map(({ id, chapter, title, purpose, seconds, tallOnly }) => ({ id, chapter, title, purpose, seconds, tallOnly }));
 
@@ -108,10 +109,10 @@ const LOOK_OF: Record<Env, LookId> = { space: "space", town: "interior", class: 
 const MOODS = { tuesday: { sat: 0.9, hall: 0, tint: [1.035, 1.0, 0.94] }, knock: { sat: 1.04, hall: 1, tint: [0.955, 0.995, 1.06] } } as const;
 /** The morning outdoors, a little more gold than the room. */
 const MORNING = [1.05, 1.0, 0.92] as const;
-/** One fade grammar, in seconds: out to the void, and back in. */
-const FADE = { out: 0.7, in: 0.9 };
-/** How long the class waits for a hand, when a classmate's goes up, and how long it waits for an answer before a classmate helps. */
-const WAIT = { hand: 5, rival: 3, answer: 8, launch: 20 };
+/** One fade grammar, in seconds: out to the void, and back in (a join of two chapters is the two together). */
+const FADE = F.fade;
+/** How long the class waits for a hand, when a classmate's goes up, and how long it waits for an answer or for Launch before the story moves on. */
+const WAIT = { hand: F.question.wait, rival: F.question.rival, answer: F.question.answer, launch: F.nova.wait };
 /** Skip is offered once the film has run this long. */
 const SKIP_AFTER = 3;
 /** The lens, in degrees of vertical field of view: for a wide screen, and for a tall phone (a wide setup, and a portrait of one person). */
@@ -138,9 +139,11 @@ export interface IntroOptions {
   colour?: string;
   /** Less motion: every setup is a still frame, the crane and the dive do not travel, nothing shakes. Defaults to the system setting. */
   calm?: boolean;
+  /** Pace the captions as if every line were heard, or as if none were, whatever the sound is doing (for review and timing). */
+  pace?: "heard" | "read";
 }
 
-export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calmer }: IntroOptions = {}) {
+export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calmer, pace }: IntroOptions = {}) {
   const { scene, camera, mats: M } = stage;
   const rnd = seeded(11);
   const calm = calmer ?? (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -362,33 +365,34 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
   // ---- words on screen ----
   /** Seconds of film played since Play: captions and Skip keep this clock, which stops with the stage. */
   let played = 0;
-  /** A caption may not leave the screen before this (its reading time); a caption waiting to go leaves at `clearAt`. */
-  let floor = 0, clearAt = Infinity;
-  let line: { who: string; pieces: string[]; starts: number[]; t0: number; i: number } | null = null;
+  /** The line on screen: its captions, when each goes up, and when the last one leaves (`off`, from `t0`). */
+  let line: { who: string; pieces: string[]; starts: number[]; t0: number; i: number; off: number } | null = null;
   /** What is being said now (the id of a baked line), so a still can be taken at a known word. */
   let saying = "";
   const fit = (who: string, t: string) => (fits ? fits(who, t) : t.length <= 84);
   /** Is the line on screen being heard? With sound off (or no clip) a caption is read alone, at a young reader's pace. */
   let heard = true;
-  const put = (who: string, text: string) => { setUi({ caption: text ? { who, text } : null }); if (text) floor = played + readingTime(text, heard); };
-  /** Put a line on screen, in as many captions as it needs; returns how long it holds the screen. */
+  const put = (who: string, text: string) => setUi({ caption: text ? { who, text } : null });
+  /**
+   * Put a line on screen, in as many captions as it needs; returns how long it holds the screen. Heard, that
+   * is the length of the voice, and the caption leaves just after it. Read alone, it is the reading time.
+   */
   function say(who: string, text: string, spoken: number, voiced = true) {
-    heard = voiced && !audio.muted;
+    heard = voiced && (pace ? pace === "heard" : !audio.muted);
     const pieces = splitCaption(text, (t) => fit(who, t)), { starts, hold } = scheduleCaptions(pieces, spoken, heard);
-    line = { who, pieces, starts, t0: played, i: -1 };
-    clearAt = Infinity;
+    line = { who, pieces, starts, t0: played, i: -1, off: hold + (heard ? F.linger : 0) };
     captions();
     return hold;
   }
-  /** The caption goes, once it has had its reading time. */
-  const hush = () => { line = null; clearAt = Math.max(played, floor); };
+  /** Take the caption off now (a cut to another place, the launch). Otherwise a caption leaves by itself, when its line is over. */
+  const clear = () => { line = null; if (ui.caption) put("", ""); };
   function captions() {
-    if (line) {
-      let k = 0;
-      while (k + 1 < line.starts.length && played - line.t0 >= line.starts[k + 1] - 1e-4) k++;
-      if (k !== line.i) { line.i = k; put(line.who, line.pieces[k]); }
-    }
-    if (played >= clearAt) { clearAt = Infinity; if (ui.caption) put("", ""); }
+    if (!line) return;
+    const since = played - line.t0;
+    if (since >= line.off - 1e-4) return clear();
+    let k = 0;
+    while (k + 1 < line.starts.length && since >= line.starts[k + 1] - 1e-4) k++;
+    if (k !== line.i) { line.i = k; put(line.who, line.pieces[k]); }
   }
 
   // environments: four sets far apart in one scene; switching changes the look, the light rig and which set is drawn
@@ -424,15 +428,15 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     stage.grade.tint.value.copy(tint);
     stage.grade.sat.value = look.sat * (cls ? MOODS[mood].sat : 1);
   }
-  const fadeOut = (t: number, from: number, d = FADE.out) => smooth((t - from) / d);
-  const fadeIn = (t: number, d = FADE.in) => 1 - smooth(t / d);
+  const fadeOut = (t: number, from: number, d: number = FADE.out) => smooth((t - from) / d);
+  const fadeIn = (t: number, d: number = FADE.in) => 1 - smooth(t / d);
 
   const S = SPACE_AT, T = TOWN_AT;
   const eye = () => eyePosition(player);
   const lidCurve = keyframes([[0, 0], [0.55, 0], [1.1, 0.4], [1.45, 0.1], [2.05, 0.65], [2.35, 0.3], [2.9, 1]]);
 
-  /** A breath between two lines of dialogue, measured from where the words stop. */
-  const GAP = 0.55;
+  /** A breath between two thoughts of the same speaker, measured from where the line ends (a reply names its own, shorter one). */
+  const GAP = 0.45;
   type Who = Character | "nova" | null;
   /** Speak one baked line (or a live buffer): `len` is how long until the words stop, `hold` how long its captions need the screen. */
   const speak = (id: string, who: string, c: Who, live?: AudioBuffer | null, text?: string) => {
@@ -444,27 +448,29 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     return { len, hold: say(who, text ?? FILM_LINES[id as FilmLineId] ?? audio.text(id), len, !!live || !!audio.text(id)) };
   };
 
-  interface Beat { id: string; who: string; c: () => Who; gap?: number; go?: () => void; live?: () => AudioBuffer | null; text?: () => string; after?: (t: number, start: number, len: number) => void }
+  interface Beat { id: string; who: string; c: () => Who; gap?: number; cue?: () => void; go?: () => void; live?: () => AudioBuffer | null; text?: () => string; after?: (t: number, start: number, len: number, hold: number) => void }
   /**
-   * Lines spoken one after another: each waits for the last one's words to stop and its caption to be
-   * read, plus a breath (`gap`, default GAP); mouths close in the pauses; and the step ends `tail`
-   * seconds after the last line. Nothing is ever cut off by the next shot.
+   * Lines spoken one after another, as a conversation: each starts a breath (`gap`, default GAP) after
+   * the one before it ends (the voice when it is heard, the caption when it is read alone). The listeners
+   * turn to the next speaker a moment before the first word (`cue`), and the cut lands on that word (`go`).
+   * Mouths close in the pauses, and the step ends `tail` seconds after the last line.
    */
-  function dialogue(beats: Beat[], { lead = 0.25, tail = 0.7 } = {}) {
-    let i = -1, next = 0, start = 0, len = 0, endAt = Infinity;
+  function dialogue(beats: Beat[], { lead = 0.25, tail = 0.4 } = {}) {
+    let i = -1, next = 0, start = 0, len = 0, hold = 0, endAt = Infinity, cued = -1;
     return {
-      begin() { i = -1; next = lead; endAt = Infinity; len = 0; },
+      begin() { i = -1; next = lead; endAt = Infinity; len = 0; hold = 0; cued = -1; },
       update(t: number) {
         if (i >= 0 && t >= start + len && speaker !== null) talk(null);
-        if (i >= 0) beats[i].after?.(t, start, len);
+        if (i >= 0) beats[i].after?.(t, start, len, hold);
+        if (i < beats.length - 1 && cued < i + 1 && t >= next - F.turnLead) { cued = i + 1; beats[i + 1].cue?.(); }
         if (i < beats.length - 1 && t >= next) {
           const b = beats[++i];
           b.go?.();
           start = t;
           const s = speak(b.id, b.who, b.c(), b.live?.(), b.text?.());
-          len = s.len;
+          len = s.len; hold = s.hold;
           next = t + s.hold + (beats[i + 1]?.gap ?? GAP);
-          if (i === beats.length - 1) endAt = t + Math.max(s.len + tail, s.hold + 0.2);
+          if (i === beats.length - 1) endAt = t + s.hold + tail;
         }
       },
       done: (t: number) => t >= endAt,
@@ -480,7 +486,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
   let phaseNow = "";
   function question(o: { name: string; eq: string; answer: number; options: number[]; ask: string; kid: number; kidClip: string; ok: string; close: string; open: () => void; during?: (since: number, len: number) => void }): Shot {
     type Phase = "ask" | "raise" | "called" | "choose" | "answer" | "reply" | "done";
-    let phase: Phase = "ask", at0 = 0, len = 0, hold = 0, result: "right" | "close" | "classmate" = "right", keen = false, early = false, wait: number = WAIT.hand, last = 0;
+    let phase: Phase = "ask", at0 = 0, len = 0, hold = 0, result: "right" | "close" | "classmate" = "right", keen = false, early = false;
+    const Q = F.question;
     const to = (p: Phase) => { phase = p; phaseNow = p; at0 = director.t; };
     const prompt = (stage: "raise" | "called" | "choose") => setUi({ prompt: { eq: o.eq, options: o.options, stage } });
     const shot: Shot = {
@@ -491,7 +498,6 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         feel(people(), "neutral");
         lookAt(headOf(teacher), CLASS_CENTRE);
         ({ len, hold } = speak(o.ask, "Teacher", teacher));
-        last = line?.starts.at(-1) ?? 0; // when the question's last caption goes up
         o.open();
       },
       update(t) {
@@ -499,26 +505,25 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         if (since >= len && speaker !== null && phase !== "raise" && phase !== "choose") talk(null);
         if (phase === "ask") {
           o.during?.(since, len);
-          // the invitation comes when her words stop and the question's last caption is up; a caption still being
-          // read (sound off) stays up, and the class waits for it
-          if (since >= Math.max(Math.min(len, hold), last) + 0.3) {
-            wait = Math.max(WAIT.hand, hold - since + 3);
+          // the invitation shows as the question's last word lands: the end of her voice, or of its caption when it is read alone
+          if (since >= hold) {
             to("raise");
             talk(null);
-            hush(); // the question is on the board and in the invitation now
+            clear(); // the invitation takes the caption's place: nothing under the button moves a moment later
             if (early) call();
             else { prompt("raise"); show(SETUP.invite); }
           }
         } else if (phase === "raise") {
-          if (since > wait - (WAIT.hand - WAIT.rival) && !keen) { keen = true; kids[o.kid].rig.raise = true; kids[o.kid].rig.mood = "happy"; } // someone else is keen too
-          if (since >= wait) classmate();
-        } else if (phase === "called" && since >= hold + 0.2) {
+          if (since > WAIT.rival && !keen) { keen = true; kids[o.kid].rig.raise = true; kids[o.kid].rig.mood = "happy"; } // someone else is keen too
+          if (since >= WAIT.hand) classmate();
+        } else if (phase === "called" && since >= hold) {
           to("choose");
-          hush();
+          clear();
           prompt("choose");
           show(() => SETUP.board(true)); // what the cadet is looking at: the sum, with the answers under it
         } else if (phase === "choose" && since >= WAIT.answer) classmate(); // a long think: a classmate helps out
-        else if (phase === "answer" && since >= hold + GAP) {
+        else if (phase === "answer" && since < hold) { if (since > len * 0.5) feel([teacher], "happy"); } // she is pleased while the answer is still coming
+        else if (phase === "answer" && since >= hold + (result === "classmate" ? Q.kidReply : Q.reply)) {
           to("reply");
           for (const p of people()) p.rig.raise = false;
           room.write(o.eq.replace("?", String(o.answer)));
@@ -526,7 +531,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
           feel([teacher], "happy");
           ({ len, hold } = speak(result === "close" ? o.close : o.ok, "Teacher", teacher));
           show(SETUP.ask);
-        } else if (phase === "reply" && since >= Math.max(len + 0.8, hold + 0.2)) to("done");
+        } else if (phase === "reply" && since >= hold + Q.tail) to("done");
       },
       done: () => phase === "done",
     };
@@ -573,7 +578,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       saying = "you";
       player.rig.mime = true; // the cadet's own answer has no recording to follow
       player.rig.mood = result === "right" ? "happy" : "thinking";
-      len = 1.1;
+      len = Q.mime;
       hold = say("You", result === "right" ? `${v}!` : `${v}?`, len);
       show(() => SETUP.child(player, 1));
     };
@@ -597,9 +602,9 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
   let diveFrom = new THREE.Vector3(), cardShown = false, backPair = false, novaLen = 4, novaHold = 4, ctaAt = 0, launchCut = 0;
   const turnFrom = new THREE.Vector3();
   /** The launch, in seconds from the press: three beats of lights, a held breath, the fire, the climb, the cloud. */
-  const LAUNCH = { beat: 0.7, breath: 2.0, fire: 2.5, lift: 3.3, cloud: 4.85, end: 5.75 };
+  const LAUNCH = F.launch;
   /** The last shot: the cloud clears, the rocket climbs to its place, the title holds, and the frame is left clean. */
-  const ARRIVAL = { clear: 1.0, settle: 3.0, card: [1.1, 4.5] as const, end: 5.9 };
+  const ARRIVAL = F.arrival;
   /** Put the last frame on screen exactly as the film leaves it (the battle opens on this frame, and Skip lands here). */
   let framed = false;
   const unframe = () => { if (framed) { framed = false; camera.clearViewOffset(); } };
@@ -619,10 +624,10 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
   }
 
   const steps: Shot[] = [
-    { name: "orbit", env: "space", chapter: "orbit", d: 4.6,
-      enter() { audio.mood("space"); lids = 1; hush(); lens(); overlay.card("", "Earth", "An ordinary blue planet", "low"); again = null; cut(at(S, -14, 9, 150), at(S, 0, 0, 0)); if (!calm) cam.shot(at(S, 10, 6, 128), at(S, 0, 0, 0), 0.55); },
-      update(t) { fadeColor = COLOR.void; fade = fadeIn(t); if (t > 3.7) overlay.card("", ""); } },
-    { name: "dive", env: "space", chapter: "dive", d: 2.6,
+    { name: "orbit", env: "space", chapter: "orbit", d: F.orbit.d,
+      enter() { audio.mood("space"); lids = 1; clear(); lens(); overlay.card("", "Earth", "An ordinary blue planet", "low"); again = null; cut(at(S, -14, 9, 150), at(S, 0, 0, 0)); if (!calm) cam.shot(at(S, 10, 6, 128), at(S, 0, 0, 0), 0.55); },
+      update(t) { fadeColor = COLOR.void; fade = fadeIn(t); if (t > F.orbit.cardOff) overlay.card("", ""); } },
+    { name: "dive", env: "space", chapter: "dive", d: F.dive.d,
       // the plunge starts from wherever the orbit left the camera, so there is no jump at the cut
       enter() { overlay.card("", ""); audio.sfx("dive"); cam.hold(); diveFrom = cam.p.clone(); },
       update(t) {
@@ -631,23 +636,23 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         cam.l.set(S.x, S.y + 2 * e, S.z);
         fadeColor = COLOR.approach; fade = fadeOut(t, 1.3, 0.85); // into the cloud, which closes before the ground rushes up
       } },
-    { name: "town", env: "town", chapter: "dive", d: 6.6,
+    { name: "town", env: "town", chapter: "dive", d: F.town.d,
       // wide over the rooftops, then down to the gate, square on to the porch so the school's name reads in full
       enter() { audio.sfx("chime"); lens(); overlay.card("", "An ordinary Tuesday", "8:42 in the morning", "top"); again = null; cut(at(T, 34, 23, 56), at(T, 0, 4, 2)); cam.hold(); },
       update(t) {
         // one eased crane down from over the rooftops: slow away, gentle in, then it rests on the sign.
         // For less motion it is two still frames instead: the town, then the door
-        const k = calm ? (t < 3.6 ? 0 : 1) : smooth(t / 4.3), far = tall() ? 19.5 : 16.2;
+        const k = calm ? (t < 3.2 ? 0 : 1) : smooth(t / F.town.crane), far = tall() ? 19.5 : 16.2;
         cam.p.set(T.x + 34 * (1 - k), 23 + (2.35 - 23) * k, 56 + (far - 56) * k);
         cam.l.set(T.x, 4 + (3.45 - 4) * k, 2 + (5.9 - 2) * k);
-        if (t > 3.9) overlay.card("", ""); // the sign gets the frame to itself
-        if (t < 1) { fadeColor = COLOR.approach; fade = fadeIn(t, 1); }
-        else if (t > 6.6 - FADE.out) { fadeColor = COLOR.void; fade = fadeOut(t, 6.6 - FADE.out); }
+        if (t > F.town.cardOff) overlay.card("", ""); // the sign gets the frame to itself
+        if (t < F.town.in) { fadeColor = COLOR.approach; fade = fadeIn(t, F.town.in); }
+        else if (t > F.town.d - FADE.out) { fadeColor = COLOR.void; fade = fadeOut(t, F.town.d - FADE.out); }
         else fade = 0;
       } },
-    { name: "wake", env: "class", chapter: "wake", firstPerson: true, d: 3.1,
+    { name: "wake", env: "class", chapter: "wake", firstPerson: true, d: F.wake.d,
       enter() {
-        audio.mood("classroom"); fade = 0; overlay.card("", ""); hush();
+        audio.mood("classroom"); fade = 0; overlay.card("", ""); clear();
         mood = "tuesday"; doorTarget = 0;
         room.write("4 + 4 = ?");
         feel(people(), "neutral");
@@ -664,7 +669,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         cam.p.copy(e);
         cam.l.set(e.x + (calm ? 0 : Math.sin(t * 0.9) * 0.06 * (1 - up)), 0.45 + up * 0.75, e.z - 1.0 - up * 1.5); // the drowsy drift is gone by the time the head is up
       } },
-    { name: "yawn", env: "class", chapter: "wake", firstPerson: true, d: 3.2,
+    { name: "yawn", env: "class", chapter: "wake", firstPerson: true, d: F.yawn.d,
       enter() { lids = 1; blur = 0; audio.sfx("yawn"); hand.group.visible = true; HAND_POSE(0); },
       update(t) {
         // the hand comes up under the mouth from the lower right, holds, then drops away; the head
@@ -677,31 +682,32 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         cam.l.set(e.x, 1.2 + 0.32 * up, e.z - 2.5);
         if (t > 3.12) hand.group.visible = false;
       } },
-    { name: "turn", env: "class", chapter: "wake", firstPerson: true, d: 1.8,
-      // still through the cadet's eyes: an unhurried look over to the teacher, who is about to speak
+    { name: "turn", env: "class", chapter: "wake", firstPerson: true, d: F.turn.d,
+      // still through the cadet's eyes: a look over to the teacher, who speaks on the cut that follows it
       enter() { lids = 1; turnFrom.copy(cam.l); cam.hold(); },
-      update(t) { const e = eye(), k = smooth(t / 1.3); cam.p.copy(e); cam.l.set(turnFrom.x + (TEACHER_MARK.x + 0.3 - turnFrom.x) * k, turnFrom.y + (1.5 - turnFrom.y) * k, turnFrom.z + (-4.05 - turnFrom.z) * k); } },
+      update(t) { const e = eye(), k = smooth(t / F.turn.look); cam.p.copy(e); cam.l.set(turnFrom.x + (TEACHER_MARK.x + 0.3 - turnFrom.x) * k, turnFrom.y + (1.5 - turnFrom.y) * k, turnFrom.z + (-4.05 - turnFrom.z) * k); } },
     q1,
     q2,
-    talkShot({ name: "mult", env: "class", chapter: "wake", lead: 0.3, tail: 0.9,
+    talkShot({ name: "mult", env: "class", chapter: "wake", lead: F.mult.lead, tail: F.mult.tail,
       enter() { room.write("× Multiplication"); feel(people(), "neutral"); feel([teacher], "happy"); lookAt(headOf(teacher), CLASS_CENTRE); show(SETUP.lesson); },
       beats: [{ id: "teacher_mult", who: "Teacher", c: T_ }] }),
-    { name: "knock", env: "class", chapter: "knock", d: 4.1,
-      // the sound first, on the faces that hear it; then the door, as it opens
-      enter() { talk(null); saying = "knock"; say("", "Knock, knock, knock.", 1.0); audio.sfx("knock"); shake = 0.025; feel(people(), "oops"); lookAt(DOOR_POINT); show(SETUP.heard); },
+    { name: "knock", env: "class", chapter: "knock", d: F.knock.d,
+      // the sound first, on the faces that hear it (it cuts in on the lesson); then the door, as it opens.
+      // The words for a sound are read, not heard, so they keep their reading time with the sound on too
+      enter() { talk(null); saying = "knock"; say("", "Knock, knock, knock.", F.knock.sound, false); audio.sfx("knock"); shake = 0.025; feel(people(), "oops"); lookAt(DOOR_POINT); show(SETUP.heard); },
       update(t) {
-        if (t > 1.6 && doorTarget === 0) { doorTarget = 1; mood = "knock"; grade(MOODS.knock.tint); audio.sfx("door"); audio.mood("heroic"); show(SETUP.door); }
-        if (t > 2.3) feel(people(), "neutral");
-        if (t > 2.6) hush();
+        if (t > F.knock.door && doorTarget === 0) { doorTarget = 1; mood = "knock"; grade(MOODS.knock.tint); audio.sfx("door"); audio.mood("heroic"); show(SETUP.door); }
+        if (t > F.knock.door + 0.5) feel(people(), "neutral");
       } },
-    talkShot({ name: "officers", env: "class", chapter: "knock", lead: 2.3, tail: 0.5,
+    // the visitors are already walking as the door finishes its swing, and the principal speaks on the way in
+    talkShot({ name: "officers", env: "class", chapter: "knock", lead: F.officers.lead, tail: F.officers.tail,
       enter() {
         doorTarget = 1; mood = "knock"; grade(MOODS.knock.tint);
-        for (const [c, to, delay] of [[principal, ARRIVE.principal, 0], [captain, ARRIVE.captain, 0.35]] as const) {
+        for (const [c, to, delay] of [[principal, ARRIVE.principal, 0], [captain, ARRIVE.captain, F.officers.behind]] as const) {
           c.group.visible = true;
           c.group.position.copy(HALL[0]);
           face(c.group, HALL[1]);
-          c.rig.walk = { pts: [HALL[0], HALL[1], to], t0: stage.time + delay, d: 2.1, face: CLASS_CENTRE };
+          c.rig.walk = { pts: [HALL[0], HALL[1], to], t0: stage.time + delay, d: F.officers.walk, face: CLASS_CENTRE };
           c.rig.look = CLASS_CENTRE;
         }
         gaze([...kids, player, teacher], new THREE.Vector3(4.6, 1.5, -2.7));
@@ -710,18 +716,22 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       },
       beats: [
         { id: "principal_sorry", who: "Principal", c: PR, go: () => { feel([principal], "happy"); gaze([...kids, player, teacher], headOf(principal)); } },
-        { id: "principal_intro", who: "Principal", c: PR, go: () => { principal.rig.look = headOf(captain); gaze([...kids, player, teacher], headOf(captain)); } },
+        // every head goes to the Captain a moment before he is named
+        { id: "principal_intro", who: "Principal", c: PR, gap: F.officers.gap, cue: () => { principal.rig.look = headOf(captain); gaze([...kids, player, teacher], headOf(captain)); } },
       ] }),
-    talkShot({ name: "captain", env: "class", chapter: "knock", lead: 0.35, tail: 0.6,
+    talkShot({ name: "captain", env: "class", chapter: "knock", lead: F.captain.lead, tail: F.captain.tail,
       enter() { lookAt(headOf(captain)); captain.rig.look = CLASS_CENTRE; principal.rig.look = headOf(captain); feel([principal], "neutral"); show(SETUP.captain); },
       beats: [
-        { id: "captain_danger", who: "Captain", c: CAP },
-        // the teacher answers, surprised and then proud; then the Captain asks her to name them
-        { id: "teacher_proud", who: "Teacher", c: T_, gap: 0.7, go: () => { lookAt(headOf(teacher), headOf(captain)); captain.rig.look = headOf(teacher); feel([teacher], "oops"); show(() => SETUP.teacher(P(0.2, 1.5, -1.5))); },
+        // "five cadets start today" lands on the teacher while he is still saying it: her surprise is there before she speaks
+        { id: "captain_danger", who: "Captain", c: CAP, after: (t, start, len) => { if (t > start + len * 0.72 && t < start + len) feel([teacher], "oops"); } },
+        // the teacher answers, surprised and then proud; then the Captain asks her to name them. Heads turn to
+        // whoever is about to speak a moment before the first word, and the cut lands on that word
+        { id: "teacher_proud", who: "Teacher", c: T_, gap: F.captain.proud, cue: () => { lookAt(headOf(teacher), headOf(captain)); captain.rig.look = headOf(teacher); },
+          go: () => { feel([teacher], "oops"); show(() => SETUP.teacher(P(0.2, 1.5, -1.5))); },
           after: (t, start, len) => { if (t > start + len * 0.45) feel([teacher], "happy"); } },
-        { id: "captain_names", who: "Captain", c: CAP, gap: 0.5, go: () => { lookAt(headOf(captain)); captain.rig.look = headOf(teacher); show(SETUP.captain); } },
+        { id: "captain_names", who: "Captain", c: CAP, gap: F.captain.names, cue: () => { lookAt(headOf(captain)); captain.rig.look = headOf(teacher); }, go: () => show(SETUP.captain) },
       ] }),
-    talkShot({ name: "names", env: "class", chapter: "knock", lead: 0.4, tail: 1.5,
+    talkShot({ name: "names", env: "class", chapter: "knock", lead: F.names.lead, tail: F.names.tail,
       enter() {
         backPair = false;
         lookAt(headOf(teacher), CLASS_CENTRE); gaze([captain, principal], CLASS_CENTRE); feel([teacher], "happy");
@@ -738,7 +748,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
         });
         if (!backPair && t > start + len * (0.47 + 2 * 0.13) - 0.15) { backPair = true; if (tall()) show(() => (tall() ? SETUP.pair(named()[2], named()[3], P(-1.3, 3.0, -2.9)) : SETUP.names())); }
       } }] }),
-    talkShot({ name: "picked", env: "class", chapter: "knock", lead: 0.5, tail: 7.7,
+    // the cadet's name is called while the last of the four is still getting to their feet
+    talkShot({ name: "picked", env: "class", chapter: "knock", lead: F.picked.lead, tail: F.picked.out + FADE.out,
       enter() {
         cardShown = false;
         lookAt(headOf(player));
@@ -747,8 +758,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       },
       beats: [{ id: "teacher_pick_generic", who: "Teacher", c: T_, live: () => nameLine, text: () => `And our fifth cadet is… ${cadet || "you"}!`,
         go: () => audio.sfx("fanfare"),
-        after: (t, start, len) => {
-          if (t > start + len * 0.8 && player.rig.stand === 0) {
+        after: (t, start, len, hold) => {
+          if (t > start + len * F.picked.stand && player.rig.stand === 0) {
             player.rig.stand = 1; player.rig.mood = "happy";
             // for less motion the camera does not follow the rise: one cut to a frame that already holds the whole cheer
             if (calm) { const g = player.rig.seat!; lens("portrait"); shoot([P(g.x - 0.5, 1.9, g.z), P(g.x + 0.5, 1.9, g.z), P(g.x - 0.3, 0.6, g.z), P(g.x + 0.3, 0.6, g.z)], P(g.x + 0.85, 1.0, g.z - 1.5), { walls: true }); }
@@ -761,31 +772,32 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
             cam.shot(arr(p), arr(p.clone().addScaledVector(d, dist)), 5);
           }
           if (player.rig.s > 0.9) player.rig.mood = "cheer";
-          // out to the void, and the cadet's new name on it
-          const out = start + Math.max(len + 2.0, readingTime(`And our fifth cadet is ${cadet || "you"}!`, heard) + 0.2);
-          if (t > out) { fadeColor = COLOR.void; fade = fadeOut(t, out); hush(); }
-          if (t > out + FADE.out && !cardShown) { cardShown = true; overlay.card("", `Cadet ${cadet || "you"}`, "Next stop: the Star Fleet hangar"); }
-          if (t > out + FADE.out + 4.3) overlay.card("", "");
+          // the cadet's new name rises under the cheer and is read across the join: the picture dips to the void
+          // and comes back as the hangar (one second in all), and the card leaves once the hangar has been seen
+          const end = start + hold;
+          if (t > end + F.picked.card && !cardShown) { cardShown = true; overlay.card("", `Cadet ${cadet || "you"}`, "Next stop: the Star Fleet hangar", "low"); }
+          if (t > end + F.picked.out) { fadeColor = COLOR.void; fade = fadeOut(t, end + F.picked.out); }
         } }] }),
-    talkShot({ name: "hangar", env: "hangar", chapter: "hangar", lead: 1.9, tail: 0.5,
-      enter() { hangar.reset(); hangar.nova.express("neutral"); overlay.card("", ""); hush(); audio.mood("hangar"); captainH.rig.look = null; show(SETUP.nave); },
-      extra(t) { fadeColor = COLOR.void; fade = fadeIn(t - 0.2); },
+    talkShot({ name: "hangar", env: "hangar", chapter: "hangar", lead: F.hangar.lead, tail: F.hangar.tail,
+      enter() { hangar.reset(); hangar.nova.express("neutral"); if (!cardShown) overlay.card("", ""); audio.mood("hangar"); captainH.rig.look = null; show(SETUP.nave); },
+      extra(t) { fadeColor = COLOR.void; fade = fadeIn(t); if (t > F.hangar.cardOff && cardShown) { cardShown = false; overlay.card("", ""); } },
       beats: [
         { id: "captain_brief1", who: "Captain", c: CAPH, go: () => show(SETUP.hCaptain) }, // in to the Captain
-        { id: "captain_brief2", who: "Captain", c: CAPH, gap: 0.6, go: () => show(SETUP.ship) }, // the ship he is talking about
+        { id: "captain_brief2", who: "Captain", c: CAPH, gap: F.hangar.brief2, go: () => show(SETUP.ship) }, // the ship he is talking about
         // the rule (too few, too many) is not told here: the first battle shows it in the world (docs/teaching.md)
-        { id: "captain_nova", who: "Captain", c: CAPH, gap: 0.7, go: () => { show(SETUP.hCaptain); }, after: (t, start, len) => { if (t > start + len * 0.55) captainH.rig.look = novaHead().clone(); } },
+        { id: "captain_nova", who: "Captain", c: CAPH, gap: F.hangar.nova, go: () => { show(SETUP.hCaptain); }, after: (t, start, len) => { if (t > start + len * 0.55) captainH.rig.look = novaHead().clone(); } },
       ] }),
     { name: "nova", env: "hangar", chapter: "hangar", d: Infinity,
       enter() { audio.sfx("nova_chirp"); hangar.set({ lamps: 0, burn: 0, rise: 0 }); hangar.nova.express("happy"); ctaAt = 0; ({ len: novaLen, hold: novaHold } = speak("nova_hi", "Nova", "nova")); show(() => SETUP.nova(!!ui.cta)); },
       update(t) {
         if (t >= novaLen && speaker !== null) talk(null);
-        if (t > novaHold + 0.3 && !ui.cta) { hush(); ctaAt = t; setUi({ cta: "Launch" }); show(() => SETUP.nova(true)); }
+        // Launch shows as her question's last word lands
+        if (t >= novaHold && !ui.cta) { ctaAt = t; clear(); setUi({ cta: "Launch" }); show(() => SETUP.nova(true)); }
         // a cadet who never presses it is carried along: Nova launches for them
         if (ctaAt && t > ctaAt + WAIT.launch) director.go(director.find("launch"));
       } },
     { name: "launch", env: "hangar", chapter: "hangar", d: LAUNCH.end,
-      enter() { talk(null); line = null; clearAt = Infinity; if (ui.caption) put("", ""); setUi({ cta: null }); hangar.nova.express("cheer"); launchCut = 0; show(SETUP.countdown); },
+      enter() { talk(null); clear(); setUi({ cta: null }); hangar.nova.express("cheer"); launchCut = 0; show(SETUP.countdown); },
       update(t, dt) {
         const L = LAUNCH;
         // anticipation: the pad's lights come on in three beats, then everything holds its breath
@@ -822,7 +834,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       talk(null);
       setUi({ prompt: null, chapter: s.chapter });
       overlay.timer(null);
-      if (s.env !== env) { setEnv(s.env); line = null; clearAt = Infinity; if (ui.caption) put("", ""); }
+      if (s.env !== env) { setEnv(s.env); clear(); }
       flight.visible = s.name === "arrive";
       if (s.name !== "arrive") unframe();
       firstPerson = !!s.firstPerson;
@@ -838,8 +850,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     teacher.group.position.copy(TEACHER_MARK);
     teacher.group.rotation.y = 0.2;
     mood = "tuesday"; doorTarget = 0; room.reset();
-    overlay.card("", ""); overlay.timer(null);
-    line = null; clearAt = Infinity; saying = ""; phaseNow = "";
+    overlay.card("", ""); overlay.timer(null); cardShown = false;
+    line = null; saying = ""; phaseNow = "";
     hand.group.visible = false; lids = 1; blur = 0; fade = 0; firstPerson = false; shake = 0;
     hangar.reset();
     hangar.nova.express("neutral");
@@ -894,7 +906,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     skipping = 0;
     audio.stopVoice();
     talk(null);
-    line = null; clearAt = Infinity;
+    line = null;
     setUi({ prompt: null, cta: null, caption: null, canSkip: false });
   }
 

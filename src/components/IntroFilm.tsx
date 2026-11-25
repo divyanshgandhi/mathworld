@@ -13,8 +13,8 @@ import { PauseMenu } from "./battle/PauseMenu";
 import { FirstShotGuide } from "./teach/FirstShotGuide";
 import { CadetSignUp } from "./hub/CadetSignUp";
 
-/** The film's fade grammar (ms): out to the void, and back in (the same as FADE in intro.ts). */
-const FILM_FADE = { out: 700, in: 900 };
+/** The film's fade grammar (ms): out to the void, and back in (the same as `fade` in pace.ts). The two together are one join. */
+const FILM_FADE = { out: 500, in: 500 };
 
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
 
@@ -114,7 +114,8 @@ export function IntroFilm() {
     setTimeout(() => setVeil("off"), (still ? 0 : FILM_FADE.in) + 100);
   }, []);
   // the film is over the moment the battle opens: a reload from here on carries on in the battle, not at the film's start
-  useEffect(() => { ending.current = again ? () => router.replace(from) : () => { post({ type: "seen", payload: { key: FILM_DONE } }); void startBay(); }; }, [again, from, router, startBay]);
+  // (a replay goes back with a plain page load: a router transition started from the stage's clock can stall while the tab is not in front)
+  useEffect(() => { ending.current = again ? () => location.replace(from) : () => { post({ type: "seen", payload: { key: FILM_DONE } }); void startBay(); }; }, [again, from, startBay]);
 
   /**
    * Does this piece of a line fit the caption plate in two lines on this screen? The film asks before it
@@ -137,7 +138,9 @@ export function IntroFilm() {
       const s = createStage(box.current, { fill: true });
       stage.current = s;
       // `?calm` plays the film as someone who asked for less motion sees it (for review; the system setting does it for real)
-      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits, calm: new URLSearchParams(location.search).has("calm") || undefined });
+      // `?pace=heard` or `?pace=read` paces the captions as with sound on or off, whatever the sound is doing (for review and timing)
+      const asked = new URLSearchParams(location.search).get("pace"), pace = asked === "heard" || asked === "read" ? asked : undefined;
+      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits, calm: new URLSearchParams(location.search).has("calm") || undefined, pace });
       window.__mw = { stage: s, film: film.current };
       setFilmReady(true);
       cleanup = () => { film.current?.dispose(); bay.current?.dispose(); s.dispose(); };
@@ -146,15 +149,16 @@ export function IntroFilm() {
     (async () => {
       const j = await fetch("/api/player").then((r) => r.json()).catch(() => ({ player: null }));
       // the Title owns sign-up; a cadet who has finished the intro only comes back here to watch the film again
-      if (!j.player && !devMode) return router.replace("/");
+      // these gates leave with a plain page load: router.replace from inside an async mount effect can stall on a blank screen
+      if (!j.player && !devMode) return location.replace("/");
       const watching = wantReplay && (!!j.introCompleted || devMode);
-      if (j.introCompleted && !devMode && !watching) return router.replace("/bay");
+      if (j.introCompleted && !devMode && !watching) return location.replace("/bay");
       if (j.player && !watching) setInBay((await history()).some((e) => (e.type === "seen" && e.payload.key === FILM_DONE) || (e.type === "attempt_submitted" && e.payload.planetId === "earth")));
       setAgain(watching);
       setPlayer(j.player);
     })();
     return () => { gone = true; cleanup(); };
-  }, [fits, router]);
+  }, [fits]);
 
   // the hoodie and the first-person sleeve take the colour picked at sign-up
   useEffect(() => {
@@ -162,7 +166,8 @@ export function IntroFilm() {
     if (filmReady && c) film.current?.setColour(c);
   }, [player, filmReady]);
 
-  const begin = useCallback((n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); }, []);
+  // the battle's code is fetched while the film plays, so the join at the end never waits for it
+  const begin = useCallback((n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); void import("@/worlds/space/cadetBay"); }, []);
   const go = useCallback(() => { if (!player) return; if (inBay) void startBay(); else begin(player.name); }, [player, inBay, startBay, begin]);
 
   // straight from Start game on the Title (or a link to the replay): sound is already unlocked, so the film rolls at once
