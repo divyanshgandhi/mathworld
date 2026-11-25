@@ -22,13 +22,23 @@ const alpha = (c: string, a: number) => `rgba(${parseInt(c.slice(1, 3), 16)},${p
 const NAME_INK: Record<string, string> = { Nova: COLOR.sky };
 
 /**
- * The least time a caption stays on screen, in seconds. Heard (the voice is saying it): 1.5 plus 0.3
- * for every word, since the ear carries the line and the eye only follows. Read alone (sound off, or no
- * clip): 1 plus 0.67 for every word, the pace of a Grade 3 reader (about 90 words a minute).
+ * The rhythm of spoken lines, in seconds (the review round's decision 9). A reply starts `reply` after the
+ * line before it ends; the same speaker's next thought `same`; a change of scene takes `scene`. Nothing
+ * holds in silence for longer than `hold` unless something is visibly happening. A heard caption leaves
+ * with its voice (`linger` after, at most). Read alone it holds `read.base` plus `read.word` a word.
+ * An invitation waits `wait` for the player and then the story moves on; a join of two chapters takes `join`.
+ */
+export const PACE = { reply: [0.15, 0.45], same: [0.3, 0.6], scene: [0.6, 1.0], hold: 1.2, linger: 0.3, wait: 5, join: 1.0, read: { base: 0.8, word: 0.42 } } as const;
+
+/**
+ * The least time a caption stays on screen, in seconds. Heard (the voice is saying it) it has no time of
+ * its own: it goes up with its words and leaves with them. Read alone (sound off, or no clip): 0.8 plus
+ * 0.42 for every word, an easy pace for a Grade 3 reader with the picture to help.
  */
 export const readingTime = (text: string, heard = true) => {
+  if (heard) return 0;
   const n = text.trim().split(/\s+/).filter(Boolean).length;
-  return heard ? 1.5 + 0.3 * n : 1 + 0.67 * n;
+  return PACE.read.base + PACE.read.word * n;
 };
 
 /** A word with a hyphen in it ("co-pilot") is never broken across two lines: the hyphen becomes a non-breaking one. */
@@ -62,13 +72,14 @@ export function splitCaption(text: string, fits: (piece: string) => boolean): st
 
 /**
  * When each caption of a spoken line goes up (seconds from the first word), and how long the line
- * holds the screen in all. A caption gets its share of the speech and never less than its reading
- * time, so a slow reader is never cut off; `hold` is at least the length of the speech.
+ * holds the screen in all. Heard, a caption has its share of the speech and the line ends with the
+ * voice. Read alone, each caption has its reading time, so a slow reader is never cut off; `hold` is
+ * never less than the length of the speech (the lips still move with the sound off).
  */
 export function scheduleCaptions(pieces: string[], spoken: number, heard = true) {
   const total = pieces.reduce((n, c) => n + c.length, 0) || 1;
   let t = 0;
-  const starts = pieces.map((c) => { const at = t; t += Math.max(readingTime(c, heard), spoken * (c.length / total)); return at; });
+  const starts = pieces.map((c) => { const at = t; t += heard ? spoken * (c.length / total) : readingTime(c, false); return at; });
   return { starts, hold: Math.max(t, spoken) };
 }
 

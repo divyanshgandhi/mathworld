@@ -13,8 +13,8 @@ import { PauseMenu } from "./battle/PauseMenu";
 import { FirstShotGuide } from "./teach/FirstShotGuide";
 import { CadetSignUp } from "./hub/CadetSignUp";
 
-/** The film's fade grammar (ms): out to the void, and back in (the same as FADE in intro.ts). */
-const FILM_FADE = { out: 700, in: 900 };
+/** The film's fade grammar (ms): out to the void, and back in (the same as `fade` in pace.ts). The two together are one join. */
+const FILM_FADE = { out: 500, in: 500 };
 
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
 
@@ -137,7 +137,9 @@ export function IntroFilm() {
       const s = createStage(box.current, { fill: true });
       stage.current = s;
       // `?calm` plays the film as someone who asked for less motion sees it (for review; the system setting does it for real)
-      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits, calm: new URLSearchParams(location.search).has("calm") || undefined });
+      // `?pace=heard` or `?pace=read` paces the captions as with sound on or off, whatever the sound is doing (for review and timing)
+      const asked = new URLSearchParams(location.search).get("pace"), pace = asked === "heard" || asked === "read" ? asked : undefined;
+      film.current = mountIntro(s, { onUi: setUi, onEnd: () => ending.current(), fits, calm: new URLSearchParams(location.search).has("calm") || undefined, pace });
       window.__mw = { stage: s, film: film.current };
       setFilmReady(true);
       cleanup = () => { film.current?.dispose(); bay.current?.dispose(); s.dispose(); };
@@ -162,7 +164,8 @@ export function IntroFilm() {
     if (filmReady && c) film.current?.setColour(c);
   }, [player, filmReady]);
 
-  const begin = useCallback((n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); }, []);
+  // the battle's code is fetched while the film plays, so the join at the end never waits for it
+  const begin = useCallback((n: string) => { film.current?.setName(n); film.current?.play(); setPhase("film"); void import("@/worlds/space/cadetBay"); }, []);
   const go = useCallback(() => { if (!player) return; if (inBay) void startBay(); else begin(player.name); }, [player, inBay, startBay, begin]);
 
   // straight from Start game on the Title (or a link to the replay): sound is already unlocked, so the film rolls at once
