@@ -318,9 +318,8 @@
 }
 .mwc-sectors::-webkit-scrollbar { display: none; }
 .mwc-sectorCount { position: sticky; left: 0; z-index: 1; flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 10px 0 4px; background: var(--color-void); font-size: 16px; color: var(--color-ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* on phones the slot is too narrow to keep the count beside the chips: it moves under the question */
-.mwc-console:not([data-layout="strip"]) .mwc-sectorCount { display: none; }
-.mwc-console[data-layout="strip"] .mwc-slots:has(.mwc-sectors) { justify-content: flex-start; }
+/* the count is the line under the question already */
+.mwc-sectorRow .mwc-sectorCount { display: none; }
 .mwc-sector {
   flex: none;
   min-height: 44px;
@@ -364,7 +363,8 @@
 .mwc-console[data-layout="pad"] .mwc-fire,
 .mwc-console[data-layout="pad"] .mwc-slots,
 .mwc-console[data-layout="pad"] .mwc-help { margin-left: 6px; }
-.mwc-console[data-layout="pad"] .mwc-slots { justify-content: space-between; }
+.mwc-console[data-layout="pad"] .mwc-slots { justify-content: stretch; }
+.mwc-console[data-layout="pad"] .mwc-slots .mwc-puButton { width: 100%; height: 100%; }
 .mwc-console[data-layout="pad"] .mwc-fire { --fire-n: clamp(34px, 6dvh, 48px); }
 .mwc-console[data-layout="pad"] .mwc-help { gap: 8px; padding: 0 12px 0 6px; }
 
@@ -373,26 +373,45 @@
  * the height back. Fire stands two rows tall at the thumb's side; Power-Ups, Delete and Show me how sit under.
  */
 @media (max-height: 899px) {
-  .mwc-console[data-layout="pad"] { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .mwc-console[data-layout="pad"] { padding: 8px 8px max(8px, env(safe-area-inset-bottom)); }
   .mwc-console[data-layout="pad"] .mwc-grid {
     --key: 48px;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.6fr);
-    grid-template-rows: var(--key) var(--key) 50px;
+    row-gap: 8px;
+    grid-template-columns: repeat(5, minmax(44px, 1fr)) minmax(54px, 1.5fr);
+    grid-template-rows: var(--key) var(--key) 48px;
     grid-template-areas:
       "k1 k2 k3 k4 k5 fire"
       "k6 k7 k8 k9 k0 fire"
-      "slots slots slots del help help";
+      "tools tools tools tools tools tools";
   }
+  /* the third row: Power-Ups (glyph and word), Delete, Show me how (word), with clear gaps */
+  .mwc-console[data-layout="pad"] .mwc-tools {
+    grid-area: tools;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) 48px minmax(0, 1fr);
+    column-gap: 8px;
+    min-width: 0;
+  }
+  .mwc-console[data-layout="pad"] .mwc-puButton { gap: 6px; padding: 0 12px 0 4px; }
+  .mwc-console[data-layout="pad"] .mwc-help { font-stretch: 100%; }
+  .mwc-console[data-layout="pad"] .mwc-tools > * { grid-area: auto; margin: 0; }
+  .mwc-console[data-layout="pad"] .mwc-slots { justify-content: stretch; }
+  .mwc-console[data-layout="pad"] .mwc-puButton { width: 100%; }
   .mwc-console[data-layout="pad"] .mwc-fire,
   .mwc-console[data-layout="pad"] .mwc-slots,
   .mwc-console[data-layout="pad"] .mwc-help { margin-left: 0; }
-  .mwc-console[data-layout="pad"] .mwc-fire { grid-template-columns: 1fr; grid-template-rows: auto 1fr; padding: 10px 8px; justify-items: center; }
-  .mwc-console[data-layout="pad"] .mwc-fireWord { justify-self: center; }
+  .mwc-console[data-layout="pad"] .mwc-fire { grid-template-columns: 1fr; grid-template-rows: auto 1fr; padding: 10px 4px; justify-items: center; }
+  .mwc-console[data-layout="pad"] .mwc-fireWord { justify-self: center; letter-spacing: 0.1em; }
   .mwc-console[data-layout="pad"] .mwc-fireGlyph { display: none; }
   .mwc-console[data-layout="pad"] .mwc-fireNumber { --fire-n: 30px; justify-self: center; align-self: center; }
   .mwc-console[data-layout="pad"] .mwc-help { padding: 0 8px; }
   .mwc-console[data-layout="pad"] .mwc-help .mwc-ring { display: none; }
-  .mwc-console[data-layout="pad"] .mwc-helpWords { font-size: 16px; }
+  .mwc-console[data-layout="pad"] .mwc-helpWords { font-size: 17px; }
+}
+/* the narrowest phones: the third row's words narrow a little (Saira's width axis) instead of clipping */
+@media (max-height: 899px) and (max-width: 359px) {
+  .mwc-console[data-layout="pad"] .mwc-puButton, .mwc-console[data-layout="pad"] .mwc-help { font-stretch: 85%; }
+  .mwc-console[data-layout="pad"] .mwc-puRing { width: 28px; height: 28px; }
 }
 
 /* ---- column: a phone on its side ---- */
@@ -419,7 +438,8 @@
     "k0 k0 del"
     "help fire fire";
 }
-.mwc-console[data-layout="column"] .mwc-slots { justify-content: space-between; }
+.mwc-console[data-layout="column"] .mwc-slots { justify-content: stretch; }
+.mwc-console[data-layout="column"] .mwc-puButton { width: 100%; height: 100%; }
 .mwc-console[data-layout="column"] .mwc-help { padding: 0; }
 .mwc-console[data-layout="column"] .mwc-helpWords { display: none; }
 .mwc-console[data-layout="column"] .mwc-fire {
@@ -468,12 +488,115 @@
 .mwc-console[data-layout="strip"] .mwc-help[data-invite] .mwc-ring { border-color: var(--color-sky); background: var(--color-raised); }
 .mwc-console[data-layout="strip"] .mwc-help[data-disabled] .mwc-ring { border-color: var(--color-line-1); }
 .mwc-console[data-layout="strip"] .mwc-helpWords { font-size: 16px; }
+.mwc-console[data-layout="strip"] .mwc-puButton { height: var(--key); padding-right: 22px; }
 @media (min-width: 1300px) {
   .mwc-console[data-layout="strip"] .mwc-slotName { display: block; }
   .mwc-console[data-layout="strip"] .mwc-slot { width: 104px; }
 }
 /* outside the strip the help ring is just Nova's face */
 .mwc-console:not([data-layout="strip"]) .mwc-help .mwc-ring { border: 0; width: auto; height: auto; }
+
+/* ---------- the one Power-Ups button and its list ---------- */
+.mwc-tools { display: contents; }
+.mwc-del { grid-area: del; }
+.mwc-puButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px 0 6px;
+  border: 1px solid var(--color-line-2);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-1);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
+}
+.mwc-puButton[data-empty] { border-color: transparent; cursor: default; }
+.mwc-puButton:hover:not([data-disabled]):not([data-empty]) { border-color: var(--color-gold); }
+.mwc-puButton:active:not([data-disabled]) { background: var(--color-raised); }
+.mwc-puButton[aria-expanded="true"] { border-color: var(--color-gold); }
+.mwc-puButton[data-disabled] { color: var(--color-ink-3); border-color: var(--color-line-1); cursor: default; }
+.mwc-puButton:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 3px; }
+.mwc-puRing { position: relative; flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; }
+.mwc-puRing .mwc-orbit { inset: -4px; }
+.mwc-orbit[data-still] { animation: none; }
+.mwc-puWord { overflow: hidden; text-overflow: ellipsis; }
+
+.mwc-puPop {
+  z-index: 50;
+  width: min(calc(100vw - 24px), 400px);
+  max-height: min(calc(var(--available-height, 100dvh) - 4px), 560px);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 12px 20px;
+  background: var(--color-panel);
+  overflow: hidden;
+  transition: opacity var(--transition-duration-quick) var(--ease-out), translate var(--transition-duration-quick) var(--ease-out);
+}
+.mwc-puPop[data-starting-style], .mwc-puPop[data-ending-style] { opacity: 0; translate: 0 6px; }
+.mwc-puSheet { --sheet-backdrop: var(--color-scrim); display: flex; flex-direction: column; max-height: 80dvh; padding: 20px 16px max(16px, env(safe-area-inset-bottom)) 20px; }
+.mwc-puHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.mwc-puTitle { margin: 0; font-weight: 200; font-stretch: 125%; letter-spacing: 0.03em; font-size: 28px; line-height: 1; }
+.mwc-puNone { margin: 4px 0 10px; font-size: var(--text-child); line-height: 1.4; color: var(--color-ink-1); max-width: 34ch; }
+.mwc-puList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  /* five rows show; more scroll */
+  max-height: calc(5 * 76px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-right: -4px;
+  padding-right: 4px;
+}
+.mwc-puRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px 8px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--color-ink-1);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
+}
+button.mwc-puRow:hover { border-color: var(--color-line-2); }
+button.mwc-puRow:active { background: var(--color-raised); }
+button.mwc-puRow:focus-visible { outline: 2px solid var(--color-gold); outline-offset: -2px; }
+.mwc-puRow[data-dim] { color: var(--color-ink-3); cursor: default; }
+.mwc-puRowRing { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--color-line-2); }
+.mwc-puRow[data-dim] .mwc-puRowRing { border-color: var(--color-line-1); }
+.mwc-puRow[aria-pressed="true"] .mwc-puRowRing { border-color: var(--color-ink-1); background: var(--color-raised); }
+.mwc-puRowText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mwc-puRowName { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 18px; font-weight: 600; line-height: 1.25; }
+.mwc-puRowDoes { font-size: 17px; line-height: 1.35; color: var(--color-ink-2); text-wrap: pretty; }
+.mwc-puRow[data-dim] .mwc-puRowName, .mwc-puRow[data-dim] .mwc-puRowDoes { color: var(--color-ink-3); }
+.mwc-puRowState { font-size: 17px; font-weight: 500; color: var(--color-gold); }
+.mwc-puChip { padding: 1px 10px; border: 1px solid var(--color-gold); border-radius: var(--radius-pill); color: var(--color-gold); font-size: 15px; font-weight: 500; line-height: 1.5; }
+
+/* Sector-Lock: the sectors under the question, on every arrangement */
+.mwc-sectorRow { grid-area: sectors; display: flex; justify-content: center; min-width: 0; margin-top: 6px; pointer-events: auto; }
+.mwc-strip[data-layout="pad"]:has(.mwc-sectorRow) { grid-template-areas: "lead . trail" "question question question" "msg msg msg" "sectors sectors sectors"; }
+.mwc-strip:not([data-layout="pad"]):has(.mwc-sectorRow) { grid-template-areas: "lead question trail" "msg msg msg" "sectors sectors sectors"; }
 
 /* ---------- the reward: orbs fly from the world to the counter ---------- */
 .mwc-flyer {

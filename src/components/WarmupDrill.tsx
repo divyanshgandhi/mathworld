@@ -9,7 +9,8 @@ import { warmupRun, WARMUP_LENGTH, WARMUP_OF } from "@/rig/warmup";
 import type { Warmup } from "@/worlds/space/warmup";
 import { BriefingCard, ClearCard, PLANET_TEACHES } from "./battle/Cards";
 import { missLine, useCockpitSafe, type Safe } from "./battle/BattleHud";
-import { Console, EmptySlot, useEntry } from "./battle/Console";
+import { Console, useEntry } from "./battle/Console";
+import { PowerUpsButton } from "./battle/PowerUps";
 import { useConsoleLayout, useReducedMotion } from "./battle/layout";
 import { MissionStrip, useOrbReward } from "./battle/MissionStrip";
 import { PauseMenu, usePauseWhenHidden } from "./battle/PauseMenu";
@@ -123,7 +124,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
         question={started && p && !done ? { a: p.a, b: p.b, op: sign } : null}
         lines={[lineA, lineB]} />
       <Console layout={layout} consoleRef={conRef} entry={entry} live={live} onKey={press} help={null}
-        slots={<><EmptySlot /><EmptySlot /><EmptySlot /></>} />
+        slots={<PowerUpsButton empty disabled orbit={false} reduced={false} open={false} onPress={() => {}} />} />
       <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${entry} plasma balls loaded`}</p>
 
       <BriefingCard open={!started} body={planet} name={NAME[planet]} teaches={PLANET_TEACHES[planet]} win="Five quick ones." onLaunch={() => void start()} />

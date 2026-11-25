@@ -9,7 +9,7 @@ import { css } from "./cockpit";
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
 export const fmtN = (n: number) => n.toLocaleString("en-US");
 /** A ui-sdk dialog (a card, the pause menu) is open. ui-sdk dialogs are not <dialog> elements, so `dialog[open]` never matches. */
-export const CARD_OPEN = "[data-slot=dialog-content][data-open], [data-slot=alert-dialog-content][data-open]";
+export const CARD_OPEN = "[data-slot=dialog-content][data-open], [data-slot=alert-dialog-content][data-open], [data-slot=popover-content][data-open]";
 
 /**
  * The typed number, with every input-safety rule in one place:
@@ -58,8 +58,9 @@ export function useEntry({ maxDigits, live, onChange, onFire }: {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest?.("input, textarea, [contenteditable]")) return;
-      // Enter on a focused button presses that button; it must not also fire
-      if (e.key === "Enter" && t?.closest?.("button, a")) return;
+      // Enter on a focused button presses that button; it must not also fire. The Power-Ups button is the
+      // exception: focus returns to it when its list closes, and Enter there still fires (Space opens the list)
+      if (e.key === "Enter" && t?.closest?.("button, a") && !t.closest("[data-enter-fires]")) return;
       // a card or the pause menu is up (the X-Ray is a drawer, not a dialog: typing goes on behind it)
       if (document.querySelector(CARD_OPEN)) return;
       if (/^\d$/.test(e.key)) { press(e.key); return; }
@@ -90,7 +91,8 @@ export function Slot({ label, glyph, onPress, disabled, pressed, pulse }: {
 export const EmptySlot = () => <span className={css.empty} aria-hidden />;
 
 /**
- * The console: one instrument band with the same anatomy everywhere (Power-Ups, keypad, Fire, help).
+ * The console: one instrument band with the same anatomy everywhere (keypad, Fire, Power-Ups, Delete, help).
+ * `slots` holds the one Power-Ups button (PowerUpsButton), or an empty reserved space of the same size.
  * Its size and place depend only on the screen, never on the game: everything that comes and goes
  * fills a slot it already reserves. There is no input box: the number shows on Fire ("Fire 42").
  */
@@ -116,28 +118,31 @@ export function Console({ layout, entry, live, fireWord = "Fire", onKey, slots, 
   return (
     <div ref={consoleRef} className={css.console} data-layout={layout} role="group" aria-label={label}>
       <div className={css.grid} data-guide="keypad">
-        <div className={css.slots} data-guide="powerups">{slots}</div>
         {DIGITS.map((d) => (
           <Button key={d} className={css.key} onMouseDown={keep} style={{ gridArea: `k${d}` }} aria-label={d} disabled={!live} data-key={d}
             onClick={() => onKey(d)}>{d}</Button>
         ))}
-        <Button className={css.key} onMouseDown={keep} style={{ gridArea: "del" }} aria-label="Delete" disabled={!live || entry === ""} onClick={() => onKey("del")}>
-          <Icon name="delete" size={22} />
-        </Button>
         <Button className={`mw-btn mw-primary ${css.fire}`} onMouseDown={keep} data-guide="fire" data-armed={loaded || undefined} disabled={!loaded}
           aria-label={n === null ? fireWord : `${fireWord} ${fmtN(n)}`} onClick={() => onKey("fire")}>
           <span className={css.fireWord}>{fireWord}</span>
           <span className={css.fireGlyph}><RocketGlyph size={30} /></span>
           <span className={css.fireNumber} style={fireN}>{n === null ? "" : fmtN(n)}</span>
         </Button>
-        {help === null || help === undefined ? (
-          <span className={css.help} data-quiet aria-hidden />
-        ) : (
-          <Button className={css.help} onMouseDown={keep} data-guide="help" disabled={help.disabled} data-invite={help.invite || undefined} aria-label="Show me how" title="Show me how" onClick={help.onPress}>
-            <span className={css.ring}><NovaPortrait size={layout === "strip" ? 40 : 30} /></span>
-            <span className={css.helpWords}>Show me how</span>
+        {/* Power-Ups, Delete and Show me how: their own row on a phone held upright, their own places elsewhere */}
+        <div className={css.tools}>
+          <div className={css.slots}>{slots}</div>
+          <Button className={`${css.key} ${css.del}`} onMouseDown={keep} aria-label="Delete" title="Delete" disabled={!live || entry === ""} onClick={() => onKey("del")}>
+            <Icon name="delete" size={22} />
           </Button>
-        )}
+          {help === null || help === undefined ? (
+            <span className={css.help} data-quiet aria-hidden />
+          ) : (
+            <Button className={css.help} onMouseDown={keep} data-guide="help" disabled={help.disabled} data-invite={help.invite || undefined} aria-label="Show me how" title="Show me how" onClick={help.onPress}>
+              <span className={css.ring}><NovaPortrait size={layout === "strip" ? 40 : 30} /></span>
+              <span className={css.helpWords}>Show me how</span>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

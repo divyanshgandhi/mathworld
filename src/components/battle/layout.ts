@@ -34,3 +34,12 @@ export function useReducedMotion() {
     () => false,
   );
 }
+
+/** A phone-width screen (under 600 px wide): lists rise as a bottom sheet here, and sit beside their button elsewhere. */
+export function useNarrow() {
+  return useSyncExternalStore(
+    (f) => { const m = matchMedia("(max-width: 599px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); },
+    () => matchMedia("(max-width: 599px)").matches,
+    () => false,
+  );
+}
