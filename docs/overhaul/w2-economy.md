@@ -158,8 +158,11 @@ The pace is one new look about every one to two sessions, with the top looks aft
 
 ## Not done or not verified
 - **`/admin` with the passphrase.** I did not open it, because the key lives in a local env file I may not read. The Orbs tab uses the same `OrbLedger` component I verified on `/dev/economy`, the page compiles and type-checks, and `/admin` still renders its locked view.
-- **The Academy still pays like practice.** The arena writes Academy shots with `waveRole: "practice"`, so the fold cannot tell them apart; see Requests. Until that changes, an Academy clear pays 5 or 3, or 1 for a Gold fact once a day.
-- **`hyper_jump_taken` is still believed without its offer.** The fold checks only `from === tier` and `to > from`, so a forged jump moves progress and opens the planet-unlocked looks. It mints no orbs. Gating it needs the fold fixtures in `fold.test.ts` that use forged jumps rewritten to earn them.
+- **The Academy pays nothing** now that the arena writes Academy shots with `waveRole: "academy"` (done at the merge).
+- **Learning events are client-trusted** (fix pass after wave 2). The fold derives every orb from `attempt_submitted`, `flashcard_answered` and the rest, and it cannot tell a played answer from a posted one. What it does now:
+  - a `hyper_jump_taken` moves progress only when the log has earned that exact offer (a Gold run and a Gold probe), so a forged jump opens nothing; the test fixtures that needed a later planet now play there (`tests/reach.ts`);
+  - two answers closer than `MIN_SHOT_MS` (1 s, by the log's clock: the server's time for stored events) cannot both have been played, so the second pays no orbs and does not feed the first-try run. A burst of forged answers in one request pays for one.
+  - What it does not do: a script that posts one plausible right answer every couple of seconds still earns about what a fast player earns. Closing that needs the server to issue each wave (and to know the battle's timing), which is a design decision, not a fix.
 - **No patrol income until wave 3.** The patrol has no screen yet.
 - **Tested in the shop only by click:** Escape on the question, and a held Enter. Both are coded (Escape closes the question; repeats are ignored) but I did not exercise them in the browser.
 - **The ten waves were driven through `arena.fire`, not the keypad.** The console UI was not in the loop.

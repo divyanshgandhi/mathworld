@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { reach } from "./reach";
 import { fold, transferRate, type LoggedEvent, type WaveRole } from "@/director/fold";
 import { acceptHyperJump, housekeeping, nextWave, scaffold } from "@/director/next";
 import { band, ewma } from "@/rig/adaptive";
@@ -112,7 +113,7 @@ describe("fold", () => {
   });
 
   it("keeps Deep Space moving: every mission there is new and the sectors ramp", () => {
-    let log: LoggedEvent[] = [{ type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "deep-space" } }];
+    let log: LoggedEvent[] = reach(7); // played there: a forged jump moves nothing
     const goals: string[] = [], anchors: string[] = [], sectors: (number | null)[] = [], applied: (number | null)[] = [], ns: number[] = [];
     for (let i = 0; i < 25; i++) {
       let s = fold(log);
@@ -130,7 +131,7 @@ describe("fold", () => {
     expect(new Set(anchors).size).toBe(anchors.length);
     expect(sectors).toEqual([0, 1, 2, 3, 3]); // 3d×3d → 4d×2d → 4d×3d → 5d×3d onward
     expect(applied).toEqual(sectors);
-    expect(fold(log).cleared).toEqual([7]);
+    expect(fold(log).cleared).toEqual([0, 1, 2, 3, 4, 5, 6, 7]); // every planet on the way was played, then Deep Space
   });
 
   it("works orbs out from the waves, ignores the client's amounts, and charges the catalogue price", () => {
@@ -168,7 +169,7 @@ describe("scaffolding", () => {
 
 describe("problem strings", () => {
   it("runs anchor → discovery → application → adaptive → boss on the Asteroid Belt", () => {
-    let log: LoggedEvent[] = [{ type: "hyper_jump_taken", payload: { fromPlanet: "earth", toPlanet: "asteroid-belt" } }];
+    let log: LoggedEvent[] = reach(3);
     const roles: string[] = [];
     for (let i = 0; i < 5; i++) {
       const w = nextWave(fold(log), 42);
