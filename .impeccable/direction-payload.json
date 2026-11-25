@@ -1,0 +1,117 @@
+{
+  "title": "Choose Math World's visual world",
+  "question": "The roll assigned The Build Booklet. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Build Booklet",
+      "kicker": "THE ROLL",
+      "lineage": "wordless toy-construction instruction booklets (exploded isometric steps, '2x' part callouts)",
+      "thesis": "Math World as a wordless build manual. Every screen is a numbered step, and every quantity is a parts callout. '5× [row of 8]' is multiplication written the way a builder already reads it.",
+      "palette": ["#e7eef6", "#1a1f2b", "#d8332b", "#f5c400", "#1f5fbf", "#3a9a3c"],
+      "materials": ["pale booklet-blue page", "flat 3-tone isometric parts with ink outlines", "rounded callout frames", "heavy black step numerals"],
+      "viewport": "The Resting Bay is the booklet's current step page. A giant step number and the next mission's sub-assembly (the planet fleet drawn as an exploded parts callout, e.g. '7× ▢▢▢▢▢▢▢▢') lead, with the Launch action as the finished-model arrow. The Hangar, Academy and Map sit as three sub-assembly callout boxes along the side. The times-table wall is the parts inventory page at the back, shown only as a folded tab until opened.",
+      "risk": "It can tip into toy-manual literalism and lose the space adventure if the parts are not rockets, drones and planets. It also must avoid any toy brand's marks.",
+      "raised": [
+        {"from": "challenger-webgl-shader-portal", "raise": "Route changes are page turns of one continuous booklet, never hard cuts between unrelated screens."},
+        {"from": "challenger-torn-flyer-wall", "raise": "History stays visible: the previous step's result sits in the corner, the way a manual shows the last build."},
+        {"from": "challenger-daylight-section", "raise": "The bay is drawn as one continuous cutaway section of the ship, so every room has a real place in it."},
+        {"from": "challenger-accretion-disk", "raise": "Mastery states are labelled by shape (empty outline, dashed, filled, starred), not colour alone."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Isotype Squadrons",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Otto Neurath and Gerd Arntz's Isotype pictorial statistics (Vienna, 1920s-30s)",
+      "thesis": "Count, don't read. Every quantity is a row of identical pictograms, so a fleet of 6 squads × 8 is literally an Isotype chart you shoot at, and mastery is a chart that fills in.",
+      "palette": ["#f2efe6", "#1d1d1b", "#c8382c", "#2c5aa0", "#e0a526"],
+      "materials": ["flat pictograms on an unprinted ground", "strict rows and columns", "one sans in two weights"],
+      "viewport": "The Resting Bay as a single Isotype plate. The next mission is a big pictogram row block with one line of plain caption and the Launch action under it. Three small plates (Hangar, Academy, Map) sit in the same grammar. The times-table wall is a 10×10 field of tiny glyphs that fill as facts turn Gold.",
+      "risk": "It is my top grounded candidate and familiar to anyone who knows infographic history. It can read cool and museum-like for an eight-year-old unless the pictograms have character."
+    },
+    {
+      "id": "challenger-teletext",
+      "label": "Teletext Service",
+      "verdict": "competitive",
+      "lineage": "broadcast teletext magazines",
+      "thesis": "Keying digits is the whole input, as in the battle. Every screen is a three-digit page, and hidden answers wait behind REVEAL, which maps directly onto the hint ladder.",
+      "palette": ["#000000", "#ffff00", "#00ffff", "#ffffff", "#ff0000"],
+      "materials": ["block-mosaic graphics", "one bitmap face in a 40×24 grid", "double-height headers"],
+      "viewport": "P100 RESTING BAY: the next mission as a double-height header with a mosaic planet, routes as page numbers (P200 MAP, P300 HANGAR, P400 ACADEMY), and the times tables behind REVEAL.",
+      "case": "Holds product clarity (digits as input, REVEAL as the hint ladder), but kids outside the UK and Europe will not recognise it.",
+      "risk": "Retro novelty if the grid is not strict; very low-resolution art for a game.",
+      "hero": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service.webp"
+    },
+    {
+      "id": "challenger-crouwel-grid",
+      "label": "Crouwel Grid Specimen",
+      "verdict": "competitive",
+      "lineage": "Wim Crouwel's gridded type specimens",
+      "thesis": "Multiplication is an array. Every number, fleet and wall cell is built cell by cell on a visible construction grid, so 7 × 8 is drawn as the grid that makes 56.",
+      "palette": ["#ffffff", "#1a1a1a", "#3b5bff", "#ff5a1f"],
+      "materials": ["visible construction grid", "monumental grid-built numerals", "one accent plane"],
+      "viewport": "The next mission's numerals built huge from grid cells across the bay, with the Launch action on the accent plane and the routes as small grid-set labels.",
+      "case": "Holds product clarity (arrays are multiplication), but audience identification is weak for kids.",
+      "risk": "Austere: a design poster rather than a place to come home to.",
+      "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/crouwel-grid-specimen.webp"
+    },
+    {
+      "id": "challenger-webgl-shader-portal",
+      "label": "Shader Portal",
+      "verdict": "declined",
+      "lineage": "experiential studio portals",
+      "palette": ["#0a0a14", "#ff4fd8"],
+      "materials": ["fullscreen shader", "thin tracked labels"],
+      "case": "Fuses poorly: it hides the next action behind atmosphere, and kids don't read thin corner links.",
+      "kept": "One continuous transition between screens instead of DOM swaps.",
+      "hero": "https://impeccable.style/worlds/cards/webgl-shader-portal-hero.webp"
+    },
+    {
+      "id": "challenger-torn-flyer-wall",
+      "label": "Torn Flyer Wall",
+      "verdict": "declined",
+      "lineage": "photocopy club-flyer walls",
+      "palette": ["#111111", "#ff3ea5", "#f5ff3e"],
+      "materials": ["photocopy", "staples", "torn strips"],
+      "case": "Fuses poorly: the club-night register suits neither kids nor a maths tutor.",
+      "kept": "Past states stay visible as layers.",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-torn-flyer-photocopy-wall-hero.webp"
+    },
+    {
+      "id": "challenger-daylight-section",
+      "label": "Daylight Section",
+      "verdict": "declined",
+      "lineage": "architectural section drawings",
+      "palette": ["#f4f1ea", "#2a2a2a", "#e8b64a"],
+      "materials": ["limewash", "section poche"],
+      "case": "Fuses poorly: lovely, but nothing in it carries counting or mastery.",
+      "kept": "One continuous cutaway that gives every room a real place.",
+      "hero": "https://impeccable.style/worlds/cards/architecture-inhabitable-space-daylight-section-hero.webp"
+    },
+    {
+      "id": "challenger-accretion-disk",
+      "label": "Accretion Disk",
+      "verdict": "declined",
+      "lineage": "black-hole visualisation",
+      "palette": ["#000000", "#9fd0ff", "#ff6a3d", "#ffc24d"],
+      "materials": ["warped light", "orbiting labels"],
+      "case": "Fuses poorly: it is the dark sci-fi neon look the game has now.",
+      "kept": "A named state vocabulary that does not rely on colour.",
+      "hero": "https://impeccable.style/worlds/cards/galaxies-nebulae-deep-time-accretion-disk-threshold-hero.webp"
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A bright illustrated kids'-game hub like the big maths RPGs: a painted scene, a waving mascot, big rounded buttons, a currency counter.",
+    "palette": ["#7ec8f2", "#ffd23f", "#5b3cc4", "#ffffff"],
+    "materials": ["painted cartoon backdrop", "rounded glossy buttons"],
+    "viewport": "A cheerful illustrated room with the mascot centre-left and three big buttons.",
+    "risk": "This is the generic kids-edtech look you named as wrong, done well."
+  },
+  "steer": true
+}

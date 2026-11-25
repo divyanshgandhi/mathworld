@@ -5,14 +5,15 @@
 A space multiplication game for kids (Grade 3+) and adults: answer to fire plasma cannonballs, learn visually from every miss, unlock tricks as live tactical power-ups (`We Do`), and climb the Solar System from `0 × 0` up to unbounded multi-digit armadas.
 
 Read in this exact order before making changes:
-1. `STATE.md` — current status and next active phase
-2. `SPEC.md` — locked end-to-end product, pedagogy, visual unit, audio, and DB specification
-3. `ROADMAP.md` — phased execution plan and acceptance criteria
-4. `docs/tricks.md` — the exact kid-named trick scripts
+1. `OVERHAUL.md` — the brief for the current overhaul: the learning model, the Void and Gold design language, the plan and the working rules. It wins over older documents where they disagree.
+2. `PRODUCT.md` — product truth: users, purpose, positioning, principles
+3. `STATE.md` — current status
+4. `SPEC.md` — the product, pedagogy, audio and database specification (its visual sections are superseded by `OVERHAUL.md`)
+5. `docs/tricks.md` — the exact kid-named trick scripts
 
 ## Engineering & Execution Rules
 
-- **Execute Phases 0 → 6 strictly in order.** Do NOT spend time polishing `/intro` visuals or adding extra art until Phase 0 (DB + Vercel), Phase 1 (`src/rig/` + 5-bot simulation), Phase 2 (playable single + multi-digit wave + live Power-Ups), and Phase 3 (`Show Me How` + Phonon voice) are complete and verified.
+- **Follow `OVERHAUL.md`.** Values come from `src/design/tokens.ts`; 3D lighting comes from `src/worlds/looks.ts`.
 - **Small vertical slices + clean commits.** Commit after each working phase or sub-slice with a crisp commit message. Run `bun run check` (`next typegen`, `tsc`, `eslint`, `vitest`) after every step and confirm it is green.
 - **Code owns the math and structure; AI writes words only.** All pools, mastery math, error classification, and trick beat breakdowns live in pure TypeScript under `src/rig/` with Vitest assertions proving partial products equal `a × b`.
 - **Event-sourced persistence.** Every player action appends to `events` (`src/db/schema.ts`); `PlayerState` is folded purely by `src/director/fold.ts`. Never store loose mutable mastery columns that drift from the event log.
