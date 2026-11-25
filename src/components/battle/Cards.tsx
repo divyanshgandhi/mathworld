@@ -95,3 +95,19 @@ export function ClearCard({ open, body, title, sub, orbs, actions }: {
     </Card>
   );
 }
+
+/**
+ * A mission played out without a win: one calm card, never a punishment. What was won, then the same
+ * planet again (the next mission's first fleet is already waiting behind it) or a rest.
+ */
+export function MissionOverCard({ open, won, of, onAgain, onRest }: { open: boolean; won: number; of: number; onAgain: () => void; onRest: () => void }) {
+  return (
+    <Card open={open} title="Mission over" label="Mission over"
+      actions={<>
+        <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={onAgain}>Try again</Button>
+        <Button variant="quiet" size="md" icon="bay" className="w-full justify-center" onClick={onRest}>Resting Bay</Button>
+      </>}>
+      <p className={css.cardText}>You won {won} of {of}.</p>
+    </Card>
+  );
+}

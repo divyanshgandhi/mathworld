@@ -32,7 +32,11 @@ export function usePauseWhenHidden() {
  * How to play opens the Field Manual over the menu, on its "count" page; Escape then closes the manual
  * and leaves the menu open. `places={false}` drops Star map and Resting Bay (Cadet Bay, before the bay exists).
  */
-export function PauseMenu({ label = "Paused", blocked = false, onOpenChange, places = true }: { label?: string; blocked?: boolean; onOpenChange?: (open: boolean) => void; places?: boolean }) {
+export function PauseMenu({ label = "Paused", blocked = false, onOpenChange, places = true, leave }: {
+  label?: string; blocked?: boolean; onOpenChange?: (open: boolean) => void; places?: boolean;
+  /** One quiet way out where Star map and Resting Bay do not exist yet (the first battle, inside the film). */
+  leave?: { label: string; href: string };
+}) {
   const router = useRouter();
   const [open, setOpenState] = useState(false);
   const [help, setHelp] = useState(false);
@@ -68,7 +72,7 @@ export function PauseMenu({ label = "Paused", blocked = false, onOpenChange, pla
   const row = `${buttonClass("secondary", "md")} w-full justify-start`;
   return (
     <Dialog open={open} onOpenChange={(o) => setOpen(o)}>
-      <DialogTrigger aria-label="Pause" title="Pause (Esc)" className="mw-btn mw-icon bg-void"><Icon name="menu" size={20} /></DialogTrigger>
+      <DialogTrigger aria-label="Pause" title="Pause (Esc)" data-guide="pause" className="mw-btn mw-icon bg-void"><Icon name="menu" size={20} /></DialogTrigger>
       <DialogBackdrop className={backdrop} />
       <DialogContent className={`${dialogBox} flex w-[min(92vw,400px)] flex-col gap-2.5 p-6`} initialFocus="[data-primary]">
         <DialogTitle className="mb-3 text-center type-display text-[34px]">{label}</DialogTitle>
@@ -77,6 +81,7 @@ export function PauseMenu({ label = "Paused", blocked = false, onOpenChange, pla
         <Button className={row} aria-pressed={!muted} onClick={sound}><Icon name={muted ? "sound-off" : "sound-on"} size={20} />{muted ? "Sound is off" : "Sound is on"}</Button>
         {places && <Button className={row} onClick={() => void go("/map")}><Icon name="map" size={20} />Star map</Button>}
         {places && <Button className={row} onClick={() => void go("/bay")}><Icon name="bay" size={20} />Resting Bay</Button>}
+        {!places && leave && <Button className={row} onClick={() => void go(leave.href)}><Icon name="home" size={20} />{leave.label}</Button>}
         {/* nested in the menu, so the manual sits on top of it and closing it comes back here */}
         <FieldManual open={open && help} onClose={() => { helpRef.current = false; setHelp(false); }} topic="count" />
       </DialogContent>

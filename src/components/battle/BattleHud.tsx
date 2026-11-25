@@ -4,20 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { fold } from "@/director/fold";
 import { PRACTICE_WAVES } from "@/director/next";
 import { flushed } from "@/engine/outbox";
-import { missionLength, solvesToClear } from "@/rig/adaptive";
+import { isSolved, missionLength, solvesToClear } from "@/rig/adaptive";
 import { tierOfPlanet, type PlanetId } from "@/rig/pools";
 import { CARD, type TrickId } from "@/rig/tricks";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
 import { BODY_NAME } from "@/worlds/space/bodies";
 import { Button } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
-import { BriefingCard, ClearCard, OfferCard, PLANET_TEACHES } from "./Cards";
-import { Console, EmptySlot, fmtN, Slot, useEntry } from "./Console";
+import { BriefingCard, ClearCard, MissionOverCard, OfferCard, PLANET_TEACHES } from "./Cards";
+import { CARD_OPEN, Console, fmtN, useEntry } from "./Console";
 import { useConsoleLayout, useReducedMotion, type ConsoleLayout } from "./layout";
 import { MissionStrip, useOrbReward } from "./MissionStrip";
 import { usePauseWhenHidden } from "./PauseMenu";
 import { hold } from "./pause";
-import { PowerUpGlyph } from "./PowerUpGlyph";
+import { PowerUpList, PowerUpsButton } from "./PowerUps";
 import { XRay } from "./XRay";
 import { css } from "./cockpit";
 
@@ -27,8 +27,6 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 const TRICK_BY_CARD = Object.fromEntries(Object.entries(CARD).map(([id, name]) => [name, id as TrickId])) as Record<string, TrickId>;
 /** After a card or the menu closes, presses on the console wait this long (a double tap's second tap is not an answer). */
 const SETTLE_MS = 350;
-/** At most this many Power-Ups on the console: the ones that fit this fleet. */
-const SLOTS = 3;
 /** A planet by its own name, never the mission's ("Earth", not "Cadet Bay"); "the Moon" in the middle of a sentence. */
 export const planetName = (id: PlanetId, mid = false) => (mid ? BODY_NAME[id].replace(/^The /, "the ") : BODY_NAME[id]);
 
@@ -125,18 +123,37 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const briefing = !!ui && launch && !ui.started && !ui.done;
   const offer = !!ui?.offer && !jumping;
   const done = !!ui?.done;
-  const cardOpen = briefing || offer || done || !!jumping;
+  // ---- a mission that ended without a win: one card, before the next mission's first wave plays ----
+  const [over, setOver] = useState<{ won: number; of: number } | null>(null);
+  const lastMission = useRef<{ n: number; tier: number } | null>(null);
+  const missionKey = ui?.wave ? `${ui.wave.index}:${ui.wave.a}x${ui.wave.b}` : "";
+  useEffect(() => {
+    if (!arena || ui?.mode !== "campaign" || !ui.wave) return;
+    const s = fold(arena.log()), m = s.mission, prev = lastMission.current;
+    lastMission.current = { n: m.n, tier: s.tier };
+    if (!prev || prev.tier !== s.tier || m.n <= prev.n || m.waves !== 0) return;
+    // the mission before this one was played out and not passed: how many of its counted waves were won
+    const counted = s.history.filter((h) => h.mission === prev.n && h.tier === s.tier && h.role !== "anchor");
+    setOver({ won: counted.filter((h) => isSolved(h.outcome)).length, of: counted.length });
+  }, [missionKey, arena]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (over) hold.on("card"); else hold.off("card"); }, [over]);
+  // ---- the Power-Ups list ----
+  const [listOpen, setListOpen] = useState(false);
+  const [puEl, setPuEl] = useState<HTMLButtonElement | null>(null);
+  useEffect(() => { if (listOpen) hold.on("powerups"); else hold.off("powerups"); }, [listOpen]);
+  useEffect(() => () => hold.off("powerups"), []);
+  const cardOpen = briefing || offer || done || !!jumping || !!over;
   // the keyboard works without a click: the game root has focus whenever no card is up
   useEffect(() => { if (!cardOpen && !paused) rootRef.current?.closest<HTMLElement>("[data-cockpit]")?.focus({ preventScroll: true }); }, [cardOpen, paused]);
   // a card or the menu just closed: the second tap of a double tap lands on the console under it, so for a
   // moment the console ignores presses (a stray digit on Fire, or a Power-Up switched on, by accident)
   const closedAt = useRef(-Infinity);
-  const covered = cardOpen || paused;
+  const covered = cardOpen || paused || listOpen;
   useEffect(() => { if (!covered) closedAt.current = performance.now(); }, [covered]);
   const settled = useCallback(() => performance.now() - closedAt.current > SETTLE_MS, []);
 
   // ---- the number ----
-  const live = !!ui?.canFire && !!w && !cardOpen && !paused;
+  const live = !!ui?.canFire && !!w && !cardOpen && !paused && !listOpen;
   const [lastFired, setLastFired] = useState<number | null>(null);
   const maxDigits = w ? Math.max(2, String(w.a * w.b).length + 1) : 2;
   const { entry, press, set } = useEntry({
@@ -155,6 +172,21 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   useEffect(() => { set(""); }, [waveKey, set]);
   // every sector locked: their sum loads onto Fire
   useEffect(() => { if (ui?.lockTotal != null) set(String(ui.lockTotal)); }, [ui?.lockTotal, set]);
+
+  // the key P opens the Power-Ups list (only when the button itself could be pressed)
+  const puReady = !!ui && ui.belt.length > 0 && live && !ui.lesson && !ui.sectors;
+  useEffect(() => {
+    if (!puReady) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || (e.key !== "p" && e.key !== "P")) return;
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]") || document.querySelector(CARD_OPEN)) return;
+      if (!settled()) return;
+      e.preventDefault();
+      setListOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [puReady, settled]);
 
   // ---- where the cockpit is ----
   const apply = useMemo(() => arena ? (s: Omit<Safe, "left">, cap: { px: number; side: "centre" | "left"; max?: number }) => { arena.setSafe(s); arena.captionAt(cap.px, cap.side, cap.max); } : null, [arena]);
@@ -211,15 +243,18 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   } else if (w && ui.mode !== "academy" && BONUS.has(w.role) && ui.mode !== "practice") lineA = <span className={css.soft}>Bonus wave</span>;
   // a mission's first fleet is an easier one that sets up the trick: it does not count toward the mission, so it says so
   else if (w && ui.mode === "campaign" && w.role === "anchor") lineA = <span className={css.soft}>Warm-up wave: not part of the mission score</span>;
-  if (ui.sectors && layout !== "strip" && !lesson) lineB = <span><b>{ui.sectors.filter((s) => s.value !== null).length}</b> of {ui.sectors.length} sectors locked</span>;
+  if (ui.sectors && !lesson) lineB = <span><b>{ui.sectors.filter((s) => s.value !== null).length}</b> of {ui.sectors.length} sectors locked</span>;
   if (ui.lockTotal !== null && ui.sectors) lineB = <span className={css.exact}>{ui.sectors.map((s) => fmtN(s.value ?? 0)).join(" + ")} = <b>{fmtN(ui.lockTotal)}</b></span>;
 
-  // ---- the Power-Up slots: only the ones that fit this fleet, at most three, in belt order ----
-  const fits = ui.belt.filter((t) => t.fits);
-  const want = new Set([h?.powerUp, ...fits.filter((t) => t.active).map((t) => t.id)].filter(Boolean) as TrickId[]);
-  const chosen = [...fits.filter((t) => want.has(t.id)), ...fits.filter((t) => !want.has(t.id))].slice(0, SLOTS);
-  const shown = fits.filter((t) => chosen.includes(t));
-  const slots = ui.sectors ? (
+  // ---- the one Power-Ups button (the list it opens shows the whole belt); Sector-Lock's sectors sit under the question ----
+  const hinted = h?.powerUp ?? null;
+  const puOrbit = ui.belt.some((t) => t.fits && !t.active && (t.id === hinted || fresh.has(t.id)));
+  const puDisabled = !live || !!lesson || !!ui.sectors;
+  const slots = (
+    <PowerUpsButton empty={ui.belt.length === 0} disabled={puDisabled} orbit={puOrbit} reduced={reduced} open={listOpen} buttonRef={setPuEl}
+      onPress={() => { if (settled()) setListOpen(true); }} />
+  );
+  const sectorRow = ui.sectors ? (
     <div className={css.sectors} role="group" aria-label="Sectors">
       <span className={css.sectorCount}>{ui.sectors.filter((s) => s.value !== null).length} of {ui.sectors.length} locked</span>
       {ui.sectors.map((s) => (
@@ -231,15 +266,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
         </button>
       ))}
     </div>
-  ) : (
-    <>
-      {shown.map((t) => (
-        <Slot key={t.id} label={t.card} glyph={<PowerUpGlyph id={t.id} lock={t.card === "Sector-Lock"} />} pressed={t.active}
-          disabled={!live || !!lesson} pulse={!reduced && (fresh.has(t.id) || (h?.powerUp === t.id && !t.active))} onPress={() => { if (settled()) arena?.powerUp(t.id); }} />
-      ))}
-      {Array.from({ length: SLOTS - shown.length }, (_, i) => <EmptySlot key={`e${i}`} />)}
-    </>
-  );
+  ) : null;
 
   const leave = (to: string) => void flushed().then(() => router.push(to));
   const planetTitle = planetName(ui.planet);
@@ -255,7 +282,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       <MissionStrip layout={layout} stripRef={stripRef} orbsRef={orbsRef} orbs={shownOrbs}
         menu={menu} dots={dots}
         question={w ? { a: ra, b: rb } : null}
-        lines={[lineA, lineB]} />
+        lines={[lineA, lineB]} below={sectorRow} />
       {dev && (
         <div className="pointer-events-none absolute left-3 top-40 z-10 hidden type-body-sm type-number text-ink-3 [:root:has([data-xray][data-open])_&]:left-[356px] [:root:has([data-xray][data-open])_&]:block">
           <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
@@ -265,8 +292,12 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       <Console layout={layout} consoleRef={conRef} entry={entry} live={live} fireWord={sectorActive ? "Lock" : "Fire"} onKey={(k) => { if (settled()) press(k); }}
         slots={slots} label={sectorActive ? `Console, sector ${sectorActive.label}` : "Console"}
         help={ui.mode === "academy" ? null : { onPress: () => { if (settled()) arena?.showMeHow(); }, disabled: !live || !!lesson, invite: ui.invite }} />
+      <PowerUpList open={listOpen} onClose={() => setListOpen(false)} belt={ui.belt} hinted={hinted} layout={layout} anchor={puEl}
+        onPick={(id) => { hold.off("powerups"); arena?.powerUp(id); }} />
       <p className={css.srOnly} aria-live="polite">{entry === "" ? "" : `${fmtN(Number(entry))} plasma balls loaded`}</p>
 
+      <MissionOverCard open={!!over && !done} won={over?.won ?? 0} of={over?.of ?? 0}
+        onAgain={() => setOver(null)} onRest={() => leave("/bay")} />
       <BriefingCard open={briefing} body={ui.planet} name={planetTitle} teaches={PLANET_TEACHES[ui.planet] ?? ""} win={winLine} onLaunch={() => arena?.start()} />
       <OfferCard open={offer} title={ui.offer ? planetName(ui.offer.to) : ""} name={ui.offer ? planetName(ui.offer.to, true) : ""} body={ui.offer?.to ?? null}
         onJump={() => { const name = ui.offer ? planetName(ui.offer.to, true) : null, to = arena?.acceptJump(); if (to) { setJumping(name); onFly?.(to); } }}

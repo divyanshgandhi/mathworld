@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useRef, type ReactNode, type Ref } from "react";
 import { OrbCount, WaveDots } from "@/components/kit";
 import { topBars } from "@/components/kit/chrome";
 import { MOTION } from "@/design/tokens";
@@ -14,7 +14,7 @@ import { css } from "./cockpit";
  * on the right, and two reserved message lines under the question (the outcome, a hint, a lesson).
  * Its height never changes: an empty line keeps its place.
  */
-export function MissionStrip({ layout, menu, question, dots, lines, orbs, orbsRef, stripRef, right }: {
+export function MissionStrip({ layout, menu, question, dots, lines, orbs, orbsRef, stripRef, right, below }: {
   layout: ConsoleLayout;
   menu?: ReactNode;
   question: { a: number; b: number; op?: "×" | "+" | "−" } | null;
@@ -25,6 +25,8 @@ export function MissionStrip({ layout, menu, question, dots, lines, orbs, orbsRe
   stripRef?: Ref<HTMLDivElement>;
   /** Beside the column console the strip covers only the free area. */
   right?: number;
+  /** A row under the two lines (the Sector-Lock sectors), only while it is needed. */
+  below?: ReactNode;
 }) {
   // while the strip is up it owns the sound button (the floating one hides)
   useEffect(() => topBars.mount(), []);
@@ -34,7 +36,7 @@ export function MissionStrip({ layout, menu, question, dots, lines, orbs, orbsRe
     <div ref={stripRef} className={css.strip} data-layout={layout} style={right ? { right } : undefined}>
       <div className={css.lead}>
         {menu}
-        {dots && dots.total > 0 && <WaveDots total={dots.total} won={dots.won} current={dots.current} words={layout !== "column"} className={css.dotWords} />}
+        {dots && dots.total > 0 && <span data-guide="dots" className="flex min-w-0"><WaveDots total={dots.total} won={dots.won} current={dots.current} words={layout !== "column"} className={css.dotWords} /></span>}
       </div>
       <h1 className={css.question} data-guide="question" data-long={len > 8 ? 2 : len > 5 ? 1 : undefined}
         aria-label={question ? `${fmtN(question.a)} ${op === "×" ? "times" : op === "+" ? "plus" : "take away"} ${fmtN(question.b)}` : undefined}>
@@ -48,43 +50,30 @@ export function MissionStrip({ layout, menu, question, dots, lines, orbs, orbsRe
         <p className={`m-0 ${css.line}`}>{lines[0]}</p>
         <p className={`m-0 ${css.line}`}>{lines[1]}</p>
       </div>
+      {below && <div className={css.sectorRow}>{below}</div>}
     </div>
   );
 }
 
 /**
- * The reward: when the orb count goes up, a few orbs fly from the middle of the world to the counter
- * (about 600 ms) and the counter ticks up as they land. With reduced motion, or while a card covers
- * the screen, it just ticks. Returns the number the counter should show.
+ * The reward: when the orb count goes up, the counter shows the new total at once (the same moment the
+ * "+N orbs" line appears, so the two always agree) and a few orbs fly from the middle of the world to
+ * the counter (about 600 ms) as a flourish. With reduced motion, or while a card covers the screen,
+ * nothing flies. Returns the number the counter should show.
  */
 export function useOrbReward(orbs: number, target: React.RefObject<HTMLElement | null>, from: () => { x: number; y: number }, opts: { reduced: boolean; still: boolean }) {
-  const [shown, setShown] = useState(orbs);
-  const shownRef = useRef(orbs);
-  const optsRef = useRef(opts), fromRef = useRef(from);
+  const optsRef = useRef(opts), fromRef = useRef(from), last = useRef(orbs);
   useEffect(() => { optsRef.current = opts; fromRef.current = from; });
   useEffect(() => {
-    const start = shownRef.current;
-    if (orbs === start) return;
-    let raf = 0, gone = false;
-    const flyers: HTMLElement[] = [];
-    const set = (v: number) => { shownRef.current = v; setShown(v); };
-    const tick = (to: number) => {
-      const t0 = performance.now(), dur = MOTION.quick * 2;
-      const step = () => {
-        if (gone) return;
-        const k = Math.min(1, (performance.now() - t0) / dur);
-        set(Math.round(start + (to - start) * k));
-        if (k < 1) raf = requestAnimationFrame(step);
-      };
-      step();
-    };
+    const start = last.current;
+    last.current = orbs;
     const el = target.current;
     const { reduced, still } = optsRef.current;
-    if (orbs < start || reduced || still || !el) { set(orbs); return; }
+    if (orbs <= start || reduced || still || !el) return;
+    const flyers: HTMLElement[] = [];
     const end = el.querySelector("svg")?.getBoundingClientRect() ?? el.getBoundingClientRect();
     const p = fromRef.current(), ex = end.left + end.width / 2, ey = end.top + end.height / 2;
     const n = Math.min(5, orbs - start), fly = 600;
-    let landed = 0;
     for (let i = 0; i < n; i++) {
       const f = document.createElement("div");
       f.className = css.flyer;
@@ -96,15 +85,11 @@ export function useOrbReward(orbs: number, target: React.RefObject<HTMLElement |
       const anim = f.animate([
         { transform: `translate(${sx}px, ${sy}px) scale(0.6)`, opacity: 0 },
         { transform: `translate(${sx}px, ${sy - 24}px) scale(1)`, opacity: 1, offset: 0.2 },
-        { transform: `translate(${ex - 11}px, ${ey - 11}px) scale(0.8)`, opacity: 1 },
+        { transform: `translate(${ex - 11}px, ${ey - 11}px) scale(0.8)`, opacity: 0 },
       ], { duration: fly, delay: i * 45, easing: MOTION.ease, fill: "both" });
-      anim.onfinish = () => {
-        f.remove();
-        if (++landed === n && !gone) tick(orbs);
-      };
+      anim.onfinish = () => f.remove();
     }
-    return () => { gone = true; cancelAnimationFrame(raf); flyers.forEach((f) => f.remove()); set(orbs); };
+    return () => flyers.forEach((f) => f.remove());
   }, [orbs, target]);
-  return shown;
+  return orbs;
 }
-
