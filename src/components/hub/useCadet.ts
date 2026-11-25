@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EventInput } from "@/db/events";
 import { fold, type LoggedEvent } from "@/director/fold";
@@ -12,7 +11,6 @@ import type { Cadet } from "./CadetSignUp";
  * back to the Title. `emit` appends to /api/events and to the local log, so the screen updates at once.
  */
 export function useCadet({ needIntro = true } = {}) {
-  const router = useRouter();
   const [cadet, setCadet] = useState<Cadet | null>(null);
   const [log, setLog] = useState<LoggedEvent[] | null>(null);
 
@@ -21,15 +19,17 @@ export function useCadet({ needIntro = true } = {}) {
     (async () => {
       const j = await fetch("/api/player").then((r) => r.json()).catch(() => ({ player: null }));
       if (gone) return;
-      if (!j.player) return router.replace("/");
-      if (needIntro && !j.introCompleted && !new URLSearchParams(location.search).has("dev")) return router.replace("/intro");
+      // A hard replace, not router.replace: a soft one from inside this effect could stall and leave
+      // the screen on its loading line for ever (a cadet who left the first mission and came back).
+      if (!j.player) return location.replace("/");
+      if (needIntro && !j.introCompleted && !new URLSearchParams(location.search).has("dev")) return location.replace("/intro");
       const events = await history();
       if (gone) return;
       setCadet(j.player);
       setLog(events);
     })();
     return () => { gone = true; };
-  }, [router, needIntro]);
+  }, [needIntro]);
 
   const state = useMemo(() => (log ? fold(log) : null), [log]);
   const emit = useCallback((e: EventInput) => { post(e); setLog((l) => [...(l ?? []), { ...e, at: Date.now() }]); }, []);

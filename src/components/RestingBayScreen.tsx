@@ -8,7 +8,7 @@ import { missionLength, solvesToClear, type Band } from "@/rig/adaptive";
 import { MAX_TIER, PLANETS_BY_TIER, type PlanetId } from "@/rig/pools";
 import { MASTERY, type MasteryKey } from "@/design/tokens";
 import { BODY_NAME } from "@/worlds/space/bodies";
-import { Button, buttonClass, Loading, masterySummary, MasteryKeyLegend, MasteryMark, NovaLine, PillLink, Pips, RingLogo, SheetClose, SheetDialog, TopBar, WaveDots } from "./kit";
+import { Button, Loading, masterySummary, MasteryKeyLegend, MasteryMark, NovaLine, PillLink, Pips, RingLogo, TopBar, WaveDots } from "./kit";
 import { Flashcards } from "./hub/Flashcards";
 import { FieldManual } from "./teach/FieldManual";
 import { GREETINGS } from "@/teach/greetings";
@@ -135,7 +135,6 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
   const [open, setOpen] = useState<number | null>(null);
   const [help, setHelp] = useState(false);
   const [deck, setDeck] = useState<number | null>(null);
-  const [asking, setAsking] = useState(false);
   const [leaving, setLeaving] = useState(false);
   // the first arrival is decided once, from the log as it loads (recording it must not change the line)
   const [first, setFirst] = useState<boolean | null>(null);
@@ -188,8 +187,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
   const switchCadet = async () => {
     if (leaving) return;
     setLeaving(true);
-    await fetch("/api/player", { method: "DELETE" }).catch(() => null);
-    router.push("/?new");
+    router.push("/?switch"); // the Title asks who is playing: cadets made here stay on the list
   };
 
   return (
@@ -209,7 +207,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
             <div data-slot="daily-patrol" className="empty:hidden">{typeof patrol === "function" ? patrol({ state, log, emit }) : patrol}</div>
-            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, who, !!first, name, ps)}</NovaLine>
+            <NovaLine className={`mw-bay-nova transition-opacity duration-route ${first && greetDone ? "opacity-0" : ""}`}>{novaLine(state, log, `\u2068${who}\u2069`, !!first, name, ps)}</NovaLine>
           </div>
         </section>
 
@@ -268,16 +266,9 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
         </section>
 
         <div className="mw-bay-foot">
-          <Button variant="quiet" size="sm" onClick={() => setAsking(true)}>Switch cadet</Button>
+          <Button variant="quiet" size="sm" onClick={() => void switchCadet()} disabled={leaving} focusableWhenDisabled>Switch cadet</Button>
         </div>
       </main>
-
-      <SheetDialog open={asking} onOpenChange={setAsking} size="sm" presentation="auto" title="Start as a new cadet?"
-        description={<>This device will forget <b className="font-medium text-ink-1">{who}</b>. {who}&apos;s orbs and Gold facts cannot be brought back.</>}
-        actions={<>
-          <SheetClose className={`${buttonClass("primary", "md")} justify-center`}>Keep playing</SheetClose>
-          <Button onClick={() => void switchCadet()} disabled={leaving} focusableWhenDisabled>New cadet</Button>
-        </>} />
 
       <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/bay" />
 

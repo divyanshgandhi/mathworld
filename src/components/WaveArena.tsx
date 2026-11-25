@@ -52,7 +52,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
       const events = j.player ? await history() : [];
       // a locked planet is a silhouette on the map, not a battle (dev drills may go anywhere):
       // decided before anything mounts, with a visible way back in case the redirect stalls
-      if (j.player && !isDev && !canLaunch(fold(events), planet)) { setLocked(true); return location.replace("/map"); }
+      if (j.player && !isDev && !canLaunch(fold(events), planet)) { setLocked(true); return location.replace(`/map?locked=${planet}`); }
       setLog(events);
       setCadet(j.player);
     }).catch(() => setCadet(null));

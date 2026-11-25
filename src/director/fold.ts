@@ -9,6 +9,7 @@ import { factKey, MAX_TIER, tierOf, tierOfPlanet, type Fact } from "@/rig/pools"
 import { selectTrick, type TrickId } from "@/rig/tricks";
 import { dayNumber, ORB_RULES, ORB_WORDS, payWave, type OrbRule } from "@/battle/rewards";
 import { isUnlocked, itemOf, priceFor } from "./hangar";
+import { patrol } from "./hub";
 
 /** An event as folded: the contract shape plus an optional timestamp (ms) for the anti-mash rule. */
 export type LoggedEvent = EventInput & { at?: number };
@@ -115,6 +116,12 @@ export function fold(events: LoggedEvent[]): PlayerState {
    * patrol. A patrol pays only for facts reviewed that way, so a patrol event alone mints nothing.
    */
   let reviewed = new Set<string>();
+  /**
+   * The patrol a cadet is playing, read from the log itself (timed logs only): `offered` is how many
+   * facts were due at its first card, `asked` the due facts answered since (right or wrong). A patrol
+   * pays only once every offered fact has had its card, so one posted card cannot mint a patrol.
+   */
+  let offered = 0, asked = new Set<string>();
 
   const pay = (rule: OrbRule, amount: number, fact?: string) => {
     if (amount <= 0) return;
@@ -275,8 +282,11 @@ export function fold(events: LoggedEvent[]): PlayerState {
         // A gentle mastery nudge only: never a mission wave, a planet clear or a Hyper-Jump streak.
         // Flashcards pay no orbs (ORB_RULES.flashcard); a card that makes a fact Gold still pays the first Gold.
         const p = e.payload, key = factKey(p.a, p.b);
+        // Timed logs: only a fact that was due for the patrol counts towards it (checked before this card moves its rest).
+        const due = at === undefined ? null : patrol(s, at) ?? [], isDue = due === null || due.some((f) => f.key === key);
+        if (due && isDue) { if (!asked.size) offered = due.length; asked.add(key); }
         if (at !== undefined) s.lastSeen[key] = at;
-        if (p.guess === p.a * p.b) reviewed.add(key);
+        if (p.guess === p.a * p.b && isDue) reviewed.add(key);
         if (p.guess !== p.a * p.b || p.latencyMs > fastMs(tierOf(p.a, p.b) ?? s.tier)) break;
         const f = s.facts[key] ?? { m: M0, seen: 0, fastWins: 0 };
         s.facts[key] = { m: Math.max(f.m, ewma(f.m, FLASHCARD_OBS, FLASHCARD_ALPHA)), seen: f.seen + 1, fastWins: f.fastWins + 1 };
@@ -288,8 +298,9 @@ export function fold(events: LoggedEvent[]): PlayerState {
         const { day, facts } = e.payload, keys = facts.map((x) => factKey(x.a, x.b));
         if (s.patrol.lastDay !== null && day <= s.patrol.lastDay) break;
         if (!keys.every((k) => reviewed.has(k))) break;
+        if (at !== undefined && asked.size < offered) break;
         s.patrol = { lastDay: day, done: s.patrol.done + 1 };
-        reviewed = new Set();
+        reviewed = new Set(); asked = new Set(); offered = 0;
         pay("patrol", ORB_RULES.patrol.amount);
         break;
       }

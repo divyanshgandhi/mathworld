@@ -57,3 +57,15 @@ describe("flashcards on one table", () => {
     expect(arrayOf({ a: 0, b: 7 }).total).toBe(0);
   });
 });
+
+describe("the server keeps the sign-up's name rules (NewPlayer in src/db/events.ts)", () => {
+  it("refuses what the field refuses and saves the name the field would save", async () => {
+    const { NewPlayer } = await import("@/db/events");
+    expect(NewPlayer.safeParse({ name: "😀😀" }).success).toBe(false);
+    expect(NewPlayer.safeParse({ name: "<b>x</b>" }).success).toBe(false);
+    expect(NewPlayer.safeParse({ name: "   " }).success).toBe(false);
+    expect(NewPlayer.parse({ name: "  Kit   Ray " }).name).toBe("Kit Ray");
+    expect(NewPlayer.safeParse({ name: "Abcdefghijklmnopq" }).success).toBe(false); // 17: the field cuts to 16 before it sends
+    expect(NewPlayer.parse({ name: "Abcdefghijklmnop" }).name).toBe("Abcdefghijklmnop");
+  });
+});

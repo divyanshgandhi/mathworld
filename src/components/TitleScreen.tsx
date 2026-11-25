@@ -7,6 +7,7 @@ import { Button } from "./kit/Button";
 import { RingLogo } from "./kit/Brand";
 import "./hub/title.css";
 import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
+import { forgetCadet, knownCadets, rememberCadet, type KnownCadet } from "./hub/cadets";
 import { useScene } from "./hub/Scene";
 
 /** Dev only (?dev): every planet and a few exact drills. */
@@ -31,7 +32,7 @@ const SIDE = "(min-width: 1100px), (min-width: 640px) and (min-aspect-ratio: 16/
 const sideNow = () => matchMedia(SIDE).matches;
 const onMedia = (fn: () => void) => { const m = matchMedia(SIDE); m.addEventListener("change", fn); return () => m.removeEventListener("change", fn); };
 
-type Me = { player: Cadet | null; introCompleted: boolean };
+type Me = { player: (Cadet & { id?: string }) | null; introCompleted: boolean };
 /** What the words block is showing: nothing to press yet, Start game, the sign-up, welcome back, or the switch question. */
 type Phase = "wait" | "new" | "signup" | "back" | "switch";
 
@@ -50,6 +51,7 @@ export function TitleScreen() {
   const [phase, setPhase] = useState<Phase>("wait");
   const [settled, setSettled] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [others, setOthers] = useState<KnownCadet[]>([]);
   const [moved, setMoved] = useState(false); // the first phase arrives quietly; later ones take focus
   const words = useRef<HTMLDivElement>(null);
   const side = useSyncExternalStore(onMedia, sideNow, () => true);
@@ -63,8 +65,11 @@ export function TitleScreen() {
       .then((m: Me) => {
         if (gone) return;
         setMe(m);
-        // after Switch cadet in the Resting Bay (/?new), go straight to the sign-up
-        setPhase(m.player ? "back" : new URLSearchParams(location.search).has("new") ? "signup" : "new");
+        if (m.player?.id) rememberCadet({ id: m.player.id, name: m.player.name });
+        setOthers(knownCadets().filter((c) => c.id !== m.player?.id));
+        // after Switch cadet in the Resting Bay (/?switch), go straight to the choice of cadet
+        const q = new URLSearchParams(location.search);
+        setPhase(m.player ? (q.has("switch") ? "switch" : "back") : q.has("new") ? "signup" : "new");
       });
     router.prefetch("/bay");
     router.prefetch("/intro");
@@ -119,6 +124,20 @@ export function TitleScreen() {
     go("signup");
   };
 
+  /** Play as a cadet made on this device before. */
+  const pick = async (c: KnownCadet) => {
+    if (leaving) return;
+    setLeaving(true);
+    const res = await fetch("/api/player", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id }) }).catch(() => null);
+    const j = res?.ok ? await res.json().catch(() => null) : null;
+    setLeaving(false);
+    if (!j?.player) { forgetCadet(c.id); setOthers((o) => o.filter((k) => k.id !== c.id)); return; }
+    rememberCadet({ id: j.player.id, name: j.player.name });
+    setMe({ player: j.player, introCompleted: !!j.introCompleted });
+    setOthers(knownCadets().filter((k) => k.id !== j.player.id));
+    go("back");
+  };
+
   const name = me?.player?.name ?? "";
   const shown = settled && phase !== "wait";
 
@@ -147,10 +166,13 @@ export function TitleScreen() {
   } else {
     body = (
       <div role="group" aria-labelledby="switch-q" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); go("back"); } }}>
-        <p id="switch-q" className="mw-title-ask">Start as a new cadet?</p>
-        <p className="mw-title-line !mt-3">This device will forget <b className="mw-title-name">{name}</b>. {name}&apos;s orbs and Gold facts cannot be brought back.</p>
+        <p id="switch-q" className="mw-title-ask">Who is playing?</p>
+        <p className="mw-title-line !mt-3">Every cadet on this device keeps their orbs and Gold facts.</p>
         <div className="mw-title-act" data-on>
-          <Button variant="primary" size="lg" autoFocus onClick={() => go("back")} className="mw-title-primary">Keep playing</Button>
+          <Button variant="primary" size="lg" autoFocus onClick={() => go("back")} className="mw-title-primary"><span>Keep playing as <bdi>{name}</bdi></span></Button>
+          {others.map((c) => (
+            <Button key={c.id} variant="secondary" size="lg" onClick={() => void pick(c)} disabled={leaving} focusableWhenDisabled><span>Play as <bdi>{c.name}</bdi></span></Button>
+          ))}
           <Button variant="secondary" size="lg" onClick={() => void forget()} disabled={leaving} focusableWhenDisabled>New cadet</Button>
         </div>
       </div>

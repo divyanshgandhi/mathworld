@@ -71,3 +71,18 @@ describe("a failed save's retry (patrolUnreviewed)", () => {
     expect(patrolUnreviewed(paid, facts)).toEqual(facts); // a paid patrol starts the count again
   });
 });
+
+describe("a forged patrol (the fold pays only a patrol that was played)", () => {
+  it("pays nothing for one posted card and a patrol event when nothing was due", () => {
+    const at = t0 + H, log: LoggedEvent[] = [{ type: "flashcard_answered", at, payload: { a: 3, b: 4, guess: 12, latencyMs: 900 } }, done(patrolDay(at), [{ a: 3, b: 4 }], at + 1)];
+    expect(patrolPaid(log, patrolDay(at))).toBeNull();
+  });
+  it("pays nothing until every due fact has had its card", () => {
+    const at = t0 + PATROL_REST.practicing + H, facts = patrol(fold(played), at)!;
+    expect(facts.length).toBeGreaterThan(1);
+    const one = [...played, { type: "flashcard_answered", at, payload: { a: facts[0].a, b: facts[0].b, guess: facts[0].a * facts[0].b, latencyMs: 900 } } as LoggedEvent, done(patrolDay(at), [{ a: facts[0].a, b: facts[0].b }], at + 1)];
+    expect(patrolPaid(one, patrolDay(at))).toBeNull();
+    const all = [...played, ...facts.map((f, k) => ({ type: "flashcard_answered", at: at + k, payload: { a: f.a, b: f.b, guess: k === 0 ? 1 : f.a * f.b, latencyMs: 900 } }) as LoggedEvent), done(patrolDay(at), facts.slice(1).map(({ a, b }) => ({ a, b })), at + 99)];
+    expect(patrolPaid(all, patrolDay(at))).toBe(15); // a missed card still had its turn: a miss never costs the patrol
+  });
+});
