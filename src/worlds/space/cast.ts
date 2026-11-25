@@ -90,7 +90,13 @@ export interface Rig {
   /** raise amount and target */ r: number; raise: boolean;
   /** Both arms up (0..1, follows the `cheer` expression). */
   cheer: number;
+  /** The voice as the body hears it: a quick envelope for the mouth, a slow one for the hands. */
+  v: number; va: number;
+  /** How much the hands are in the conversation (0..1): eased, so a line never starts or ends with a snap. */
+  ge: number;
   talking: boolean; look: THREE.Vector3 | null;
+  /** Speak with no voice to follow (the cadet's own answer has no recording): the mouth keeps its own time. */
+  mime: boolean;
   /** The face the character is making. */
   mood: Expression;
   /** Where this character sits: the seated hip height, the spot, and the chair and desk it belongs to. */
@@ -319,7 +325,7 @@ export function makeCharacter(spec: Spec, M: Materials, rnd: Rng): Character {
 
   const rig: Rig = {
     body, hips, knees, shoulders, elbows, head, torso, prop, face, H, L, Ht, A, R, blink: 1 + rnd() * 3, ph: rnd() * 6,
-    r: 0, raise: false, cheer: 0, talking: false, look: null, mood: "neutral", seat: null, s: 0, stand: 0, walk: null,
+    r: 0, raise: false, cheer: 0, v: 0, va: 0, ge: 0, talking: false, mime: false, look: null, mood: "neutral", seat: null, s: 0, stand: 0, walk: null,
   };
   return { group: g, rig, spec };
 }
@@ -396,8 +402,13 @@ export function ik(a: number, b: number, dz: number, dy: number, bendForward: bo
 }
 
 /** Per-frame life: breathing, blinking, a face that acts, a voice-driven mouth, looking, raising a hand, sitting, standing, walking. */
-export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, voice = 0) {
+export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, level = 0) {
   const u = c.rig, g = c.group, f = u.face, k = (rate: number) => Math.min(1, dt * rate);
+  // the raw loudness of a voice jumps from frame to frame: the mouth follows a quick envelope of it
+  // and the hands a slow one, so neither ever jitters
+  u.v += (level - u.v) * k(level > u.v ? 22 : 10);
+  u.va += (level - u.va) * k(3.5);
+  const voice = u.v;
   u.torso.scale.set(1, 1 + Math.sin(T * 2.2 + u.ph) * 0.01, 1);
 
   // sitting ↔ standing: a timed move, not a blend, so it has anticipation and a settle
@@ -454,7 +465,8 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
     b.position.y = f.browY + lift * f.er * 0.42 - (blinking ? f.er * 0.06 : 0);
     b.rotation.z = Math.PI / 2 - side * ((n.tilt + f.set) * 0.42 + 0.06);
   });
-  const speak = u.talking ? (voice > 0.02 ? 0.12 + voice * 0.9 : 0.16 + Math.abs(Math.sin(T * 11 + u.ph)) * 0.45) : 0;
+  // a voice opens the mouth as loud as it is, and lets it close in the pauses
+  const speak = u.talking ? (u.mime ? 0.16 + Math.abs(Math.sin(T * 11 + u.ph)) * 0.45 : 0.09 + voice * 0.95) : 0;
   const open = Math.max(n.open, speak), showOpen = open > 0.07, grinning = showOpen && n.smile > 0.5 && n.open > 0.07;
   f.open.visible = showOpen && !grinning;
   f.grin.visible = grinning;
@@ -470,13 +482,14 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   u.r += ((u.raise ? 1 : 0) - u.r) * k(7);
   u.cheer += ((u.mood === "cheer" ? 1 : 0) - u.cheer) * k(6);
   // standing speakers talk with their hands: forearms lift and sway with the voice
-  const gest = u.talking && sit < 0.5 && !u.walk ? 1 : 0;
+  u.ge += ((u.talking && sit < 0.5 && !u.walk ? 1 : 0) - u.ge) * k(4);
+  const gest = u.ge;
   // into the torso's own frame (it leans), then solve the arm
   const ty = hy * Math.cos(lean) + hz * Math.sin(lean), tz = -hy * Math.sin(lean) + hz * Math.cos(lean);
   const arm = ik(up, fore, tz, ty - shY, false);
   u.shoulders.forEach((sh, i) => {
     const side = i === 0 ? -1 : 1, lift = Math.max(side === 1 ? u.r : 0, u.cheer);
-    const g1 = gest * (0.3 + 0.16 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + voice * 0.4);
+    const g1 = gest * (0.3 + 0.16 * Math.sin(T * 2.6 + i * 1.7 + u.ph) + u.va * 0.4);
     const top = u.cheer > 0.02 ? Math.PI * 0.8 : Math.PI * 0.9;
     sh.rotation.x = (-arm.first - g1 * 0.35) * (1 - lift);
     sh.rotation.z = side * (0.14 + splay + (top - 0.14 - splay) * lift) + (lift ? Math.sin(T * 9 + i) * 0.05 * lift : 0);
@@ -486,19 +499,18 @@ export function animateCharacter(c: Character, T: number, dt: number, rnd: Rng, 
   if (u.walk) {
     const w = u.walk, kk = clamp((T - w.t0) / w.d), seg = smooth(kk) * (w.pts.length - 1), i = Math.min(w.pts.length - 2, Math.floor(seg));
     g.position.lerpVectors(w.pts[i], w.pts[i + 1], seg - i);
-    if (kk < 1) {
-      // strides match the ground covered: the gait slows as the walk eases in and out
-      const pace = Math.sin(Math.PI * clamp(kk * 1.02)), sw = Math.sin(T * 7.2 + u.ph) * (0.25 + 0.75 * pace);
-      g.position.y = Math.abs(sw) * 0.025;
-      face(g, w.pts[i + 1]);
-      u.hips[0].rotation.x = sw * 0.42; u.hips[1].rotation.x = -sw * 0.42;
-      u.knees[0].rotation.x = Math.max(0, -sw) * 0.6; u.knees[1].rotation.x = Math.max(0, sw) * 0.6;
-      u.shoulders[0].rotation.x = -sw * 0.32; u.shoulders[1].rotation.x = sw * 0.32;
-    } else {
-      if (w.face) face(g, w.face);
-      u.hips.forEach((h) => (h.rotation.x = 0)); u.knees.forEach((kn) => (kn.rotation.x = 0));
-      u.walk = null;
-    }
+    // strides match the ground covered: the gait slows as the walk eases in and out, and stops with the body
+    const pace = Math.sin(Math.PI * clamp(kk)), sw = Math.sin(T * 7.2 + u.ph) * pace;
+    g.position.y = Math.abs(sw) * 0.025;
+    // the body turns along the path, and over the last steps turns to face where it will stand
+    const along = Math.atan2(w.pts[i + 1].x - g.position.x, w.pts[i + 1].z - g.position.z);
+    const end = w.face ? Math.atan2(w.face.x - w.pts[w.pts.length - 1].x, w.face.z - w.pts[w.pts.length - 1].z) : along;
+    const want = kk > 0.999 ? end : along + Math.atan2(Math.sin(end - along), Math.cos(end - along)) * smooth((kk - 0.6) / 0.4);
+    g.rotation.y += Math.atan2(Math.sin(want - g.rotation.y), Math.cos(want - g.rotation.y)) * k(9);
+    u.hips[0].rotation.x = sw * 0.42; u.hips[1].rotation.x = -sw * 0.42;
+    u.knees[0].rotation.x = Math.max(0, -sw) * 0.6; u.knees[1].rotation.x = Math.max(0, sw) * 0.6;
+    u.shoulders[0].rotation.x -= sw * 0.32; u.shoulders[1].rotation.x += sw * 0.32; // the swing rides on the hanging pose
+    if (kk >= 1 && Math.abs(Math.atan2(Math.sin(end - g.rotation.y), Math.cos(end - g.rotation.y))) < 0.01) { g.rotation.y = end; u.walk = null; }
   }
 }
 

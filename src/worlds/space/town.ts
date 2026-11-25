@@ -32,9 +32,10 @@ export function buildTown(scene: THREE.Scene, M: Materials, rnd: Rng, at: THREE.
   const flat = (w: number, h: number, mat: THREE.Material, x: number, y: number, z: number) =>
     (add(town, new THREE.PlaneGeometry(w, h), mat, x, y, z, noCast).rotation.x = -Math.PI / 2);
   flat(700, 700, matte(SET.grass, 0.95), 0, 0, 0);
-  flat(700, 8, matte(SET.road), 0, 0.02, 16);
-  for (let x = -120; x <= 120; x += 7) flat(3, 0.3, matte(hex(COLOR.approach)), x, 0.04, 16);
-  flat(4, 7, matte(SET.path), 0, 0.03, 8.6);
+  // each layer sits clear of the one under it, so none of them fight at a distance
+  flat(700, 8, matte(SET.road), 0, 0.05, 16);
+  for (let x = -120; x <= 120; x += 7) flat(3, 0.3, matte(hex(COLOR.approach)), x, 0.1, 16);
+  flat(4, 7, matte(SET.path), 0, 0.06, 8.6);
 
   const brick = matte(SET.brick, 0.9), cream = matte(SET.stone, 0.85), roof = matte(mix(COLOR.horizon, COLOR.disk, 0.4), 0.8);
   const frame = matte(mix(COLOR.approach, SET.stone, 0.4)), glass = matte(mix(COLOR.sky, COLOR.shadow, 0.35), 0.5);

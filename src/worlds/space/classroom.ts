@@ -100,7 +100,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     box(room, xi, [y1 - 0.06, y1], [z0, z1], trim); box(room, xi, [y0, y0 + 0.06], [z0, z1], trim);
     box(room, xi, [y0, y1], [z - 0.025, z + 0.025], trim);
     box(room, xi, [y0 + 1.28, y0 + 1.33], [z0, z1], trim);
-    box(room, [-RX - 0.02, -RX + 0.14], [y0 - 0.05, y0], [z0 - 0.08, z1 + 0.08], wood);
+    box(room, [-RX, -RX + 0.14], [y0 - 0.05, y0], [z0 - 0.08, z1 + 0.08], wood);
   }
 
   // the door: a frame that stands proud of the wall, stops behind the leaf that it closes against (so
@@ -286,7 +286,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
     d.position.set(x, 0, z);
     room.add(d);
     box(d, [-0.5, 0.5], [DESK_HEIGHT - 0.035, DESK_HEIGHT], [-DESK_DEPTH / 2, DESK_DEPTH / 2], deskTop);
-    box(d, [-0.46, 0.46], [DESK_HEIGHT - 0.12, DESK_HEIGHT - 0.035], [-0.25, -0.22], deskTop);
+    box(d, [-0.43, 0.43], [DESK_HEIGHT - 0.12, DESK_HEIGHT - 0.035], [-0.238, -0.218], deskTop); // the apron sits between the legs, on no face of theirs
     for (const a of [-1, 1]) for (const b of [-1, 1]) box(d, [a * 0.45 - 0.02, a * 0.45 + 0.02], [0, DESK_HEIGHT - 0.035], [b * 0.23 - 0.02, b * 0.23 + 0.02], steel);
     const nb = add(d, new THREE.BoxGeometry(0.3, 0.008, 0.21), paper, -0.14, DESK_HEIGHT + 0.004, -0.04, noCast);
     nb.rotation.y = 0.12 - (i % 3) * 0.1;
