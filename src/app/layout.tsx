@@ -7,10 +7,21 @@ import "@/components/kit/kit.css";
 
 export const metadata: Metadata = {
   title: "Math World",
-  description: "Answer to fire. Learn from the miss. Climb the solar system.",
+  description: "A space game for times tables: answer with your shots and clear the planets.",
+  applicationName: "Math World",
+  appleWebApp: { capable: true, title: "Math World", statusBarStyle: "black" },
 };
 
-export const viewport: Viewport = { themeColor: COLOR.void, colorScheme: "dark" };
+/**
+ * The phone's frame. `viewportFit` stays at the default for now: every full-screen surface must pad
+ * with env(safe-area-inset-*) before it can be "cover" (the title, the bay and the kit already do).
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: COLOR.void,
+  colorScheme: "dark",
+};
 
 /** One void behind every screen, one typeface (Saira, from globals.css), and a fade between routes. */
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -8,8 +8,10 @@ import { Icon, type IconName } from "./Icon";
  * Do: say what will fill this place and how ("Win a Show Me How in battle to earn your first trick.").
  * Do not: apologise, joke, or show an empty state while something is still loading (use `Loading`).
  */
-export function EmptyState({ icon = "star", title, children, action, className = "" }: {
+export function EmptyState({ icon = "star", title, children, action, size = "inline", className = "" }: {
   icon?: IconName;
+  /** `inline` inside a screen or a sheet; `page` when it is the whole screen (not found, an error). */
+  size?: "inline" | "page";
   title: ReactNode;
   children?: ReactNode;
   /** One button or link: the way forward. */
@@ -18,10 +20,12 @@ export function EmptyState({ icon = "star", title, children, action, className =
 }) {
   return (
     <div className={`flex flex-col items-center gap-4 py-8 text-center ${className}`}>
-      <span className="mw-orbit grid size-20 place-items-center text-ink-2" aria-hidden>
-        <Icon name={icon} size={26} />
+      <span className={`mw-orbit grid place-items-center text-ink-2 ${size === "page" ? "mb-2 size-28" : "size-20"}`} aria-hidden>
+        <Icon name={icon} size={size === "page" ? 32 : 26} />
       </span>
-      <p className="m-0 type-name text-[22px]">{title}</p>
+      {size === "page"
+        ? <h1 className="m-0 type-display text-[clamp(36px,6vw,64px)] text-balance">{title}</h1>
+        : <p className="m-0 type-name text-[22px]">{title}</p>}
       {children && <p className="m-0 max-w-[36ch] type-child text-ink-2">{children}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>

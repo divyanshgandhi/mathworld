@@ -1,19 +1,12 @@
-import Link from "next/link";
+import { EmptyState, PillLink } from "@/components/kit";
 
-// the kit's sheet and primary pill (battle/ui is a client module, so its class strings are not imported here)
-const glass = "mw-sheet";
-const lime = "mw-btn mw-primary mw-md";
-
-/** A wrong turn in space: still the game's look, with one way home. */
+/** A page that is not in the game: plain words and one way home, on the void. */
 export default function NotFound() {
   return (
-    <main className="fixed inset-0 grid place-items-center bg-void text-approach">
-      <div className={`${glass} flex flex-col items-center gap-3 p-7 text-center`}>
-        <p className="type-label-sm text-ink-2">Navigation · no signal</p>
-        <p className="type-display text-[32px]">Nothing out here, cadet.</p>
-        <p className="type-body text-ink-2">That sector is not on the star chart.</p>
-        <Link href="/" className={`${lime} mt-3`}>Back to base</Link>
-      </div>
+    <main className="fixed inset-0 grid place-items-center overflow-y-auto bg-void px-6 text-approach">
+      <EmptyState size="page" icon="map" title="Nothing out here" action={<PillLink href="/bay" variant="primary" size="lg" className="justify-between">Resting Bay</PillLink>}>
+        This page is not part of the game. The Resting Bay will get you flying again.
+      </EmptyState>
     </main>
   );
 }
