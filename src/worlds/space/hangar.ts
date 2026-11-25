@@ -54,10 +54,7 @@ export function buildHangar(scene: THREE.Scene, M: Materials, rnd: Rng, at: THRE
     ring.rotation.x = -Math.PI / 2;
   }
   add(g, new THREE.CylinderGeometry(2.45, 2.6, 0.18, 64), M.clay(0x3b4660, { metalness: 0.5, roughness: 0.4 }), 0, 0.09, -1.8);
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4, clamp = add(g, new THREE.BoxGeometry(0.3, 1.2, 0.3), M.clay(0x4b5670, { metalness: 0.6, roughness: 0.35 }), Math.cos(a) * 1.4, 0.6, -1.8 + Math.sin(a) * 1.4);
-    clamp.rotation.y = -a;
-  }
+  // no clamps: the rocket stands on its own fins
 
   const rib = M.clay(0x1b263b, { roughness: 0.45, metalness: 0.55 }), strip = M.glow(hex(COLOR.sky), 0.45); // matte light strips: under the bloom threshold
   for (const z of [-9, -4, 1, 6]) {
