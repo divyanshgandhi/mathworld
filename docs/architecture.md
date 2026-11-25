@@ -82,4 +82,8 @@ A jump ahead needs a clean record: a Gold run, a Gold answer on a probe from the
    curl -b jar https://<app>/api/player   # introCompleted: true
    ```
 
+Visits are counted with Vercel Web Analytics, which sets no cookies. A child's answers stay in the game's own database.
+
+Vercel's own database names are read only on Vercel, so pulling the project's settings to a laptop cannot point local play at the live database.
+
 Row Level Security is on for both tables with no policies, so only the server's own database role can read or write them. A hosted database is always reached over TLS.

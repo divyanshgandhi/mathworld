@@ -27,9 +27,10 @@ export const cleanDbUrl = (url: string | undefined) => { if (!url) return undefi
 
 /**
  * The runtime database: `DATABASE_URL`, or `POSTGRES_URL`, which Vercel sets by itself when a Supabase
- * database is added from the project's Storage tab.
+ * database is added from the project's Storage tab. `POSTGRES_URL` counts only on Vercel, so pulling
+ * the project's settings to a laptop can never point local play at the live database.
  */
-export const databaseUrl = (env: Record<string, string | undefined> = process.env) => cleanDbUrl(env.DATABASE_URL || env.POSTGRES_URL);
+export const databaseUrl = (env: Record<string, string | undefined> = process.env) => cleanDbUrl(env.DATABASE_URL || (env.VERCEL ? env.POSTGRES_URL : undefined));
 
 async function connect(): Promise<DB> {
   const url = databaseUrl();

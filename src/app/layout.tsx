@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { RouteFade } from "@/components/kit/RouteFade";
 import { SoundToggle } from "@/components/SoundToggle";
 import { COLOR } from "@/design/tokens";
@@ -46,6 +47,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-void font-sans text-approach">
         <RouteFade>{children}</RouteFade>
         <SoundToggle />
+        {/* Page views, counted by the host with no cookies. Only where the host serves its script. */}
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   );

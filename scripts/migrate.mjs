@@ -8,8 +8,10 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 // Our own names first, then the ones Vercel sets when a Supabase database is added from the Storage tab.
 // A migration address comes before a runtime one; if it cannot be reached from the build machine
 // (a direct address can be IPv6 only), the next one is tried.
+// Vercel's own names count only on Vercel, so settings pulled to a laptop never reach the live database.
 const env = process.env;
-const candidates = [env.MIGRATION_DATABASE_URL, env.POSTGRES_URL_NON_POOLING, env.DATABASE_URL, env.POSTGRES_URL].filter(Boolean);
+const hosted = env.VERCEL ? [env.POSTGRES_URL_NON_POOLING, env.POSTGRES_URL] : [];
+const candidates = [env.MIGRATION_DATABASE_URL, hosted[0], env.DATABASE_URL, hosted[1]].filter(Boolean);
 if (candidates.length === 0) {
   console.log("migrate: no database address, skipping (local dev uses PGlite).");
   process.exit(0);

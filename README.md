@@ -8,6 +8,8 @@ A space multiplication game where the answer is the action. A fleet flies in as 
 
 It is for children from Grade 3 up, and for adults who do not want to be talked down to.
 
+**Play it:** https://mathworld-theta.vercel.app
+
 <p align="center">
   <img src="docs/media/battle.jpg" alt="A battle on the Moon: a fleet of 6 squads of 7 ships, the number 42 on the rocket's nose and on the Fire button." width="100%">
 </p>
@@ -85,12 +87,3 @@ bun run build    # production build
 ```
 
 Locally the database is PGlite in `.data/pg`, created on first use. Set `DATABASE_URL` to use Postgres. To deploy on Vercel with Supabase, see [`docs/architecture.md`](docs/architecture.md#deploy-vercel-and-supabase).
-
-## Status
-
-- **Verified:** the checks and the production build; the hosted-database path against a local Postgres; play-throughs by test agents at desktop and phone sizes.
-- **Not yet:** no child has played it.
-- **Not yet:** in the latest rounds the sound was checked by measurement, not by ear.
-- **Not yet:** a real phone and Safari. Phone sizes were checked in a desktop browser.
-
-Known gaps are listed in [`STATE.md`](STATE.md).
