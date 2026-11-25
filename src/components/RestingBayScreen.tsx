@@ -11,6 +11,7 @@ import { BODY_NAME } from "@/worlds/space/bodies";
 import { Button, Loading, masterySummary, MasteryKeyLegend, MasteryMark, NovaLine, PillLink, Pips, RingLogo, TopBar, WaveDots } from "./kit";
 import { Flashcards } from "./hub/Flashcards";
 import { FieldManual } from "./teach/FieldManual";
+import { ScreenTour } from "./teach/Tour";
 import { GREETINGS } from "@/teach/greetings";
 import { greetKey } from "@/teach/keys";
 import { readMs } from "@/teach/words";
@@ -202,7 +203,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             <h2 id="mission" className="m-0 type-display mw-bay-name">{name}</h2>
             <p className="mw-bay-status">{status}</p>
             {nextPlanet && <WaveDots total={waves} won={won} current={!state.mission.passed} className="mt-3.5" />}
-            <PillLink href={`/play/${planet}`} variant="primary" size="lg" className="mw-bay-launch" aria-label={`Launch to ${inLine(name)}`}>
+            <PillLink href={`/play/${planet}`} variant="primary" size="lg" className="mw-bay-launch" data-guide="bay-launch" aria-label={`Launch to ${inLine(name)}`}>
               <span>Launch<span className="mw-bay-launch-long"> to {inLine(name)}</span></span>
             </PillLink>
             {/* the daily patrol goes here (wave 3): one line and one secondary action under the mission */}
@@ -212,7 +213,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
         </section>
 
         <section className="mw-bay-deck">
-          <div className="mw-bay-tables">
+          <div className="mw-bay-tables" data-guide="bay-tables">
             <h2 id="tables" className="m-0 mb-3 type-label text-ink-2">Your times tables</h2>
             <div role="group" aria-labelledby="tables" className="mw-bay-strip">
               {ps.map((p) => {
@@ -255,7 +256,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
             </div>
           )}
 
-          <nav aria-labelledby="places" className="mw-bay-places">
+          <nav aria-labelledby="places" className="mw-bay-places" data-guide="bay-places">
             <h2 id="places" className="m-0 mb-3 type-label text-ink-2">Go to</h2>
             <div className="flex flex-wrap gap-2.5">
               <PillLink href="/map" icon="map">Star map</PillLink>
@@ -271,6 +272,7 @@ export function RestingBayScreen({ onHelp, patrol }: { onHelp?: () => void; patr
       </main>
 
       <FieldManual open={help} onClose={() => setHelp(false)} topic="squads" seen={{ seen: state.seen, emit }} replayFrom="/bay" />
+      <ScreenTour id="bay" seen={{ seen: state.seen, emit }} />
 
       {deck !== null && <Flashcards state={state} emit={emit} table={deck} onClose={() => setDeck(null)} />}
     </div>

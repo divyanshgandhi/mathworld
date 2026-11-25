@@ -10,6 +10,7 @@ import { Button, buttonClass, HomeLink, Icon, PillLink, TopBar } from "./kit";
 import { useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
 import { FieldManual } from "./teach/FieldManual";
+import { ScreenTour } from "./teach/Tour";
 import { Greeting } from "./teach/Greeting";
 
 /**
@@ -259,22 +260,23 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
       <TopBar left={<HomeLink />} title="Hangar" orbs={orbs} onHelp={onHelp ?? (() => setHelp(true))} className="absolute inset-x-0 top-0" />
       {state && <Greeting screen="hangar" edge="top" seen={{ seen: state.seen, emit }} className="[@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:pr-[calc(clamp(340px,34vw,480px)+16px)] [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[92px]" />}
       {state && <FieldManual open={help} onClose={() => setHelp(false)} topic="orbs" seen={{ seen: state.seen, emit }} replayFrom="/hangar" />}
+      {state && <ScreenTour id="hangar" seen={{ seen: state.seen, emit }} />}
 
       <section
         aria-label="Shop"
         className="absolute inset-x-0 bottom-0 top-[45dvh] [@media(max-height:699px)_and_(max-aspect-ratio:1/1)]:top-[36dvh] z-10 flex flex-col rounded-t-panel border-t border-line-1 bg-sheet [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:left-auto [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:top-16 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:w-[clamp(340px,34vw,480px)] [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:rounded-none [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-l [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:border-t-0 [@media(min-aspect-ratio:1/1)_and_(min-width:640px)]:bg-void [@media(min-aspect-ratio:1/1)_and_(min-width:900px)]:top-[76px]"
       >
         <Tabs value={slot} onValueChange={(v) => { if (v && !busy.current) { setSlot(v as Slot); setPhase({ kind: "idle" }); } }} className="flex min-h-0 flex-1 flex-col">
-          <TabsList aria-label="What to change" className="grid grid-cols-3 gap-2 px-4 pt-3.5 md:px-6 md:pt-6">
+          <TabsList aria-label="What to change" data-guide="hangar-list" className="grid grid-cols-3 gap-2 px-4 pt-3.5 md:px-6 md:pt-6">
             {SLOTS.map((s) => <TabsTab key={s.id} value={s.id} className={`${buttonClass("secondary", "sm")} w-full px-2 text-[16px]`}>{s.name}</TabsTab>)}
           </TabsList>
           {SLOTS.map((s) => (
             <TabsPanel key={s.id} value={s.id} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2.5 md:px-6 md:py-4">
               <ul className="flex flex-col gap-2" aria-label={`${s.name} you can try on`}>
-                {CATALOG[s.id].map((item) => {
+                {CATALOG[s.id].map((item, i) => {
                   const its = state ? itemState(state, item) : null, on = shown(s.id) === item.id;
                   return (
-                    <li key={item.id}>
+                    <li key={item.id} data-guide={i === 0 ? "hangar-rocket" : undefined}>
                       <button
                         type="button"
                         aria-pressed={on}
@@ -298,7 +300,7 @@ export function HangarScreen({ onHelp }: { onHelp?: () => void } = {}) {
             </TabsPanel>
           ))}
         </Tabs>
-        <div className="border-t border-line-1 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 md:px-6 md:pb-6 md:pt-5" aria-live="polite">
+        <div data-guide="hangar-buy" className="border-t border-line-1 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 md:px-6 md:pb-6 md:pt-5" aria-live="polite">
           {dock()}
           {state && st?.kind === "equipped" && state.orbs === 0 && !state.owned.length && (
             <PillLink href="/map" variant="secondary" size="sm" icon="map" className="mt-3 [@media(max-height:699px)_and_(max-aspect-ratio:1/1)]:hidden">Star map</PillLink>

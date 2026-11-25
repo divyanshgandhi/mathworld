@@ -73,6 +73,26 @@ Each hub greets the player once (`<Greeting>`, seen key `greet:<screen>`). The l
 
 Help is one tap away everywhere: the top bar's help button opens the Field Manual (`<FieldManual>`) on the page that fits the screen.
 
+### Part 4: the tours (review round, decision 8)
+
+A tour is a spotlight: the screen dims, one control shows through a rounded cut-out with a gold hairline ring, and Nova says one line of ten words or fewer beside it. "Next" moves on, "Skip" ends it, Escape skips, Enter goes on. Four steps at most, one idea a step. Each is shown once (seen key `tour:<id>`, recorded when its first step shows, so a skipped tour is still seen) and can be replayed from the Field Manual's first item, "Show me around". The tours live in `src/teach/tour.ts`; the component is `Tour` (and the drop-in `ScreenTour`) in `src/components/teach`.
+
+**The rule: a tour introduces nothing the screen has not already shown.** It names controls that are on screen now, in the glossary's words (`docs/glossary.md`). It never explains a game idea (squads, misses, tricks): the battle shows those. A step whose control is not on screen is skipped; a tour with nothing on screen does not show and is not marked seen.
+
+Where each tour sits in the first five minutes:
+
+| When | Tour | Steps (anchor: line) | Why here |
+| --- | --- | --- | --- |
+| ~2:30, first arrival at the Resting Bay, after the film and the first battle | `bay` | `bay-launch`: "Press Launch to fly your next mission." / `bay-tables`: "Your times tables. Dots fill in as you learn." / `bay-places`: "More places to visit." / `orbs`: "Orbs. You win them by learning." | The first calm screen. The player has just won orbs and met a times table, so every step names something they have already seen happen. Nova's in-page line still says hello; the floating greeting is gone. |
+| ~3:30, before the second wave of the first planet battle | `battle` | `powerups`: "Power-Ups help with tricky fleets." / `help`: "Stuck? Nova shows you how." / `dots`: "Win these to clear the planet." / `pause`: "Need a break? Pause here." | After the guided first shot (never with it) and between waves (never during a wave's action). The game holds still (`hold.on("tour")`). One shot has been fired, so the controls around Fire are what is new. |
+| First visit to the Star map | `map` | `map-planet`, `map-next`, `map-dots`, `map-launch` | The map is a pager; the tour shows where the next planet is and where Launch is. |
+| First visit to the Hangar | `hangar` | `hangar-list`: "Looks for your rocket." / `hangar-rocket`: "Tap one to try it on." / `hangar-buy`: "Buy it with orbs." | The player has orbs by then; try-on is free, buying is the dock. |
+| First visit to the Academy | `academy` | `academy-list`: "Every trick, shown with real ships." | One step: the list is the whole screen. |
+
+A screen with a tour shows the tour, not its greeting (`Greeting` renders nothing for `bay`, `map`, `hangar` and `academy`). The Flashcards and the first battle in Cadet Bay keep their greetings: they have no tour.
+
+When it starts: once the screen has settled (no dialog, card or sheet open for 0.6 s, the guided first shot not running) and at least one of its controls is on screen. One tour a visit at most: a screen mounts one tour and it decides once. If a card opens over a tour, the tour closes. Under reduced motion the ring and plate cut from step to step instead of moving.
+
 ## Left for later, on purpose
 
 These come in when the player needs them, never in the first five minutes:
