@@ -386,7 +386,7 @@ export function buildClassroom(scene: THREE.Scene, M: Materials, rnd: Rng, look:
   // the sun's shafts, as geometry: from each window a slab of faint gold air runs down the sun's own
   // direction to the floor. They are matte haze, brightest at the glass and gone by the floor; nothing blooms
   const shaftMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
-  const shaftTint = new THREE.Color(look.key.color).multiplyScalar(0.034);
+  const shaftTint = new THREE.Color(look.key.color).multiplyScalar(0.02);
   for (const z of WINDOWS.z) {
     const P: number[] = [], C: number[] = [];
     const corner = (dz: number, y: number) => {

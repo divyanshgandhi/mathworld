@@ -74,8 +74,8 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "officers", chapter: "knock", title: "The visitors", purpose: "The principal and the Captain, side by side", seconds: 6, how: [["go", "officers"], ["wait", 5.2]] },
   { id: "captain", chapter: "knock", title: "The Captain", purpose: "A steady face for a serious line", seconds: 8, how: [["go", "captain"], ["wait", 3.0]] },
   { id: "proud", chapter: "knock", title: "The teacher is proud", purpose: "Surprise, then pride", seconds: 5.5, how: [["go", "captain"], ["until", "teacher_proud"], ["wait", 3.4]] },
-  { id: "names", chapter: "knock", title: "The names", purpose: "Each child stands as their name is called", seconds: 7.5, how: [["go", "names"], ["wait", 5.2]] },
-  { id: "names-back", chapter: "knock", title: "The back row", purpose: "On a phone the back pair get a frame of their own", seconds: 3, tallOnly: true, how: [["go", "names"], ["wait", 7.2]] },
+  { id: "names", chapter: "knock", title: "The names", purpose: "Each child stands as their name is called", seconds: 7.5, how: [["go", "names"], ["wait", 3.6]] },
+  { id: "names-back", chapter: "knock", title: "The back row", purpose: "On a phone the back pair get a frame of their own", seconds: 3, tallOnly: true, how: [["go", "names"], ["wait", 5.3]] },
   { id: "picked", chapter: "knock", title: "The fifth cadet", purpose: "The cadet's name, the stand, the cheer", seconds: 6, how: [["go", "picked"], ["wait", 4.3]] },
   { id: "nave", chapter: "hangar", title: "The hangar", purpose: "A cathedral for one rocket: the aisle leads to it, the window behind draws the journey", seconds: 2.4, how: [["go", "hangar"], ["wait", 1.5]] },
   { id: "briefing", chapter: "hangar", title: "The Captain's welcome", purpose: "Gold key on his face, the rocket soft behind him", seconds: 5.5, how: [["go", "hangar"], ["until", "captain_brief1"], ["wait", 2.2]] },
@@ -111,7 +111,7 @@ const MORNING = [1.05, 1.0, 0.92] as const;
 /** One fade grammar, in seconds: out to the void, and back in. */
 const FADE = { out: 0.7, in: 0.9 };
 /** How long the class waits for a hand, when a classmate's goes up, and how long it waits for an answer before a classmate helps. */
-const WAIT = { hand: 9, rival: 5.5, answer: 9, launch: 20 };
+const WAIT = { hand: 7.5, rival: 4.5, answer: 8, launch: 20 };
 /** Skip is offered once the film has run this long. */
 const SKIP_AFTER = 3;
 /** The lens, in degrees of vertical field of view: for a wide screen, and for a tall phone (a wide setup, and a portrait of one person). */
@@ -124,6 +124,8 @@ const BAY = new THREE.Vector3(0, 34, 46);
 /** The battle's opening camera and rocket (measured from Cadet Bay as it opens), without its sideways shift: straight on, the frame lifted by `lift` of its height. */
 const LAST = { cam: new THREE.Vector3(0, 2.77, 10.9), rocket: new THREE.Vector3(0, 1.16, 1.8), scale: 0.55, lift: 0.12 };
 const UP = new THREE.Vector3(0, 1, 0);
+/** Where Nova hovers through the briefing, and where she backs away to for the launch (in the hangar's own space). */
+const NOVA_HOME = new THREE.Vector3(3.2, 2.8, 0.8), NOVA_CLEAR = new THREE.Vector3(6.4, 3.3, -0.4);
 const smooth = (k: number) => { k = clamp(k); return k * k * (3 - 2 * k); };
 const P = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
@@ -256,6 +258,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
     for (let i = 0; i < 26; i++) { const m = (lo + hi) / 2; if (solve(m)) hi = m; else lo = m; }
     const p = solve(hi) ?? from.clone();
     if (o.walls) for (let i = 0; i < 40 && !inRoom(p); i++) p.addScaledVector(d, 0.15);
+    if (env === "hangar") p.y = Math.max(p.y, HANGAR_AT.y + 0.3); // never under the deck
     return { p, d, dist: mid.distanceTo(p) };
   }
   /** The setup on screen now, so a turned phone or a resized window gets the same shot composed again. */
@@ -274,7 +277,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
   const BT = BOARD_TEXT;
   const writing = () => [P(BT.x - BT.half, BT.y - 0.3, BT.z), P(BT.x + BT.half, BT.y + 0.34, BT.z)];
   /** A person from the top of the head down `down` heads, with room for the shoulders. */
-  const bust = (c: Character, down = 2.3) => { const h = headOf(c), H = c.rig.H, R = c.rig.R * 1.7, y = h.y - H * down; return [P(h.x, h.y + H * 1.32, h.z), P(h.x - R, y, h.z), P(h.x + R, y, h.z), P(h.x, y, h.z - R), P(h.x, y, h.z + R)]; };
+  const bust = (c: Character, down = 2.3) => { const h = headOf(c), H = c.rig.H, R = Math.max(c.rig.R * 1.7, H * 1.35), y = h.y - H * down; return [P(h.x, h.y + H * 1.32, h.z), ...[y, h.y].flatMap((at) => [P(h.x - R, at, h.z), P(h.x + R, at, h.z), P(h.x, at, h.z - R), P(h.x, at, h.z + R)])]; };
   /** A whole person standing at `g`, from `low` metres up. */
   const figure = (c: Character, g: THREE.Vector3 = c.group.position, low = 0.05) => { const top = c.rig.L + c.rig.Ht + c.rig.H * 2.45, R = c.rig.R * 1.8; return [P(g.x, top, g.z), P(g.x - R, low, g.z), P(g.x + R, low, g.z), P(g.x, low, g.z - R), P(g.x, low, g.z + R)]; };
   /** A child's place in the room whether they sit or stand: the top of a standing head, and the seat. */
@@ -294,17 +297,25 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
     /** The writing on the board, as the cadet sees it from their seat. With `buttons` it sits high, clear of the answers. */
     board: (buttons = false) => { lens(); light(null); shoot(tall() ? writing() : [...writing(), ...bust(teacher, 3)], P(0.3, 1.05, 1.0), { box: buttons ? WITH_BUTTONS : SAFE, walls: true, push: buttons ? 0 : undefined, dir: P(0.14, -0.02, -1) }); },
     /** The class from behind, the cadet in the middle of the frame and the board ahead: where the invitation to raise a hand appears. */
-    invite: () => { lens(); light(null); const h = headOf(player); shoot([P(h.x, h.y + 0.3, h.z), P(h.x - 0.3, 0.36, h.z), P(h.x + 0.3, 0.36, h.z), ...writing(), ...(tall() ? [] : bust(teacher, 1.5))], P(0.5, 2.4, 6), { box: WITH_BUTTONS, walls: true, push: 0.02, dir: P(tall() ? -0.03 : -0.1, -0.3, -1) }); },
+    invite: () => {
+      lens(); light(null);
+      // a phone looks down the room from high at the back: the sum above, the cadet's head under it, the button under that
+      if (tall()) { cut([0.15, 2.6, 4.55], [0.3, 1.15, -3]); if (!calm) cam.shot([0.15, 2.55, 4.3], [0.3, 1.15, -3], 0.2); return; }
+      const h = headOf(player); shoot([P(h.x, h.y + 0.3, h.z), P(h.x - 0.3, 0.36, h.z), P(h.x + 0.3, 0.36, h.z), ...writing(), ...(tall() ? [] : bust(teacher, 1.5))], P(0.5, 2.4, 6), { box: WITH_BUTTONS, walls: true, push: 0.02, dir: P(tall() ? -0.03 : -0.1, -0.3, -1) }); },
     /** The cadet from the front, on the side of the raised arm, so the hand goes up in clear space above the shoulder. */
     called: () => { lens("portrait"); light(() => headOf(player), 1); const h = headOf(player), H = player.rig.H; shoot([...bust(player, 2.1), P(h.x - 0.34, h.y + H * 3.1, h.z)], P(h.x - 0.55, h.y + 0.25, h.z - 1.9), { box: WITH_BUTTONS, walls: true }); },
     /** One child's face, from the front and a little to the side. */
     child: (c: Character, side = 1) => { lens("portrait"); light(() => headOf(c), 1); const h = headOf(c); shoot(bust(c, 2.5), P(h.x + side * 0.85, h.y + 0.14, h.z - 1.5), { walls: true }); },
     /** The class from the board side: faces turned to the teacher. On a phone, the cadet and the classmate who will answer. */
-    faces: () => { lens(); light(() => headOf(player), 0.7); shoot(tall() ? [...bust(player, 2), ...bust(kids[ANSWERERS[1]], 2)] : [...kids, player].flatMap((k) => bust(k, 1.6)), tall() ? P(-2.4, 1.25, -2.8) : P(-4.4, 1.45, -4.2), { walls: true }); },
+    faces: () => { if (tall()) return SETUP.child(player, -1); lens(); light(() => headOf(player), 0.7); shoot([...kids, player].flatMap((k) => bust(k, 1.6)), P(-4.4, 1.45, -4.2), { walls: true }); }, // on a phone it is the cadet's own face, listening
     /** The class from the door side, as the knock turns every head this way. */
-    heard: () => { lens(); light(() => headOf(player), 0.7); shoot(tall() ? [player, kids[NAMED[1]], kids[ANSWERERS[1]]].flatMap((k) => bust(k, 1.8)) : [...kids, player].flatMap((k) => bust(k, 1.6)), P(4.9, 1.45, -3.9), { walls: true }); },
+    heard: () => { lens(); light(() => headOf(player), 0.7); shoot((tall() ? [kids[NAMED[1]], player, kids[NAMED[2]]] : [...kids, player]).flatMap((k) => bust(k, 1.6)), tall() ? P(4.6, 1.7, -2.6) : P(4.9, 1.45, -3.9), { walls: true }); },
     /** Over the class to the board: today's word is up there. */
-    lesson: () => { lens(); light(() => headOf(teacher), 0.8); shoot(tall() ? [...writing(), ...bust(teacher, 3.4)] : [...writing(), ...figure(teacher, TEACHER_MARK, 0.9), P(0, 1.22, 1.1)], P(0, 1.6, 4), { walls: true, dir: tall() ? P(0.1, -0.02, -1) : P(0.14, -0.1, -1) }); },
+    lesson: () => {
+      lens(); light(() => headOf(teacher), 0.8);
+      if (tall()) { cut([0.15, 2.3, 4.5], [0.3, 1.4, -3]); if (!calm) cam.shot([0.15, 2.25, 4.2], [0.3, 1.4, -3], 0.2); return; }
+      shoot([...writing(), ...figure(teacher, TEACHER_MARK, 0.9), P(0, 1.22, 1.1)], P(0, 1.6, 4), { walls: true, dir: P(0.14, -0.1, -1) });
+    },
     door: () => { lens(); light(null); shoot([P(6, 0.25, -4.3), P(6, 2.5, -2.8)], P(0.9, 1.45, -1.7), { walls: true, push: 0.06 }); },
     /** The principal and the Captain on their marks, clear of the open door. */
     officers: (glide = false) => {
@@ -324,16 +335,16 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
     nave: () => { lens(); light(null); shoot([...rocketPts(8.4), inHangar(0, 13.6, -17.5), ...(tall() ? [] : [inHangar(-4.4, 0.1, 1.8)])], inHangar(0, 1.25, 17), { push: 0.03, speed: 0.2 }); },
     hCaptain: () => { lens("portrait"); light(() => headOf(captainH), 1.4); shoot(bust(captainH, 2.7), inHangar(-2.1, 1.8, 5.6)); },
     /** The rocket from low down, three-quarters on. */
-    ship: () => { lens(); light(null); shoot(rocketPts(7.4), inHangar(tall() ? 3.2 : 5.2, 0.7, 7.6), { push: 0.05, speed: 0.15 }); },
+    ship: () => { lens(); light(null); const n = novaHead(); shoot(tall() ? [...rocketPts(7.4), P(n.x + 0.7, n.y, n.z)] : rocketPts(7.4), inHangar(tall() ? 3.2 : 5.2, 0.7, 7.6), { push: 0.05, speed: 0.15 }); },
     /** The Captain and the ship he is talking about, in one frame. */
-    rule: () => { lens(); light(() => headOf(captainH), 1.2); shoot([...figure(captainH, captainH.group.getWorldPosition(new THREE.Vector3()), 0.5), ...(tall() ? [inHangar(PAD.x, 4.4, PAD.z)] : rocketPts(6.4))], inHangar(-3.0, 1.5, 9.6), { ax: 0.5 }); },
+    rule: () => { lens(); light(() => headOf(captainH), 1.2); shoot([...figure(captainH, captainH.group.getWorldPosition(new THREE.Vector3()), 0.5), ...rocketPts(6.5)], tall() ? inHangar(-6.5, 1.5, 6.5) : inHangar(-3.0, 1.5, 9.6)); }, // on a phone he stands in front of the ship, not beside it
     /** Nova, close, the ship behind her. With `button` she sits high, clear of Launch. */
     nova: (button = false) => { lens("portrait"); light(novaHead, 0.3); // her shell is white: a little light goes a long way, and she must never bloom
       const n = novaHead(); shoot([P(n.x - 0.85, n.y + 0.62, n.z), P(n.x + 0.85, n.y - 0.6, n.z)], P(n.x + 1.5, n.y + 0.25, n.z + 4.6), { box: button ? WITH_BUTTONS : SAFE, push: button ? 0 : 0.04 }); },
     /** Low on the aisle for the countdown: the pad's lights and the whole height of the rocket. */
     countdown: () => { lens(); light(null); shoot([inHangar(PAD.x - 3.5, 0.02, PAD.z), inHangar(PAD.x + 3.5, 0.02, PAD.z), inHangar(PAD.x, 7.6, PAD.z)], inHangar(0.0, 0.75, 12), { push: 0.07, speed: 0.5 }); },
     /** Close and low at the pad, for the fire. */
-    ignition: () => { lens(); light(null); shoot([inHangar(PAD.x - 3.1, 0.05, PAD.z), inHangar(PAD.x + 3.1, 0.05, PAD.z), inHangar(PAD.x, 4.2, PAD.z)], inHangar(-3.6, 0.5, 4.6), { push: 0 }); }, // from the Captain's side: Nova is clear of the frame
+    ignition: () => { lens(); light(null); shoot([inHangar(PAD.x - 3.1, 0.05, PAD.z), inHangar(PAD.x + 3.1, 0.05, PAD.z), inHangar(PAD.x, 4.2, PAD.z)], inHangar(1.3, 0.45, 5.8), { push: 0 }); }, // nearly square on: the Captain is off to the left, and Nova has backed away to the right
   };
   /** Show a setup, and remember it so a turned phone gets it composed again. */
   const show = (fn: () => void) => { again = fn; fn(); };
@@ -699,9 +710,9 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       enter() {
         backPair = false;
         lookAt(headOf(teacher), CLASS_CENTRE); gaze([captain, principal], CLASS_CENTRE); feel([teacher], "happy");
-        // a phone held upright cannot hold the whole room: the front pair is seen from the back as Maya and Leo
-        // rise, then a cut to the back pair, from the front, as Aarav and Zoe do
-        show(() => (tall() ? SETUP.pair(named()[0], named()[1], P(4.6, 2.4, 4.6)) : SETUP.names()));
+        // a phone held upright cannot hold the whole room: the front pair is seen from the corner by the board as
+        // Maya and Leo rise, then a cut to the back pair, from high over the middle row, as Aarav and Zoe do
+        show(() => (tall() ? SETUP.pair(named()[0], named()[1], P(-5.2, 2.2, -4.5)) : SETUP.names()));
       },
       beats: [{ id: "teacher_names", who: "Teacher", c: T_, after: (t, start, len) => {
         // the four names fill the last half of the line: each child stands as theirs is called
@@ -710,7 +721,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
             kid.rig.stand = 1; kid.rig.mood = "happy"; kid.rig.look = headOf(teacher); teacher.rig.look = headOf(kid); gaze(kids.filter((k) => k.rig.stand === 0), headOf(kid));
           }
         });
-        if (!backPair && t > start + len * (0.47 + 2 * 0.13) - 0.15) { backPair = true; if (tall()) show(() => (tall() ? SETUP.pair(named()[2], named()[3], P(1.2, 1.7, -2.6)) : SETUP.names())); }
+        if (!backPair && t > start + len * (0.47 + 2 * 0.13) - 0.15) { backPair = true; if (tall()) show(() => (tall() ? SETUP.pair(named()[2], named()[3], P(-1.3, 3.0, -2.9)) : SETUP.names())); }
       } }] }),
     talkShot({ name: "picked", env: "class", chapter: "knock", lead: 0.5, tail: 7.7,
       enter() {
@@ -757,13 +768,15 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
       } },
     { name: "launch", env: "hangar", chapter: "hangar", d: LAUNCH.end,
       enter() { talk(null); line = null; clearAt = Infinity; if (ui.caption) put("", ""); setUi({ cta: null }); hangar.nova.express("cheer"); launchCut = 0; show(SETUP.countdown); },
-      update(t) {
+      update(t, dt) {
         const L = LAUNCH;
         // anticipation: the pad's lights come on in three beats, then everything holds its breath
         const beats = Math.min(3, Math.floor(t / L.beat) + 1);
         if (t < L.breath && beats > launchCut) { launchCut = beats; audio.sfx("blip_ok"); }
         const burn = smooth((t - L.fire) / 0.55), up = Math.max(0, t - L.lift);
         hangar.set({ lamps: Math.min(1, beats / 3), burn, rise: 1.5 * up * up + 0.9 * up * up * up });
+        // Nova backs away from the pad as the lights come on: the fire gets the frame to itself
+        hangar.nova.group.position.lerp(NOVA_CLEAR, Math.min(1, dt * 2.2));
         // release: cut in close on the fire, then tip back to follow the rocket up
         if (t >= L.fire && launchCut < 4) { launchCut = 4; audio.sfx("ignition"); audio.sfx("fanfare"); shake = 0.07; again = null; SETUP.ignition(); cam.hold(); }
         if (launchCut === 4) {
@@ -812,7 +825,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
     hand.group.visible = false; lids = 1; blur = 0; fade = 0; firstPerson = false; shake = 0;
     hangar.reset();
     hangar.nova.express("neutral");
-    hangar.nova.group.position.set(3.2, 2.8, 0.8);
+    hangar.nova.group.position.copy(NOVA_HOME);
     captainH.rig.look = null;
     flight.visible = false;
     unframe();
@@ -970,6 +983,8 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour }: IntroOpt
     director,
     /** The shot list, in story order. */
     setups: SETUPS,
+    /** Resolves when the first picture (Earth) has its maps: a still taken before this shows a bare globe. */
+    ready: earth.earth.sharp,
     /** Start from the top (from a click, so audio can start). */
     play: () => { if (!prepared) { prepared = true; prepareSets(); } jump("orbit"); },
     jump,

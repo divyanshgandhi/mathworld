@@ -39,6 +39,9 @@ export function splitCaption(text: string, fits: (piece: string) => boolean): st
     if (i + n < words.length) {
       const stop = (re: RegExp) => { for (let k = n; k > Math.max(1, Math.floor(n * 0.45)); k--) if (re.test(words[i + k - 1])) return k; return 0; };
       n = stop(/[.!?\u2026]["')]?$/) || stop(/[,;:]$/) || n;
+      // no natural stop: share the words out, so the last caption is never two or three stragglers
+      const rest = words.length - (i + n);
+      if (rest > 0 && rest < 4 && n > 5 && !/[.!?\u2026,;:]["')]?$/.test(words[i + n - 1])) n = Math.ceil((n + rest) / 2);
       if (words.length - (i + n) === 1 && n > 2) n--;
     }
     out.push(words.slice(i, i + n).join(" "));

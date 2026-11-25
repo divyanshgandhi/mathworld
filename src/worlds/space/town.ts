@@ -177,10 +177,12 @@ export function buildTown(scene: THREE.Scene, M: Materials, rnd: Rng, at: THREE.
   const poplar = (x: number, z: number, s: number) => {
     const y = ground(x, z);
     trunks.push({ p: new THREE.Vector3(x, y + 0.8 * s, z), s: new THREE.Vector3(0.2 * s, 1.6 * s, 0.2 * s) });
-    crowns.push({ p: new THREE.Vector3(x, y + 5.2 * s, z), s: new THREE.Vector3(1.25 * s, 4.4 * s, 1.25 * s), c: SET.leaf[rnd() < 0.5 ? 0 : 2] });
+    // three masses, each narrower than the one under it and a little off its axis: a flame shape, never a ball on a stick
+    const tone = rnd() < 0.5 ? 0 : 2, lean = (rnd() - 0.5) * 0.5;
+    for (const [py, w, h, k] of [[3.0, 1.35, 2.5, 0], [5.6, 1.12, 2.7, 1], [8.1, 0.74, 2.3, 3]] as const) crowns.push({ p: new THREE.Vector3(x + lean * (py / 8) * s, y + py * s, z + lean * 0.4 * s), s: new THREE.Vector3(w * s, h * s, w * s * 0.92), c: SET.leaf[(tone + k) % 4] });
   };
   broadleaf(-15.5, 5.5, 1.7); broadleaf(14.5, 7.2, 1.45); // the two old trees on the lawn
-  for (let x = -96; x <= 96; x += 12) if (Math.abs(x) > 6) broadleaf(x + (rnd() - 0.5) * 2, 26 + rnd() * 1.5, 1.05 + rnd() * 0.3); // the avenue
+  for (let x = -120; x <= 120; x += 12) if (Math.abs(x) > 44) broadleaf(x + (rnd() - 0.5) * 2, 26 + rnd() * 1.5, 1.05 + rnd() * 0.3); // the avenue, open in front of the school so the crane has a clear run down
   for (let i = 0; i < 11; i++) poplar(-25 + i * 5 + (rnd() - 0.5), -9 - (i % 2) * 1.6, 1.05 + rnd() * 0.35); // the windbreak
   for (let i = 0; i < 70; i++) {
     const a = rnd() * 6.28, r = 42 + rnd() * 110, x = Math.cos(a) * r, z = Math.sin(a) * r * 0.85 - 18;
