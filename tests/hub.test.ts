@@ -66,7 +66,9 @@ describe("Solar System map", () => {
     expect(canLaunch(fold([]), "venus")).toBe(true);
   });
   it("marks cleared and Ace-cleared planets, and the Hyper-Jump streak", () => {
-    const s = fold([{ type: "planet_cleared", payload: { planetId: "earth" } }, { type: "hyper_jump_taken", payload: { fromPlanet: "moon", toPlanet: "asteroid-belt" } }]);
+    const tutorial = [[0, 5], [1, 7], [1, 3]].map(([a, b]) => ({ ...shot(a, b, a * b, 9000, 1, "earth"), payload: { ...shot(a, b, a * b, 9000, 1, "earth").payload, waveRole: "tutorial" as const } }));
+    const s = fold([...tutorial, { type: "planet_cleared", payload: { planetId: "earth" } }, { type: "hyper_jump_taken", payload: { fromPlanet: "moon", toPlanet: "asteroid-belt" } }]);
+    expect(fold([{ type: "planet_cleared", payload: { planetId: "earth" } }]).cleared).toEqual([]); // a clear with no passed mission is ignored
     const st = Object.fromEntries(mapStops(s).map((x) => [x.id, x.status]));
     expect(st).toMatchObject({ earth: "cleared", moon: "ace", mars: "ace", "asteroid-belt": "frontier", jupiter: "locked" });
     expect(canLaunch(s, "mars")).toBe(true);

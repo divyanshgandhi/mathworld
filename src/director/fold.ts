@@ -104,7 +104,10 @@ export function fold(events: LoggedEvent[]): PlayerState {
   let at: number | undefined, index = 0;
   /** Day a Gold replay of each fact was last paid (-1: a log without times). */
   const replayPaid: Record<string, number> = {};
-  /** Facts answered right since the last paid patrol: a patrol pays only for facts really reviewed. */
+  /**
+   * Facts answered right on a card (flashcard_answered: the patrol's own answers) since the last paid
+   * patrol. A patrol pays only for facts reviewed that way, so a patrol event alone mints nothing.
+   */
   let reviewed = new Set<string>();
 
   const pay = (rule: OrbRule, amount: number, fact?: string) => {
@@ -206,7 +209,7 @@ export function fold(events: LoggedEvent[]): PlayerState {
         w.usedRadar ||= p.usedRadar;
         w.powerUp ||= !!p.powerUpUsed;
         if (at !== undefined) s.lastSeen[factKey(p.a, p.b)] = at;
-        if (p.guess === p.a * p.b) { reviewed.add(factKey(p.a, p.b)); complete(w); break; }
+        if (p.guess === p.a * p.b) { complete(w); break; }
         if (classifyError(p.a, p.b, p.guess) === "wild_guess" && e.at !== undefined) {
           wild = [...wild.filter((t) => e.at! - t < 4000), e.at];
           if (wild.length >= 3) { s.antiMashNudges++; wild = []; }
@@ -223,9 +226,9 @@ export function fold(events: LoggedEvent[]): PlayerState {
       }
       case "planet_cleared": {
         const t = tierOfPlanet(e.payload.planetId);
-        if (t !== s.tier) break;
-        // the 20 orbs only for a mission that really passed (the director sends this event when it does)
-        if (s.mission.passed) pay("planet_cleared", ORB_RULES.planet_cleared.amount);
+        // only the planet in play, and only when its mission really passed (the director sends it then)
+        if (t !== s.tier || !s.mission.passed) break;
+        pay("planet_cleared", ORB_RULES.planet_cleared.amount);
         if (!s.cleared.includes(t)) s.cleared.push(t);
         // Deep Space has no next planet: a cleared mission opens the next, bigger sector instead.
         if (t < MAX_TIER) move(t + 1);

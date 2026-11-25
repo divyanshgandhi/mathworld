@@ -53,7 +53,7 @@ export const EventInput = z.discriminatedUnion("type", [
   /**
    * The daily patrol finished. `day` is the cadet's calendar day number (see `patrolDay`); the server
    * keeps it within a day of its own clock. `facts` are the facts reviewed, each answered right
-   * (a flashcard_answered or attempt_submitted) since the last patrol. The fold pays it once per day.
+   * on a card (a flashcard_answered, which is how the patrol records its answers) since the last patrol. The fold pays it once per day.
    */
   z.object({ type: z.literal("patrol_completed"), payload: z.object({ day: z.number().int().min(0).max(1e6), facts: z.array(z.object({ a: factor, b: factor })).min(1).max(PATROL_SIZE) }) }),
   /** The cadet has met something once: a screen's greeting, a help page, a guided step. Keys look like "greet:bay" or "guide:first-shot". */

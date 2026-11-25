@@ -208,6 +208,7 @@ describe("the daily patrol (src/director/hub.ts)", () => {
     const t0 = 200 * DAY, day = Math.floor(t0 / DAY);
     const done = (d: number, facts = [{ a: 3, b: 8 }]): LoggedEvent => ({ type: "patrol_completed", payload: { day: d, facts } });
     expect(fold([done(day)]).orbs).toBe(0); // nothing was answered: a forged patrol mints nothing
+    expect(fold([right(3, 8, { at: t0 }), done(day)]).ledger.map((e) => e.rule)).toEqual(["first_try"]); // a battle answer is not a patrol
     const log = [card(3, 8, t0, 24), card(3, 8, t0 + 1), done(day)];
     let s = fold(log);
     expect(s.orbs).toBe(15);

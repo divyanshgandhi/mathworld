@@ -13,10 +13,13 @@ import { blasterOf, makePlasmaBall, makeRocket, type RocketStyle } from "./ships
  * with a small pop, a thruster trail flares, and a blaster fires a short volley up out of frame.
  * No set, no props, no glow (the hero look's bloom threshold is above everything here).
  *
- * Framing: on a wide screen the rocket sits in the left part of the frame (the shop panel is on the
- * right); on a tall screen it sits in the top half (the panel covers the bottom half).
+ * Framing: the screen tells the scene which part of the canvas the shop leaves free (`setFrame`),
+ * and the rocket and pad are framed inside it. Without a frame, a wide screen keeps the left part
+ * (the shop is on the right) and a tall one the top 45%.
  */
 export type ShipStyle = RocketStyle & { blaster?: string };
+/** A part of the canvas in CSS px, from its top-left corner. */
+export interface FrameRect { x: number; y: number; w: number; h: number }
 
 /** The rocket's centre above the pad: high enough that the thruster trail clears it. */
 const HOVER = 2.75;
@@ -102,6 +105,7 @@ export function mountHangarBay(stage: Stage, initial: ShipStyle) {
     }
   }
   let demo = stage.time + 1.4; // one volley shortly after arriving
+  let frame: FrameRect | null = null;
 
   const look3 = new THREE.Vector3();
   const stop = stage.onUpdate((dt, T) => {
@@ -126,7 +130,7 @@ export function mountHangarBay(stage: Stage, initial: ShipStyle) {
 
     // frame the rocket and pad in the part of the screen the shop panel leaves free
     const W = stage.renderer.domElement.clientWidth || 1, H = stage.renderer.domElement.clientHeight || 1, tall = W / H < 1;
-    const free = tall ? { x: 0, y: 0, w: W, h: H * 0.5 } : { x: 0, y: 0, w: Math.max(W * 0.5, W - 420), h: H };
+    const free = frame && frame.w > 40 && frame.h > 40 ? frame : tall ? { x: 0, y: 0, w: W, h: H * 0.45 } : { x: 0, y: 0, w: Math.max(W * 0.5, W - 420), h: H };
     const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), needH = 7.6, needW = 7.4;
     const d = Math.max((needH * H) / (2 * tan * free.h * 0.9), (needW * H) / (2 * tan * free.w * 0.9));
     look3.set(0, 2.3, 0);
@@ -147,6 +151,10 @@ export function mountHangarBay(stage: Stage, initial: ShipStyle) {
     },
     /** Fire the current blaster once more (a tap on the equipped one). */
     demo: fire,
+    /** The small show after a purchase: the rocket pops, its trail flares and it fires a volley. */
+    celebrate() { popT = stage.time; flareT = stage.time; fire(); },
+    /** Frame the rocket inside this part of the canvas (CSS px), or null for the default framing. */
+    setFrame(r: FrameRect | null) { frame = r; },
     /** Screen anchors for the HUD: "rocket" (its middle) and "nose" (its tip). */
     anchor(id: string) {
       if (id === "rocket") return rocket.group.getWorldPosition(new THREE.Vector3());
