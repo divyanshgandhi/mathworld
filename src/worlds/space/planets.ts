@@ -261,7 +261,7 @@ export function makeBody(M: Materials, id: BodyId, r: number, o: BodyOptions = {
     cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, depthWrite: false, roughness: 1, metalness: 0, opacity: 0.92 });
     clouds = add(body, new THREE.SphereGeometry(r * 1.012, seg[0], seg[1]), cloudMat, 0, 0, 0, off);
     clouds.visible = false;
-    // a thin cool atmosphere at the limb (additive, about a third of the bloom threshold at its brightest)
+    // a thin cool atmosphere just inside the limb, fading to nothing at the edge (additive, far under the bloom threshold)
     add(group, new THREE.SphereGeometry(r * 1.035, seg[0], seg[1]), atmosphereMaterial(look), 0, 0, 0, off);
   }
   if (s.ring) {

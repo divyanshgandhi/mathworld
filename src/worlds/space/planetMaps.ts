@@ -138,7 +138,7 @@ function stampCraters(list: Crater[], w: number, h: number, height: Float32Array
         const rim = Math.exp(-((d - 1) * (d - 1)) / 0.02) * 0.35 * c.depth;
         const skirt = d > 1 ? Math.exp(-(d - 1) * 4) * 0.08 : 0;
         height[k] += (bowl + rim + skirt) * Math.min(1, c.r * 40);
-        shade[k] += (d < 0.85 ? -0.14 : 0) + rim * 0.6 + c.fresh * Math.max(0, 1 - Math.abs(d - 1.15) * 2) * 0.55;
+        shade[k] += (d < 0.85 ? -0.08 * Math.min(1, 0.02 / c.r) : 0) + rim * 0.35 + c.fresh * Math.max(0, 1 - Math.abs(d - 1.15) * 2) * 0.55;
       }
     }
   }
@@ -283,7 +283,7 @@ function paintRocky(w: number, h: number, kind: "moon" | "mercury" | "mars" | "r
   const height = new Float32Array(w * h), shade = new Float32Array(w * h), base = new Float32Array(w * h);
   eachPixel(w, h, (_lat, _lon, x, y, z, i) => { const n = fbm(x * 4, y * 4, z * 4, 6); height[i] = n * 0.35; base[i] = n; });
   const count = { moon: 1400, mercury: 1800, mars: 300, rock: 500 }[kind] * Math.min(1, (w / 1024) ** 1.2 + 0.25);
-  stampCraters(craters(Math.round(count), seed * 31, 0.004, kind === "mars" ? 0.06 : 0.085), w, h, height, shade);
+  stampCraters(craters(Math.round(count), seed * 31, 0.004, kind === "mars" ? 0.05 : 0.055), w, h, height, shade);
   const albedo = new Uint8ClampedArray(w * h * 4);
   // the Moon's dark seas (maria), placed where they really are on the near side
   const MARIA: [number, number, number][] = [[-16, 33, 19], [17, 28, 11], [31, 8, 14], [59, 17, 8], [51, -8, 10], [-15, -18, 13], [-50, 12, 24], [-58, 32, 14], [-39, -24, 7], [0, 55, 7], [22, 56, 7], [35, -15, 8], [-2, 10, 8], [-30, 0, 14]];
@@ -292,15 +292,17 @@ function paintRocky(w: number, h: number, kind: "moon" | "mercury" | "mars" | "r
     let c: RGB;
     if (kind === "moon") {
       const C = ALBEDO.moon;
-      let m = 0;
-      const warp = fbm(x * 3 + 2, y * 3, z * 3, 5) * 0.55 + fbm(x * 12, y * 12, z * 12, 3) * 0.12;
+      // the seas: an organic noise field, gathered where the real maria are
+      let region = 0;
       for (const [mlon, mlat, r] of MARIA) {
         const ml = mlat / 57.3, mo = mlon / 57.3;
         const d = Math.acos(Math.max(-1, Math.min(1, Math.cos(ml) * Math.cos(mo) * x + Math.sin(ml) * y - Math.cos(ml) * Math.sin(mo) * z))) * 57.3 / r;
-        m = Math.max(m, smooth(1.05, 0.75, d + warp));
+        region = Math.max(region, smooth(1.5, 0.6, d));
       }
+      const field = fbm(x * 2.2 + 2, y * 2.2, z * 2.2, 4) * 0.9 + 0.5;
+      const m = smooth(0.44, 0.66, region * 0.4 + field * 0.72);
       c = mixc(C.high, C.mid, smooth(0.35, 0.65, n));
-      c = mixc(c, C.mare, m * 0.78 * (0.75 + n * 0.5));
+      c = mixc(c, C.mare, m * 0.68 * (0.75 + n * 0.5));
       if (m > 0.3) height[i] *= 0.4; // seas are smooth
     } else if (kind === "mercury") {
       const C = ALBEDO.mercury;

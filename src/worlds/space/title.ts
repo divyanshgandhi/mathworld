@@ -118,7 +118,7 @@ export function mountTitle(stage: Stage): TitleScene {
     const margin = Math.min(56, Math.max(20, w * 0.03));
     const right = box?.right ?? w * 0.52, top = box?.top ?? h * 0.55;
     // where the Sun sits on screen: right of the words, or above them
-    const px = wide ? right + (w - right) * 0.64 : w / 2, py = wide ? h * 0.5 : Math.max(h * 0.2, top * 0.47);
+    const px = wide ? right + (w - right) * 0.7 : w / 2, py = wide ? h * 0.5 : Math.max(h * 0.2, top * 0.47);
     camera.aspect = w / h;
     camera.zoom = 1;
     camera.setViewOffset(w, h, w / 2 - px, h / 2 - py, w, h);
