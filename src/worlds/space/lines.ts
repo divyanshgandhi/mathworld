@@ -1,6 +1,7 @@
 import type { ErrorType } from "@/rig/errors";
 import type { PlanetId } from "@/rig/pools";
 import type { TrickId } from "@/rig/tricks";
+import type { CombatLineId } from "@/battle/lines";
 
 /**
  * The film's spoken lines, in story order: the words the captions show. scripts/bake-voices.py bakes
@@ -20,17 +21,15 @@ export const FILM_LINES = {
   teacher_mult: "Wonderful. Today, we begin... multiplication.",
   principal_sorry: "Pardon the interruption, everyone.",
   principal_intro: "Class, this is the Captain of the Star Fleet.",
-  captain_danger: "There is grave danger in deep space. Earth needs its sharpest young minds. We are enrolling five cadets today.",
+  captain_danger: "Deep space is in danger. Earth needs sharp young minds. Five cadets start today.",
   teacher_proud: "Five cadets... from my class? Captain, I know exactly who you need.",
   captain_names: "Then call their names.",
   teacher_names: "Please stand when I call your name. Maya... Leo... Aarav... Zoe...",
   teacher_pick_generic: "And our fifth cadet is... you!",
   captain_brief1: "Welcome, cadets. You will protect Earth from the ships that attack from space.",
-  captain_brief2: "You have a spaceship, your co-pilot, and plasma balls to clear every squad.",
-  captain_brief3: "Remember, plasma balls are precious.",
-  captain_brief4: "Too few, and ships slip past. Too many, and we burn extra fuel.",
+  captain_brief2: "This is your rocket.",
   captain_nova: "And every pilot needs a co-pilot. Meet yours.",
-  nova_hi: "Hey! I am Nova, your co-pilot! Together we will calibrate every shot dead on. Ready for launch?",
+  nova_hi: "Hi! I am Nova, your co-pilot. Ready for launch?",
 } as const;
 export type FilmLineId = keyof typeof FILM_LINES;
 
@@ -48,11 +47,9 @@ export const BATTLE_LINES = {
   nova_err_group: "So close! One squad off.",
   nova_err_unit: "Just a hair off!",
   nova_err_place: "Check your place value, cadet!",
-  nova_err_under: "Too few! Load a few more.",
-  nova_err_over: "Too many! Load a few less.",
-  nova_err_wild: "Way off! Count the squads first.",
-  nova_radar: "Radar is up. Pick a target!",
-  nova_invite: "Sneaky squad! Try a Power-Up, or ask for Show Me How.",
+  nova_err_under: "Too few! Some got away. Try again.",
+  nova_err_over: "Too many! Some flew past. Try again.",
+  nova_err_wild: "Way off! Count the squads again.",
   nova_hold_fire: "Hold fire, cadet! Take a breath, and try a Power-Up.",
   nova_misfit: "That trick doesn't fit this fleet. Try another one!",
   // a zero fleet met for the first time: what the empty picture means, never the answer
@@ -99,9 +96,10 @@ export type LineId = keyof typeof BATTLE_LINES;
 export const EXACT_LINES: LineId[] = ["nova_dead_on", "nova_bullseye", "nova_perfect"];
 /** The one praise line for a right answer (the others stay baked for the Academy and older callers). */
 export const EXACT_LINE: LineId = "nova_dead_on";
-export const ERROR_LINE: Record<ErrorType, LineId> = {
+/** The line each kind of miss plays. A wild guess plays the combat track's "Way off! Count the squads with me." */
+export const ERROR_LINE: Record<ErrorType, LineId | CombatLineId> = {
   added_instead: "nova_err_added", off_by_one_group: "nova_err_group", off_by_one_unit: "nova_err_unit", place_value: "nova_err_place",
-  undershoot_close: "nova_err_under", overshoot_close: "nova_err_over", wild_guess: "nova_err_wild",
+  undershoot_close: "nova_err_under", overshoot_close: "nova_err_over", wild_guess: "nova_err_way_off",
 };
 export const POWERUP_LINE: Record<TrickId, LineId> = {
   "empty-mirror": "pu_mirror", "fast-adding": "pu_fast", "flip-it": "pu_flip", "double-it": "pu_double", "easy-5-10": "pu_easy",
