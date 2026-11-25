@@ -15,6 +15,8 @@ export type BeltItem = { id: TrickId; card: string; fits: boolean; active: boole
 
 /** The words for an empty list of fits. */
 export const NONE_FIT = "No Power-Up fits this fleet. Tap Show me how.";
+/** The list before anything is on the belt: how the first Power-Up is earned (Show me how puts its trick on the belt). */
+export const NONE_YET = "No Power-Ups yet. Tap Show me how: each trick you watch becomes one.";
 
 /**
  * The belt in the order the list shows it: the hinted one first, then the ones that fit this fleet,
@@ -28,18 +30,18 @@ export function orderBelt(belt: BeltItem[], hinted: TrickId | null | undefined):
 const keep = (e: React.MouseEvent) => e.preventDefault();
 
 /**
- * The one Power-Ups button: a glyph and the word. Its place on the console is always reserved; with
- * nothing on the belt it is an empty space of the same size. `orbit`: the slow dashed gold orbit the
+ * The one Power-Ups button: a glyph and the word, always on the console. With nothing on the belt it is
+ * quiet, and its list says how the first Power-Up is earned. `orbit`: the slow dashed gold orbit the
  * hint puts round it after a second miss (it holds still under reduced motion).
  * `data-enter-fires`: Enter on it still fires the loaded number (Space opens the list).
  */
-export function PowerUpsButton({ empty, disabled, orbit, reduced, onPress, buttonRef, open }: {
-  empty: boolean; disabled: boolean; orbit: boolean; reduced: boolean; onPress: () => void; buttonRef?: Ref<HTMLButtonElement>; open: boolean;
+export function PowerUpsButton({ empty, ready = false, disabled, orbit, reduced, onPress, buttonRef, open }: {
+  empty: boolean; ready?: boolean; disabled: boolean; orbit: boolean; reduced: boolean; onPress: () => void; buttonRef?: Ref<HTMLButtonElement>; open: boolean;
 }) {
-  // an empty belt: a reserved space, no anchor, so a tour never spotlights nothing
-  if (empty) return <span className={css.puButton} data-empty aria-hidden />;
+  // an empty belt: the button is still there with its word (the list says how the first one is earned),
+  // quiet and with no tour anchor, so a tour never spotlights an empty belt
   return (
-    <Button ref={buttonRef} className={css.puButton} onMouseDown={keep} data-guide="powerups" data-enter-fires aria-haspopup="dialog" aria-expanded={open}
+    <Button ref={buttonRef} className={css.puButton} onMouseDown={keep} data-guide={empty ? undefined : "powerups"} data-quiet={empty || undefined} data-ready={(ready && !empty) || undefined} data-enter-fires aria-haspopup="dialog" aria-expanded={open}
       aria-keyshortcuts="P" title="Power-Ups (P)" disabled={disabled} data-hinted={orbit || undefined} onClick={onPress}>
       <span className={css.puRing}>
         <Icon name="trick" size={20} />
@@ -101,7 +103,7 @@ export function PowerUpList({ open, onClose, onPick, belt, hinted, layout, ancho
             <Icon name="close" size={20} />
           </PopoverClose>
         </div>
-        {!anyFits && <p className={css.puNone}>{NONE_FIT}</p>}
+        {!anyFits && <p className={css.puNone}>{rows.length ? NONE_FIT : NONE_YET}</p>}
         <div className={css.puList} data-pu-list role="list" aria-label="Power-Ups on your belt" onKeyDown={onKeyDown}>
           {rows.map((t) => {
             const lock = t.card === "Sector-Lock";
@@ -114,7 +116,8 @@ export function PowerUpList({ open, onClose, onPick, belt, hinted, layout, ancho
                     {t.card}
                     {t.fits && t.id === hinted && <span className={css.puChip}>Try this</span>}
                   </span>
-                  <span className={css.puRowDoes}>{t.fits ? does : "Not for this fleet"}</span>
+                  <span className={css.puRowDoes}>{does}</span>
+                  {!t.fits && <span className={css.puRowDoes}><b>Not for this fleet</b></span>}
                 </span>
                 {t.fits && <span className={css.puRowState}>{t.active ? "On" : null}</span>}
               </>

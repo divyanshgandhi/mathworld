@@ -486,8 +486,11 @@
   -webkit-tap-highlight-color: transparent;
   transition: border-color var(--transition-duration-quick) var(--ease-out), background var(--transition-duration-quick) var(--ease-out);
 }
-.mwc-puButton[data-empty] { border-color: transparent; cursor: default; }
-.mwc-puButton:hover:not([data-disabled]):not([data-empty]) { border-color: var(--color-gold); }
+/* nothing on the belt yet: quiet, still the word (its list says how the first one is earned) */
+.mwc-puButton[data-quiet] { color: var(--color-ink-2); }
+/* something on the belt fits this fleet: a gold edge says it is worth a tap */
+.mwc-puButton[data-ready] { border-color: color-mix(in oklab, var(--color-gold) 60%, transparent); }
+.mwc-puButton:hover:not([data-disabled]) { border-color: var(--color-gold); }
 .mwc-puButton:active:not([data-disabled]) { background: var(--color-raised); }
 .mwc-puButton[aria-expanded="true"] { border-color: var(--color-gold); }
 .mwc-puButton[data-disabled] { color: var(--color-ink-3); border-color: var(--color-line-1); cursor: default; }

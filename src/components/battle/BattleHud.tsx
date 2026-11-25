@@ -250,7 +250,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
   const puOrbit = ui.belt.some((t) => t.fits && !t.active && (t.id === hinted || fresh.has(t.id)));
   const puDisabled = !live || !!lesson || !!ui.sectors;
   const slots = (
-    <PowerUpsButton empty={ui.belt.length === 0} disabled={puDisabled} orbit={puOrbit} reduced={reduced} open={listOpen} buttonRef={setPuEl}
+    <PowerUpsButton empty={ui.belt.length === 0} ready={ui.belt.some((t) => t.fits && !t.active)} disabled={puDisabled} orbit={puOrbit} reduced={reduced} open={listOpen} buttonRef={setPuEl}
       onPress={() => { if (settled()) setListOpen(true); }} />
   );
   const sectorRow = ui.sectors ? (
