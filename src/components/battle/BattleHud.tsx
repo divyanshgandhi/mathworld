@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { fold } from "@/director/fold";
 import { PRACTICE_WAVES } from "@/director/next";
 import { flushed } from "@/engine/outbox";
-import { isSolved, missionLength, solvesToClear } from "@/rig/adaptive";
+import { missionLength, solvesToClear } from "@/rig/adaptive";
 import { tierOfPlanet, type PlanetId } from "@/rig/pools";
 import { CARD, type TrickId } from "@/rig/tricks";
 import type { Arena, ArenaUi } from "@/worlds/space/arena";
@@ -15,6 +15,7 @@ import { BriefingCard, ClearCard, MissionOverCard, OfferCard, PLANET_TEACHES } f
 import { CARD_OPEN, Console, fmtN, useEntry } from "./Console";
 import { useConsoleLayout, useReducedMotion, type ConsoleLayout } from "./layout";
 import { MissionStrip, useOrbReward } from "./MissionStrip";
+import { missionOver } from "./mission";
 import { usePauseWhenHidden } from "./PauseMenu";
 import { hold } from "./pause";
 import { PowerUpList, PowerUpsButton } from "./PowerUps";
@@ -131,12 +132,10 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
     if (!arena || ui?.mode !== "campaign" || !ui.wave) return;
     const s = fold(arena.log()), m = s.mission, prev = lastMission.current;
     lastMission.current = { n: m.n, tier: s.tier };
-    if (!prev || prev.tier !== s.tier || m.n <= prev.n || m.waves !== 0) return;
-    // the mission before this one was played out and not passed: how many of its counted waves were won
-    const counted = s.history.filter((h) => h.mission === prev.n && h.tier === s.tier && h.role !== "anchor");
-    setOver({ won: counted.filter((h) => isSolved(h.outcome)).length, of: counted.length });
+    const ended = missionOver(prev, s);
+    if (ended) setOver(ended);
   }, [missionKey, arena]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (over) hold.on("card"); else hold.off("card"); }, [over]);
+  useEffect(() => { if (over) hold.on("mission-over"); else hold.off("mission-over"); }, [over]);
   // ---- the Power-Ups list ----
   const [listOpen, setListOpen] = useState(false);
   const [puEl, setPuEl] = useState<HTMLButtonElement | null>(null);
