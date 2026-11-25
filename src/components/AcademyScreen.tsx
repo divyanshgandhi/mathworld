@@ -61,7 +61,15 @@ export function AcademyScreen({ onHelp }: { onHelp?: () => void } = {}) {
   useEffect(() => { void import("@/engine/audio").then(({ audio }) => audio.mood("hangar")); }, []);
   useEffect(() => { void preloadSprites(PLANETS_BY_TIER.map((id) => ({ id, size: 36 }))); }, []);
 
-  const watch = useCallback((f: Film) => { pushed.current = true; setOverride(null); setUrl(`?watch=${f.trick}`, true); }, []);
+  // closing a trick film puts focus back on that trick's row (the list is drawn again, so the row is new)
+  const opener = useRef<string | null>(null);
+  useEffect(() => {
+    if (film || !opener.current) return;
+    const row = document.querySelector<HTMLElement>(`[data-trick="${opener.current}"]`);
+    opener.current = null;
+    if (row && (document.activeElement === document.body || !document.activeElement)) row.focus({ preventScroll: false });
+  });
+  const watch = useCallback((f: Film) => { opener.current = f.trick; pushed.current = true; setOverride(null); setUrl(`?watch=${f.trick}`, true); }, []);
   const back = useCallback(() => {
     setOverride(null);
     if (pushed.current) { pushed.current = false; history.back(); } else setUrl("", false);

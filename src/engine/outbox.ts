@@ -17,6 +17,9 @@ const queue: Item[] = load();
 let sending: Promise<void> | null = null;
 let failing = false;
 const listeners = new Set<() => void>();
+/** Who is waiting on an event posted from this page: told true once it is stored, false if it was dropped. */
+const waiting = new Map<string, (stored: boolean) => void>();
+const settle = (items: Item[], stored: (i: Item) => boolean) => items.forEach((i) => { waiting.get(i.id)?.(stored(i)); waiting.delete(i.id); });
 const emit = () => listeners.forEach((l) => l());
 
 function load(): Item[] {
@@ -52,14 +55,17 @@ async function drain() {
       continue;
     }
     // one malformed event must not take the rest of the batch with it: send them one by one
+    const fine = new Set<string>();
     if (res === "bad" && batch.length > 1) {
       for (const item of batch) {
-        let t = 0;
-        while ((await send([item])) === "retry") await new Promise((r) => setTimeout(r, backoff(t++)));
+        let t = 0, one: "ok" | "bad" | "retry";
+        while ((one = await send([item])) === "retry") await new Promise((r) => setTimeout(r, backoff(t++)));
+        if (one === "ok") fine.add(item.id);
       }
     }
     queue.splice(0, batch.length);
     save();
+    settle(batch, (i) => res === "ok" || fine.has(i.id));
     tries = 0;
     if (failing) { failing = false; emit(); }
   }
@@ -67,11 +73,20 @@ async function drain() {
   emit();
 }
 
-export function post(e: EventInput) {
-  queue.push({ id: newId(), e });
+/**
+ * Queue one event. The promise resolves true once the server has stored it, or false if the server
+ * rejected it for good (malformed, or no cadet): never for network trouble, which is retried until it
+ * goes through. A screen that must not show something before it is saved (a purchase, a patrol's pay)
+ * waits on it; the rest can ignore it.
+ */
+export function post(e: EventInput): Promise<boolean> {
+  const id = newId();
+  const stored = new Promise<boolean>((r) => waiting.set(id, r));
+  queue.push({ id, e });
   save();
   emit();
   sending ??= drain();
+  return stored;
 }
 
 /** Resolves once everything posted so far is stored (before navigating away). */
