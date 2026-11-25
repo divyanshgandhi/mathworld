@@ -81,6 +81,15 @@ describe("database connection", () => {
     expect(isLocal("postgresql://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres")).toBe(false);
     expect(isLocal("not a url")).toBe(false);
   });
+
+  it("takes its address from DATABASE_URL, or from the POSTGRES_URL a Vercel database sets, without the host's own parameters", async () => {
+    const { databaseUrl, cleanDbUrl } = await import("@/db/index");
+    const pooler = "postgres://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
+    expect(databaseUrl({ POSTGRES_URL: pooler + "?sslmode=require&supa=base-pooler.x" })).toBe(pooler);
+    expect(databaseUrl({ DATABASE_URL: "postgres://u:p@db.example.com:5432/app", POSTGRES_URL: pooler })).toBe("postgres://u:p@db.example.com:5432/app");
+    expect(databaseUrl({})).toBeUndefined();
+    expect(cleanDbUrl("not a url")).toBe("not a url");
+  });
 });
 
 describe("event contract", () => {

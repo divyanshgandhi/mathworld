@@ -5,11 +5,15 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
-const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
-if (!url) {
-  console.log("migrate: no DATABASE_URL, skipping (local dev uses PGlite).");
+// Our own names first, then the ones Vercel sets when a Supabase database is added from the Storage tab.
+// The query string is dropped: hosts add their own parameters, and TLS is decided below.
+const env = process.env;
+const raw = env.MIGRATION_DATABASE_URL || env.POSTGRES_URL_NON_POOLING || env.DATABASE_URL || env.POSTGRES_URL;
+if (!raw) {
+  console.log("migrate: no database address, skipping (local dev uses PGlite).");
   process.exit(0);
 }
+const url = (() => { try { const u = new URL(raw); u.search = ""; return u.toString(); } catch { return raw; } })();
 
 // A hosted database is always reached over TLS; only a Postgres on this machine may go without.
 const local = (() => { try { return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(url).hostname); } catch { return false; } })();

@@ -19,9 +19,21 @@ export function getDb(): Promise<DB> {
   return (g.__mwDb ??= connect().catch((e) => { g.__mwDb = undefined; throw e; }));
 }
 
+/**
+ * A connection string as the driver wants it: no query string. Hosts add their own (`sslmode=require`,
+ * Supabase's `supa=base-pooler.x`), and TLS is decided here, in code, not by the address.
+ */
+export const cleanDbUrl = (url: string | undefined) => { if (!url) return undefined; try { const u = new URL(url); u.search = ""; return u.toString(); } catch { return url; } };
+
+/**
+ * The runtime database: `DATABASE_URL`, or `POSTGRES_URL`, which Vercel sets by itself when a Supabase
+ * database is added from the project's Storage tab.
+ */
+export const databaseUrl = (env: Record<string, string | undefined> = process.env) => cleanDbUrl(env.DATABASE_URL || env.POSTGRES_URL);
+
 async function connect(): Promise<DB> {
-  const url = process.env.DATABASE_URL;
-  if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is not set: add the Supabase pooler URL in the Vercel project settings.");
+  const url = databaseUrl();
+  if (!url && process.env.VERCEL) throw new Error("No database: add a Supabase database from the Vercel project's Storage tab, or set DATABASE_URL to the Supabase pooler URL.");
   if (!url) return openPglite(process.env.PGLITE_DIR ?? ".data/pg");
   const [{ default: postgres }, { drizzle }] = await Promise.all([import("postgres"), import("drizzle-orm/postgres-js")]);
   // prepare: false is required by Supabase's transaction pooler (port 6543).

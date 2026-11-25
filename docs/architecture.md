@@ -71,13 +71,15 @@ A jump ahead needs a clean record: a Gold run, a Gold answer on a probe from the
 
 ## Deploy (Vercel and Supabase)
 
-1. **Supabase:** create a project. From *Connect*, copy the **transaction pooler** URL (port 6543) as `DATABASE_URL`, and the **session pooler** URL (port 5432) as `MIGRATION_DATABASE_URL`.
-2. **Vercel:** import the repository (it is detected as Next.js) and add both variables for Production and Preview, plus `MW_ADMIN_KEY` to turn on `/admin`. `vercel.json` installs with Bun and runs `scripts/migrate.mjs` before `next build`, so every deploy migrates the database first. Keep the function region next to the database.
-3. **Smoke test:**
+1. **Vercel:** import the repository. It is detected as Next.js. `vercel.json` installs with Bun and runs `scripts/migrate.mjs` before `next build`, so every deploy migrates the database first.
+2. **Database:** in the Vercel project open **Storage**, add **Supabase**, and connect it to the project. Vercel then sets `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING`, and the app reads them. Keep the database in the same region as the functions.
+   To use a Supabase project of your own, set `DATABASE_URL` to its transaction pooler URL (port 6543) and `MIGRATION_DATABASE_URL` to its session pooler URL (port 5432).
+3. **Admin:** add `MW_ADMIN_KEY` (10 characters or more) to turn on `/admin`.
+4. **Redeploy**, then smoke-test:
    ```bash
    curl -c jar -X POST -H 'content-type: application/json' -d '{"name":"Test"}' https://<app>/api/player
    curl -b jar -X POST -H 'content-type: application/json' -d '{"type":"intro_completed","payload":{}}' https://<app>/api/events
    curl -b jar https://<app>/api/player   # introCompleted: true
    ```
 
-Row Level Security is on for both tables with no policies, so only the server's own database role can read or write them.
+Row Level Security is on for both tables with no policies, so only the server's own database role can read or write them. A hosted database is always reached over TLS.
