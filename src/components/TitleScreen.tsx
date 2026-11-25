@@ -6,7 +6,10 @@ import type { TitleScene } from "@/worlds/space/title";
 import { Button } from "./kit/Button";
 import { RingLogo } from "./kit/Brand";
 import "./hub/title.css";
-import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
+import { CadetSignUp, SIGNUP_KEY, type Cadet } from "./hub/CadetSignUp";
+
+/** The sign-up was on screen when this tab reloaded (it comes back to the name field, not Start game). */
+const onSignUp = () => { try { return sessionStorage.getItem(SIGNUP_KEY) !== null; } catch { return false; } };
 import { forgetCadet, knownCadets, rememberCadet, type KnownCadet } from "./hub/cadets";
 import { useScene } from "./hub/Scene";
 
@@ -69,7 +72,7 @@ export function TitleScreen() {
         setOthers(knownCadets().filter((c) => c.id !== m.player?.id));
         // after Switch cadet in the Resting Bay (/?switch), go straight to the choice of cadet
         const q = new URLSearchParams(location.search);
-        setPhase(m.player ? (q.has("switch") ? "switch" : "back") : q.has("new") ? "signup" : "new");
+        setPhase(m.player ? (q.has("switch") ? "switch" : "back") : q.has("new") || onSignUp() ? "signup" : "new");
       });
     router.prefetch("/bay");
     router.prefetch("/intro");

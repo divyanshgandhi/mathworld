@@ -13,6 +13,8 @@ import { rememberCadet } from "./cadets";
 export interface Cadet { name: string; avatar: string }
 
 const COLOURS = Object.keys(CADET) as CadetColor[];
+/** sessionStorage: present while the sign-up form is on screen, holding the name typed so far. */
+export const SIGNUP_KEY = "mw:signup-name";
 const FAILED = "That did not save. Check the connection and press Begin again.";
 
 /**
@@ -40,6 +42,13 @@ export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
   const field = useRef<HTMLInputElement>(null);
+
+  // a reload on this form comes back to it with the name still typed (this tab only); leaving it forgets
+  useEffect(() => {
+    try { const v = sessionStorage.getItem(SIGNUP_KEY); if (v) setName(limitName(v).value); } catch { /* storage off */ }
+    return () => { try { sessionStorage.removeItem(SIGNUP_KEY); } catch { /* storage off */ } };
+  }, []);
+  useEffect(() => { try { sessionStorage.setItem(SIGNUP_KEY, name); } catch { /* storage off */ } }, [name]);
 
   const { problem } = checkName(name);
   // symbols show at once (the child can see them); an empty field only after they press Begin
@@ -73,7 +82,10 @@ export function CadetSignUp({ onDone, onBack, cta = "Begin", className = "" }: {
   };
 
   return (
+    // method="dialog" outside a <dialog> never submits natively: a Begin pressed before the page is
+    // interactive does nothing instead of loading /?name=... (the name in the address bar and history)
     <form
+      method="dialog"
       onSubmit={(e) => void submit(e)}
       onKeyDown={(e) => { if (e.key === "Escape" && onBack && !busy) { e.preventDefault(); onBack(); } }}
       noValidate
