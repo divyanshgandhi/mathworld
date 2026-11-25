@@ -78,30 +78,59 @@ const inside = (a: Box, v: Box) => a.x >= v.x && a.y >= v.y && a.x + a.w <= v.x 
 /**
  * Where a caption of `size` goes next to `anchor`: the first side in `prefer` where it fits on screen
  * (`view`, already inset by a margin) without touching the anchor or any box in `avoid`. It is centred
- * on the anchor along that side and slid along to stay on screen. If no side fits, it takes the side
+ * on the anchor along that side and slid along to stay on screen; a box in `avoid` on that side is
+ * stepped past (so a caption for the keypad sits above the whole console, not over its Power-Ups). If no side fits, it takes the side
  * with the most room, still clear of the anchor itself, so it never covers the control it points at.
  */
-export function placeCaption(anchor: Box, size: { w: number; h: number }, view: Box, avoid: Box[] = [], prefer: Side[] = ["above", "below", "left", "right"], gap = 14): { box: Box; side: Side } {
-  const at = (side: Side): Box => {
-    const cx = anchor.x + anchor.w / 2 - size.w / 2, cy = anchor.y + anchor.h / 2 - size.h / 2;
-    const slideX = (x: number) => Math.max(view.x, Math.min(view.x + view.w - size.w, x));
-    const slideY = (y: number) => Math.max(view.y, Math.min(view.y + view.h - size.h, y));
-    switch (side) {
-      case "above": return { x: slideX(cx), y: anchor.y - gap - size.h, ...size };
-      case "below": return { x: slideX(cx), y: anchor.y + anchor.h + gap, ...size };
-      case "left": return { x: anchor.x - gap - size.w, y: slideY(cy), ...size };
-      case "right": return { x: anchor.x + anchor.w + gap, y: slideY(cy), ...size };
+export function placeCaption(anchor: Box, size: { w: number; h: number }, view: Box, avoid: Box[] = [], prefer: Side[] = ["above", "below", "left", "right"], gap = 14, soft: Box[] = []): { box: Box; side: Side } {
+  // first keep clear of everything; then, if nothing fits, only of the hard boxes (controls), so a
+  // tight phone covers the question plate or a corner of the fleet before it covers a button
+  if (soft.length) {
+    const all = tryPlace(anchor, size, view, [...avoid, ...soft], prefer, gap);
+    if (all) return all;
+  }
+  return tryPlace(anchor, size, view, avoid, prefer, gap) ?? mostRoom(anchor, size, view, gap);
+}
+
+function at(anchor: Box, size: { w: number; h: number }, view: Box, side: Side, gap: number): Box {
+  const cx = anchor.x + anchor.w / 2 - size.w / 2, cy = anchor.y + anchor.h / 2 - size.h / 2;
+  const slideX = (x: number) => Math.max(view.x, Math.min(view.x + view.w - size.w, x));
+  const slideY = (y: number) => Math.max(view.y, Math.min(view.y + view.h - size.h, y));
+  switch (side) {
+    case "above": return { x: slideX(cx), y: anchor.y - gap - size.h, ...size };
+    case "below": return { x: slideX(cx), y: anchor.y + anchor.h + gap, ...size };
+    case "left": return { x: anchor.x - gap - size.w, y: slideY(cy), ...size };
+    case "right": return { x: anchor.x + anchor.w + gap, y: slideY(cy), ...size };
+  }
+}
+
+function tryPlace(anchor: Box, size: { w: number; h: number }, view: Box, avoid: Box[], prefer: Side[], gap: number): { box: Box; side: Side } | null {
+  // a box in the way on that side (the Power-Ups above a keypad, say): step past it, further out
+  const pastAvoid = (side: Side, box: Box): Box => {
+    for (let i = 0; i < 4; i++) {
+      const hit = avoid.filter((a) => overlaps(box, a));
+      if (!hit.length) return box;
+      if (side === "above") box = { ...box, y: Math.min(...hit.map((a) => a.y)) - gap - size.h };
+      if (side === "below") box = { ...box, y: Math.max(...hit.map((a) => a.y + a.h)) + gap };
+      if (side === "left") box = { ...box, x: Math.min(...hit.map((a) => a.x)) - gap - size.w };
+      if (side === "right") box = { ...box, x: Math.max(...hit.map((a) => a.x + a.w)) + gap };
     }
+    return box;
   };
   for (const side of prefer) {
-    const box = at(side);
+    const box = pastAvoid(side, at(anchor, size, view, side, gap));
     if (inside(box, view) && !overlaps(box, anchor) && !avoid.some((a) => overlaps(box, a))) return { box, side };
   }
+  return null;
+}
+
+/** No side fits: the side with the most room, still clear of the anchor itself. */
+function mostRoom(anchor: Box, size: { w: number; h: number }, view: Box, gap: number): { box: Box; side: Side } {
   const room: Record<Side, number> = {
     above: anchor.y - view.y, below: view.y + view.h - (anchor.y + anchor.h), left: anchor.x - view.x, right: view.x + view.w - (anchor.x + anchor.w),
   };
   const side = (Object.keys(room) as Side[]).sort((a, b) => room[b] - room[a])[0];
-  return { box: at(side), side };
+  return { box: at(anchor, size, view, side, gap), side };
 }
 
 /**
@@ -113,7 +142,8 @@ export function placeCaption(anchor: Box, size: { w: number; h: number }, view: 
 export function freeArea(view: Box, question: Box | null, keypad: Box | null, margin = 16): Box | null {
   if (!question || !keypad) return null;
   const top = question.y + question.h + margin;
-  const bottomDock = keypad.y > view.y + view.h * 0.45;
+  // a dock across most of the width is along the bottom (a phone), whatever its height
+  const bottomDock = keypad.w > view.w * 0.6 || keypad.y > view.y + view.h * 0.45;
   const area = bottomDock
     ? { x: view.x + margin, y: top, w: view.w - margin * 2, h: keypad.y - margin - top }
     : { x: view.x + margin, y: top, w: keypad.x - margin * 2 - view.x, h: view.y + view.h - margin - top };

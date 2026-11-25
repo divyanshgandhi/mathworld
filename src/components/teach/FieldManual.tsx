@@ -71,8 +71,8 @@ function ManualBody({ topic, seen }: { topic?: ManualTopic | null; seen?: SeenSo
         <CarouselViewport className="min-h-0 flex-1 outline-none [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-gold">
           <CarouselContent className="flex h-full">
             {MANUAL_PAGES.map((p, i) => (
-              <CarouselItem key={p.id} aria-label={`${i + 1} of ${MANUAL_PAGES.length}: ${p.name}`} className="flex h-full min-w-0 basis-full flex-col items-center justify-center gap-[clamp(16px,4dvh,32px)] overflow-y-auto px-6 pb-2 sm:px-10">
-                <figure className="m-0 w-full max-w-[440px]">
+              <CarouselItem key={p.id} aria-label={`${i + 1} of ${MANUAL_PAGES.length}: ${p.name}`} className="flex h-full min-w-0 basis-full flex-col items-center justify-center gap-[clamp(16px,4dvh,32px)] overflow-y-auto px-6 pb-2 sm:px-10 [@media(max-height:520px)]:flex-row [@media(max-height:520px)]:gap-6">
+                <figure className="m-0 w-full max-w-[440px] [@media(max-height:520px)]:max-w-[min(52%,340px)] [@media(max-height:520px)]:shrink-0">
                   <ManualPicture scene={p.scene} active={page === i + 1} />
                 </figure>
                 <div className="flex max-w-[30ch] flex-col items-center gap-2 text-center">

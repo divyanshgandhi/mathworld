@@ -59,7 +59,7 @@ export function Greeting({ screen, seen, enabled = true, placement = "float", cl
   if (placement === "inline") return <div data-greeting={screen} className={`pointer-events-none ${fade} ${className}`} style={style}>{body}</div>;
   return (
     <div data-greeting={screen} className={`pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-30 flex justify-center px-4 ${className}`}>
-      <div className={`rounded-panel border border-line-1 bg-panel px-4 py-3 ${fade}`} style={style}>{body}</div>
+      <div className={`max-w-[min(100%,520px)] rounded-panel border border-line-1 bg-panel px-4 py-3 ${fade}`} style={style}>{body}</div>
     </div>
   );
 }

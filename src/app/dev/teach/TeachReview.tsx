@@ -31,7 +31,7 @@ export function TeachReview() {
   const play = (screen: GreetScreen) => { resetSeen([GREETINGS[screen].key]); setGreet((g) => ({ screen, n: (g?.n ?? 0) + 1 })); };
 
   return (
-    <div className="min-h-dvh bg-void px-5 pb-24 pt-8 text-approach md:px-12">
+    <div className="min-h-dvh overflow-x-hidden bg-void px-5 pb-24 pt-8 text-approach md:px-12">
       <h1 className="m-0 type-display text-[clamp(32px,5vw,56px)]">Teaching</h1>
       <p className="mt-3 max-w-[62ch] type-body text-ink-2">The Field Manual, Nova&apos;s first-visit greetings, the guided first shot and the ship sprites. Nothing here is saved.</p>
 
@@ -82,11 +82,11 @@ export function TeachReview() {
           {Object.values(GUIDE_LINES).map((l) => <li key={l.id}>&ldquo;{l.text}&rdquo; points at <b className="font-medium text-approach">{l.anchor}</b></li>)}
         </ol>
         <p className="mt-2 max-w-[62ch] type-body text-ink-2">Each frame runs the mock console in its own viewport. Type in a frame (tap it first), or tap its keys. Replay is under the keypad. <a className="text-sky underline underline-offset-4" href="/dev/teach/console">Open it full size</a>, or <a className="text-sky underline underline-offset-4" href="/dev/teach/console?fleet=0">without a fleet anchor</a>.</p>
-        <div className="mt-6 flex flex-wrap items-start gap-8">
+        <div className="mt-6 flex max-w-full items-start gap-8 overflow-x-auto pb-2">
           {FRAMES.map((f) => {
             const scale = f.w > 800 ? 0.5 : 0.75;
             return (
-              <figure key={f.name} className="m-0 flex flex-col gap-2">
+              <figure key={f.name} className="m-0 flex shrink-0 flex-col gap-2">
                 <figcaption className="type-body-sm text-ink-3">{f.name} · {f.w} × {f.h}</figcaption>
                 <div className="overflow-hidden rounded-panel border border-line-1" style={{ width: f.w * scale, height: f.h * scale }}>
                   <iframe title={`Guided first shot, ${f.name}`} src="/dev/teach/console" width={f.w} height={f.h} className="origin-top-left border-0" style={{ transform: `scale(${scale})` }} />

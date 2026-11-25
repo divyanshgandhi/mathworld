@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@ui-sdk/react/button";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createBus } from "@/battle/bus";
 import { Button as KitButton, IconButton } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
@@ -26,7 +26,7 @@ export function MockConsole() {
   const [entry, setEntry] = useState("");
   const [ui, setUi] = useState<ArenaUi | null>(null);
   const [result, setResult] = useState<string | null>(null);
-  const [fleetAnchor] = useState(() => typeof location === "undefined" || new URLSearchParams(location.search).get("fleet") !== "0");
+  const fleetAnchor = useSyncExternalStore(() => () => {}, () => new URLSearchParams(location.search).get("fleet") !== "0", () => true);
   const a = 3, b = 4;
 
   // a wave flies in, then the keypad goes live (as the arena's `ready`)
@@ -69,15 +69,28 @@ export function MockConsole() {
   }, [press, ui]);
 
   const ships = useMemo(() => arrayLayout(a, b, { cell: 44, gap: 12, squadGap: 18, cx: 0, top: 0 }), []);
+  // the arena frames the fleet in the free space: scale it down to fit, never up
+  const FW = 4 * 44 + 3 * 12, FH = 3 * 44 + 2 * 18;
+  const [fit, setFit] = useState(1);
+  const area = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setFit(Math.max(0.3, Math.min(1, (r.width - 24) / FW, (r.height - 24) / FH))); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [FW, FH]);
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       {/* the fleet, framed in the free space: above the dock on a phone, left of it on a wide screen */}
-      <div className="absolute inset-x-0 bottom-[calc(380px+12px)] top-[150px] flex items-center justify-center md:bottom-0 md:right-[340px]">
-        <div data-guide={fleetAnchor ? "fleet" : undefined} className="relative" style={{ width: 4 * 44 + 3 * 12, height: 3 * 44 + 2 * 18 }} role="img" aria-label={`${a} squads of ${b} ships`}>
+      <div ref={area} className="absolute inset-x-0 bottom-[calc(380px+84px)] top-[118px] flex items-center justify-center md:bottom-0 md:right-[340px]">
+        <div data-guide={fleetAnchor ? "fleet" : undefined} className="relative" style={{ width: FW * fit, height: FH * fit }} role="img" aria-label={`${a} squads of ${b} ships`}>
+          <div className="absolute left-0 top-0 origin-top-left" style={{ width: FW, height: FH, transform: `scale(${fit})` }}>
           {ships.map((s) => (
-            <ShipSprite key={s.i} kind={s.leader ? "leader" : "invader"} tone={s.tone} size={44} alt="" className="absolute" style={{ left: s.x - 22 + (4 * 44 + 3 * 12) / 2, top: s.y - 22 }} />
+            <span key={s.i} className="absolute" style={{ left: s.x - 22 + FW / 2, top: s.y - 22 }}>
+              <ShipSprite kind={s.leader ? "leader" : "invader"} tone={s.tone} size={44} alt="" />
+            </span>
           ))}
+          </div>
         </div>
       </div>
 

@@ -250,6 +250,11 @@ describe("the guided first shot", () => {
     const fleet = { x: 60, y: 200, w: 255, h: 160 };
     const r = placeCaption(fleet, { w: 200, h: 48 }, view, [{ x: 0, y: 380, w: 375, h: 432 }], ["below", "above"]);
     expect(r.side).toBe("above");
+    // the console's other parts above the keypad are stepped past, so the caption never covers them
+    const powerups = { x: 18, y: 430, w: 200, h: 44 }, help = { x: 200, y: 476, w: 150, h: 44 };
+    const k = placeCaption(keypad, { w: 200, h: 48 }, view, [powerups, help]);
+    expect(k.side).toBe("above");
+    expect(k.box.y + k.box.h).toBeLessThanOrEqual(powerups.y);
   });
 
   it("finds the free part of the screen when the arena cannot say where the fleet is, and nothing without anchors", () => {
@@ -261,5 +266,9 @@ describe("the guided first shot", () => {
     const wide = freeArea({ x: 0, y: 0, w: 1440, h: 900 }, { x: 560, y: 12, w: 320, h: 130 }, { x: 1120, y: 300, w: 300, h: 580 });
     expect(wide!.x + wide!.w).toBeLessThan(1120);
     expect(freeArea(view, null, { x: 18, y: 470, w: 340, h: 330 })).toBeNull();
+    // a small phone: the dock starts above the middle of the screen, but it spans the width
+    const small = freeArea({ x: 0, y: 0, w: 360, h: 640 }, { x: 72, y: 12, w: 216, h: 96 }, { x: 12, y: 250, w: 336, h: 380 });
+    expect(small).not.toBeNull();
+    expect(small!.y + small!.h).toBeLessThan(250);
   });
 });

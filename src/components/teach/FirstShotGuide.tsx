@@ -67,22 +67,34 @@ function Guide({ ui, bus, mark, fleetRect, root }: { ui: ArenaUi | null; bus: Bu
 const toBox = (r: DOMRect | null | undefined): Box | null => (r && r.width > 0 && r.height > 0 ? { x: r.x, y: r.y, w: r.width, h: r.height } : null);
 const pad = (b: Box, p: number): Box => ({ x: b.x - p, y: b.y - p, w: b.w + p * 2, h: b.h + p * 2 });
 
-interface Layout { view: Box; target: Box; avoid: Box[]; prefer: Side[]; round: boolean }
+interface Layout { view: Box; target: Box; avoid: Box[]; soft: Box[]; prefer: Side[]; round: boolean }
 
-/** Finds the anchor and what the caption must keep clear of, in CSS px. Null: an anchor is missing. */
+const union = (bs: Box[]): Box | null => {
+  if (!bs.length) return null;
+  const x = Math.min(...bs.map((b) => b.x)), y = Math.min(...bs.map((b) => b.y));
+  return { x, y, w: Math.max(...bs.map((b) => b.x + b.w)) - x, h: Math.max(...bs.map((b) => b.y + b.h)) - y };
+};
+const some = (bs: (Box | null)[]) => bs.filter((b): b is Box => !!b);
+
+/**
+ * Finds the anchor and what the caption must keep clear of, in CSS px. Null: an anchor is missing.
+ * `avoid` are controls (never covered); `soft` (the question, the fleet) are covered only if nothing else fits.
+ */
 function measure(anchor: GuideAnchor, scope: ParentNode, fleetRect?: () => DOMRect | null): Layout | null {
   const view = { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
   const box = (name: string) => toBox(scope.querySelector<HTMLElement>(`[data-guide="${name}"]`)?.getBoundingClientRect());
-  const question = box("question"), keypad = box("keypad"), fire = box("fire");
+  const question = box("question"), keypad = box("keypad"), fire = box("fire"), help = box("help"), powerups = box("powerups"), orbs = box("orbs");
+  const controls = some([help, powerups, orbs]);
+  const fleet = toBox(fleetRect?.()) ?? box("fleet");
   if (anchor === "fleet") {
-    const target = toBox(fleetRect?.()) ?? box("fleet") ?? freeArea(view, question, keypad);
+    // no fleet anchor: the free part of the screen above (or beside) the whole console
+    const target = fleet ?? freeArea(view, question, union(some([keypad, help, powerups])));
     if (!target) return null;
-    return { view, target: pad(target, 12), avoid: [question, keypad].filter((b): b is Box => !!b), prefer: ["below", "above", "right", "left"], round: true };
+    return { view, target: pad(target, 12), avoid: some([keypad, ...controls]), soft: some([question]), prefer: ["below", "above", "right", "left"], round: true };
   }
   const target = anchor === "keypad" ? keypad : fire;
   if (!target) return null;
-  const avoid = [question, anchor === "fire" ? keypad : null].filter((b): b is Box => !!b);
-  return { view, target: pad(target, 8), avoid, prefer: ["above", "left", "below", "right"], round: false };
+  return { view, target: pad(target, 8), avoid: some([anchor === "fire" ? keypad : null, ...controls]), soft: some([question, fleet]), prefer: ["above", "left", "below", "right"], round: false };
 }
 
 /** One step on screen: the scrim with its cut-out, the ring, and the caption beside it. */
@@ -99,8 +111,9 @@ function Coach({ anchor, text, fleetRect, root }: { anchor: GuideAnchor; text: s
   useEffect(() => {
     const scope = root ?? document.body;
     let raf = 0;
-    const soon = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(remeasure); };
-    soon();
+    // a timer as well as a frame: a page that is not painting (a background tab) still gets measured
+    const soon = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(remeasure); setTimeout(remeasure, 50); };
+    const first = setTimeout(remeasure, 0);
     // anchors resize, reflow or appear: watch them all (the console mounts its parts as the wave starts)
     const ro = new ResizeObserver(soon);
     const watch = () => { ro.disconnect(); scope.querySelectorAll("[data-guide]").forEach((el) => ro.observe(el)); };
@@ -113,7 +126,7 @@ function Coach({ anchor, text, fleetRect, root }: { anchor: GuideAnchor; text: s
     const until = now() + 900;
     const follow = () => { remeasure(); if (now() < until) raf = requestAnimationFrame(follow); };
     raf = requestAnimationFrame(follow);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); mo.disconnect(); removeEventListener("resize", soon); removeEventListener("orientationchange", soon); };
+    return () => { clearTimeout(first); cancelAnimationFrame(raf); ro.disconnect(); mo.disconnect(); removeEventListener("resize", soon); removeEventListener("orientationchange", soon); };
   }, [remeasure, root]);
 
   useLayoutEffect(() => {
@@ -124,9 +137,10 @@ function Coach({ anchor, text, fleetRect, root }: { anchor: GuideAnchor; text: s
   }, [text, layout]);
 
   if (!layout) return null;
-  const { view, target, avoid, prefer, round } = layout;
-  const r = round ? Math.min(target.w, target.h) / 2 : 22;
-  const place = cap ? placeCaption(target, cap, pad(view, -12), avoid, prefer) : null;
+  const { view, target, avoid, soft, prefer, round } = layout;
+  // a soft corner, never a stadium: a circle would clip the ships in the fleet's corners
+  const r = round ? Math.min(32, target.w / 2, target.h / 2) : 22;
+  const place = cap ? placeCaption(target, cap, pad(view, -12), avoid, prefer, 14, soft) : null;
   const orbit = pad(target, 7);
 
   return (
@@ -142,7 +156,7 @@ function Coach({ anchor, text, fleetRect, root }: { anchor: GuideAnchor; text: s
         <rect x={target.x} y={target.y} width={target.w} height={target.h} rx={r} pathLength={1}
           className="fill-none stroke-gold motion-safe:animate-[mw-guide-ring_var(--mw-guide)_both]" strokeWidth={1}
           style={{ ["--mw-guide" as string]: "var(--transition-duration-moment) var(--ease-out)" }} />
-        <rect x={orbit.x} y={orbit.y} width={orbit.w} height={orbit.h} rx={round ? Math.min(orbit.w, orbit.h) / 2 : r + 7}
+        <rect x={orbit.x} y={orbit.y} width={orbit.w} height={orbit.h} rx={r + 7}
           className="fill-none stroke-line-2" strokeWidth={1} strokeDasharray="3 6" />
       </svg>
       <div ref={capRef} role="status" aria-live="polite"

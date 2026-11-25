@@ -9,7 +9,7 @@ export const MANUAL_PAGES = [
   {
     id: "squads",
     name: "Squads",
-    lines: ["Ships fly in squads. Each row is one squad."],
+    lines: ["Ships fly in squads.", "Each row is one squad."],
     scene: { kind: "squads", squads: 3, each: 4 },
   },
   {
@@ -21,7 +21,7 @@ export const MANUAL_PAGES = [
   {
     id: "fire",
     name: "Fire",
-    lines: ["Press Fire. One plasma ball for each ship."],
+    lines: ["Press Fire.", "One plasma ball for each ship."],
     scene: { kind: "fire", squads: 2, each: 3 },
   },
   {
@@ -39,7 +39,7 @@ export const MANUAL_PAGES = [
   {
     id: "orbs",
     name: "Orbs and Gold",
-    lines: ["First-try answers earn orbs. Facts you know in a flash turn Gold."],
+    lines: ["First-try answers earn orbs.", "Facts you know in a flash turn Gold."],
     scene: { kind: "reward", squads: 3, each: 4 },
   },
 ] as const;

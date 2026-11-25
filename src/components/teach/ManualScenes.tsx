@@ -79,7 +79,7 @@ function Picture({ label, children }: { label: string; children: ReactNode }) {
 
 /* 1. Ships fly in squads */
 function Squads({ squads, each, active }: { squads: number; each: number; active: boolean }) {
-  const cell = 30, ships = arrayLayout(squads, each, { cell, top: 24 }), art = useFleetArt(cell), box = arrayBox(ships, cell);
+  const cell = 33, ships = arrayLayout(squads, each, { cell, top: 14 }), art = useFleetArt(cell), box = arrayBox(ships, cell);
   const f = squadsFrame(squads, useLoop(squadsPeriod(squads), active));
   return (
     <Picture label={`${say(squads)} squads of ${say(each)} ships. Each row is one squad.`}>
@@ -109,7 +109,7 @@ function Count({ squads, each, active }: { squads: number; each: number; active:
 
 /* 3. Press Fire. One plasma ball for each ship. */
 function Fire({ squads, each, active }: { squads: number; each: number; active: boolean }) {
-  const cell = 34, n = squads * each, ships = arrayLayout(squads, each, { cell, top: 18 }), art = useFleetArt(cell);
+  const cell = 42, n = squads * each, ships = arrayLayout(squads, each, { cell, top: 12 }), art = useFleetArt(cell);
   const nose = { x: SCENE_W / 2, y: 146 };
   const f = fireFrame(ships, nose.x, nose.y, useLoop(firePeriod(n), active));
   return (
@@ -117,7 +117,7 @@ function Fire({ squads, each, active }: { squads: number; each: number; active: 
       {ships.map((s) => <Ship key={s.i} s={s} cell={cell} art={art} popped={f.popped[s.i]} opacity={f.back ?? 1} />)}
       <Balls balls={f.balls} />
       <Rocket x={nose.x} y={168} n={n} />
-      <FirePill x={232} y={151} n={n} pressed={f.pressed && f.balls.length > 0} />
+      <FirePill x={232} y={151} n={n} pressed={f.pressed && f.popped.some((p) => !p)} />
     </Picture>
   );
 }
@@ -146,13 +146,13 @@ function Miss({ squads, each, under, over, active }: { squads: number; each: num
 /* 5. Show Me How and Power-Ups: Flip It turns the fleet sideways. Same ships, easier to count. */
 function Flip({ squads, each, active }: { squads: number; each: number; active: boolean }) {
   const cell = 22, art = useFleetArt(cell);
-  const { before, to } = flipLayouts(squads, each, { cell, gap: 6, squadGap: 7, cx: 100, top: 8 }, { cell, gap: 6, squadGap: 7, cx: 100, top: 72 });
+  const { before, to } = flipLayouts(squads, each, { cell, gap: 6, squadGap: 7, cx: 88, top: 8 }, { cell, gap: 6, squadGap: 7, cx: 88, top: 72 });
   const f = flipFrame(useLoop(flipPeriod(), active));
   const pill = (y: number, icon: "help" | "trick", words: string, on: boolean) => (
     <g>
-      <rect x={204} y={y} width={108} height={36} rx={18} className={on ? "fill-raised stroke-gold" : "fill-none stroke-line-3"} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-      <Icon name={icon} size={18} x={214} y={y + 9} className={on ? "text-gold" : "text-approach"} />
-      <text x={238} y={y + 23} className="type-name fill-approach" fontSize={14} fontWeight={500}>{words}</text>
+      <rect x={182} y={y} width={134} height={36} rx={18} className={on ? "fill-raised stroke-gold" : "fill-none stroke-line-3"} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <Icon name={icon} size={18} x={193} y={y + 9} className={on ? "text-gold" : "text-approach"} />
+      <text x={216} y={y + 23} className="type-name fill-approach" fontSize={14} fontWeight={500}>{words}</text>
     </g>
   );
   return (
@@ -181,8 +181,8 @@ function Reward({ squads, each, active }: { squads: number; each: number; active
         </p>
       </div>
       <div className="flex flex-col items-center gap-1.5">
-        <Icon name="orb" size={40} className="text-gold" />
-        <p className="m-0 type-number text-[28px] font-medium leading-none">{f.orbs}</p>
+        {/* an orb is a gold ring with a count (decision 8); Gold mastery is the filled bullseye beside the fact */}
+        <span className="grid size-16 place-items-center rounded-full border-[1.5px] border-gold type-number text-[26px] font-medium leading-none">{f.orbs}</span>
         <p className="m-0 type-body-sm text-ink-2">orbs</p>
       </div>
     </div>

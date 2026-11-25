@@ -185,7 +185,32 @@ What the tests prove:
   - The count reaches the real total.
 - **The guide.** Its full step sequence, the skip to Fire, stepping aside for Show Me How, caption placement on phone and desktop docks, and the free-area fallback.
 
-Browser: see "Not done or not verified".
+What I saw in the browser, on `http://manual.localhost:3326`, muted:
+- **`/dev/teach` at 1440 × 900.**
+  - All six pictures render from baked ship art, and every row shows its pennant leader.
+  - The sprite sheet shows every kind and tone at 32, 48 and 96 px.
+  - The page does not scroll sideways at 375.
+- **The manual as a sheet (desktop).**
+  - It opens on page 1, with focus in the pages.
+  - ArrowRight twice reached "Fire", mid-volley.
+  - Escape closed it, and focus returned to the button that opened it.
+- **`/manual?topic=miss` at 375 × 812, the phone preset with touch.**
+  - It opens full screen on the miss page.
+  - Every target measured 44 px or more (Close, six dots, Back and Next).
+  - The lines render at 20.25 px.
+  - A drag swiped it to the next page. Next went to the last page, where Next becomes Done. Done went to `/bay`, because the page was opened directly.
+- **`/manual?topic=help` at 812 × 375 (landscape).** The picture and the words sit side by side, with nothing cut off. Close, Back, Next and the dots are all on screen.
+- **Reduced motion,** simulated by overriding `matchMedia`. The fire page holds one still frame, with one ball under each of its six ships, and it does not change over time.
+- **The guided first shot, on `/dev/teach/console`.**
+  - At 375 × 812 the steps went in order: "Count the ships." (a ring round the fleet, the caption under it), then "Type how many." (the keypad ringed, the caption above the whole console), then "Now press Fire." after typing 1. After "2" and Enter the guide was gone and stayed gone.
+  - At 1440 × 900 with a side dock, the keypad step shows the caption above the dock.
+  - At 360 × 640 with `?fleet=0`, the fallback free area is ringed, then the keypad step follows.
+- **A greeting at 375.** It floats inside the screen, takes no pointer events, and left on the first key press.
+- **Console.** The only errors were the route fade's "Transition was aborted… Document hidden", which comes from the hidden pane and the kit's RouteFade, not from this track. One hydration warning in my own mock (it read `?fleet` during render) was fixed.
+
+What I infer, not saw:
+- The pane was hidden, so frames and timers ran slowly. Step timings were read from the DOM over time, not judged by eye.
+- The real console's footprint will differ from the mock's, but the guide measures whatever carries the anchors.
 
 ## Not done or not verified
 
@@ -193,6 +218,8 @@ Browser: see "Not done or not verified".
 - **No anchors exist yet.** The console's `data-guide` anchors are not in the current `BattleHud`, so the guide has nothing to point at in a real battle until the console track lands. The mock console carries them.
 - **`fleetRect`** does not exist on the arena yet. Until it does, the guide uses `[data-guide="fleet"]` or the approximate free area.
 - **Reading level.** The word list is a reviewed allowlist, not a graded word-frequency check. I read every line as an 8-year-old would. "Power-Ups", "plasma" and "orbs" are game words that the game itself teaches.
+- **Untested inputs and states.** Reduced motion was simulated in the page, not set in the OS. A real touch swipe was simulated with a mouse drag, which ui-sdk treats as the same gesture. Phone landscape was checked on the manual only, not on the guide.
+- **A caption can cover the question.** On a very short phone with no fleet anchor (360 × 640, `?fleet=0`), the "Count the ships." caption has no free room and sits over the question plate. That plate is a "soft" box, covered before any control is.
 - **The "every picture is a true array" test** covers the five pictures that show ships. The sixth (orbs and Gold) shows a fact, a mark and an orb count, not a fleet.
 
 ## Requests for other tracks
