@@ -23,23 +23,25 @@ import { useSeen, type SeenSource } from "@/teach/seen";
  * `fleetRect` when the arena can say where the fleet is) and measures them with a ResizeObserver,
  * so it works in every layout. If an anchor is missing it shows nothing at all.
  */
-export function FirstShotGuide({ ui, bus, seen, fleetRect, root }: {
+export function FirstShotGuide({ ui, bus, seen, fleetRect, rocketRect, root }: {
   ui: ArenaUi | null;
   bus: Bus | null;
   seen?: SeenSource;
   /** Where the fleet is on screen, in CSS px, if the arena can say. */
   fleetRect?: () => DOMRect | null;
+  /** Where the rocket is on screen: captions keep off it (the typed number rides its nose). */
+  rocketRect?: () => DOMRect | null;
   /** Where to look for `data-guide` anchors (default: the whole document). */
   root?: HTMLElement | null;
 }) {
   const { seen: met, mark } = useSeen(GUIDE_FIRST_SHOT, seen);
   if (met !== false) return null;
-  return <Guide ui={ui} bus={bus} mark={mark} fleetRect={fleetRect} root={root} />;
+  return <Guide ui={ui} bus={bus} mark={mark} fleetRect={fleetRect} rocketRect={rocketRect} root={root} />;
 }
 
 const now = () => performance.now();
 
-function Guide({ ui, bus, mark, fleetRect, root }: { ui: ArenaUi | null; bus: Bus | null; mark: () => void; fleetRect?: () => DOMRect | null; root?: HTMLElement | null }) {
+function Guide({ ui, bus, mark, fleetRect, rocketRect, root }: { ui: ArenaUi | null; bus: Bus | null; mark: () => void; fleetRect?: () => DOMRect | null; rocketRect?: () => DOMRect | null; root?: HTMLElement | null }) {
   const [state, send] = useReducer(guideStep, GUIDE_START);
 
   useEffect(() => { send({ type: "ui", ui: ui ? { wave: ui.wave, canFire: ui.canFire, lesson: ui.lesson, done: ui.done, offer: ui.offer } : null, now: now() }); }, [ui]);
@@ -61,7 +63,7 @@ function Guide({ ui, bus, mark, fleetRect, root }: { ui: ArenaUi | null; bus: Bu
 
   const show = guideShows(state.step);
   if (!show) return null;
-  return <Coach key={state.step} anchor={show.anchor} text={show.text} fleetRect={fleetRect} root={root} />;
+  return <Coach key={state.step} anchor={show.anchor} text={show.text} fleetRect={fleetRect} rocketRect={rocketRect} root={root} />;
 }
 
 const toBox = (r: DOMRect | null | undefined): Box | null => (r && r.width > 0 && r.height > 0 ? { x: r.x, y: r.y, w: r.width, h: r.height } : null);
@@ -76,37 +78,41 @@ const union = (bs: Box[]): Box | null => {
 };
 const some = (bs: (Box | null)[]) => bs.filter((b): b is Box => !!b);
 
+const keypadEl = (scope: ParentNode) => scope.querySelector<HTMLElement>('[data-guide="keypad"]');
+
 /**
  * Finds the anchor and what the caption must keep clear of, in CSS px. Null: an anchor is missing.
  * `avoid` are controls (never covered); `soft` (the question, the fleet) are covered only if nothing else fits.
  */
-function measure(anchor: GuideAnchor, scope: ParentNode, fleetRect?: () => DOMRect | null): Layout | null {
+function measure(anchor: GuideAnchor, scope: ParentNode, fleetRect?: () => DOMRect | null, rocketRect?: () => DOMRect | null): Layout | null {
   const view = { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
   const box = (name: string) => toBox(scope.querySelector<HTMLElement>(`[data-guide="${name}"]`)?.getBoundingClientRect());
   const question = box("question"), keypad = box("keypad"), fire = box("fire"), help = box("help"), powerups = box("powerups"), orbs = box("orbs");
   const controls = some([help, powerups, orbs]);
-  const fleet = toBox(fleetRect?.()) ?? box("fleet");
+  const fleet = toBox(fleetRect?.()) ?? box("fleet"), rocket = toBox(rocketRect?.());
   if (anchor === "fleet") {
     // no fleet anchor: the free part of the screen above (or beside) the whole console
     const target = fleet ?? freeArea(view, question, union(some([keypad, help, powerups])));
     if (!target) return null;
-    return { view, target: pad(target, 12), avoid: some([keypad, ...controls]), soft: some([question]), prefer: ["below", "above", "right", "left"], round: true };
+    return { view, target: pad(target, 12), avoid: some([keypad, ...controls]), soft: some([question, rocket]), prefer: ["below", "above", "right", "left"], round: true };
   }
-  const target = anchor === "keypad" ? keypad : fire;
+  // "Type how many." rings the digit keys alone ([data-key] inside the keypad), not Fire and the Power-Ups beside them
+  const keys = keypadEl(scope) ? union(some([...keypadEl(scope)!.querySelectorAll<HTMLElement>("[data-key]")].map((el) => toBox(el.getBoundingClientRect())))) : null;
+  const target = anchor === "keypad" ? keys ?? keypad : fire;
   if (!target) return null;
-  return { view, target: pad(target, 8), avoid: some([anchor === "fire" ? keypad : null, ...controls]), soft: some([question, fleet]), prefer: ["above", "left", "below", "right"], round: false };
+  return { view, target: pad(target, 8), avoid: some([anchor === "fire" ? keypad : fire, ...controls]), soft: some([question, fleet, rocket]), prefer: ["above", "left", "below", "right"], round: false };
 }
 
 /** One step on screen: the scrim with its cut-out, the ring, and the caption beside it. */
-function Coach({ anchor, text, fleetRect, root }: { anchor: GuideAnchor; text: string; fleetRect?: () => DOMRect | null; root?: HTMLElement | null }) {
+function Coach({ anchor, text, fleetRect, rocketRect, root }: { anchor: GuideAnchor; text: string; fleetRect?: () => DOMRect | null; rocketRect?: () => DOMRect | null; root?: HTMLElement | null }) {
   const [layout, setLayout] = useState<Layout | null>(null);
   const [cap, setCap] = useState<{ w: number; h: number } | null>(null);
   const capRef = useRef<HTMLDivElement>(null);
 
   const remeasure = useCallback(() => {
-    const next = measure(anchor, root ?? document, fleetRect);
+    const next = measure(anchor, root ?? document, fleetRect, rocketRect);
     setLayout((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-  }, [anchor, root, fleetRect]);
+  }, [anchor, root, fleetRect, rocketRect]);
 
   useEffect(() => {
     const scope = root ?? document.body;

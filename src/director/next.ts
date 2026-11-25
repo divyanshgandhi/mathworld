@@ -113,6 +113,8 @@ export function nextWave(s: PlayerState, seed: number): Wave {
   }
 
   // the tutorial never serves the fleet just played again (after a Show Me How it is the weakest)
+  // a brand-new cadet's very first fleet is one squad of three to five ships: something to count, never empty
+  if (tier === 0 && s.waves === 0) return make({ a: 1, b: 3 + Math.floor(rng() * 3) }, "tutorial");
   if (tier === 0) return make(orient(weakest(s, 0, mix(seed, s.waves), new Set(s.history.slice(-1).map((w) => w.key))), rng, 0), "tutorial");
 
   const goal = target(s, tier, seed);

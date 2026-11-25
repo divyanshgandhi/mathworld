@@ -12,6 +12,7 @@ import { PauseMenu } from "./battle/PauseMenu";
 import { CadetSignUp, type Cadet } from "./hub/CadetSignUp";
 import { css } from "./battle/cockpit";
 import { Sheet } from "@/components/kit";
+import { FirstShotGuide } from "@/components/teach/FirstShotGuide";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -78,6 +79,8 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
         </Sheet>
       )}
       <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />} />
+      {/* a player whose very first shot is here (a refresh, a drill): the guided first shot, once ever */}
+      {arena && <FirstShotGuide ui={ui} bus={arena.bus} fleetRect={arena.fleetRect} rocketRect={arena.rocketRect} />}
     </div>
   );
 }

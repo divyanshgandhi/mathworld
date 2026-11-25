@@ -278,7 +278,7 @@ describe("planet themes", () => {
       expect((BATTLE_LINES as Record<string, string>)[t.briefing]).toBeTruthy();
       expect((BATTLE_LINES as Record<string, string>)[t.clear]).toBeTruthy();
     }
-    expect(PLANET_THEMES.earth.intro).toBe("nova_l0_intro");
+    expect(PLANET_THEMES.earth.intro).toBe("nova_greet_battle");
     expect(PLANET_THEMES.earth.introClear).toBe("nova_l0_clear");
   });
 });

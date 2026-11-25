@@ -13,6 +13,7 @@ import { factKey, PLANETS_BY_TIER, tierOfPlanet, type PlanetId } from "@/rig/poo
 import { FLIP_SEC, planShowMeHow, safetyNetApplies, SHOT, WHY, type Plan } from "@/rig/showme";
 import { CARD, selectTrick, type TrickId } from "@/rig/tricks";
 import { createBus } from "@/battle/bus";
+import { GUIDE_FIRST_SHOT, greetKey } from "@/teach/keys";
 import { planVolley, targetOrder, volleySchedule } from "@/battle/formation";
 import { LOOK, reducedMotion, sairaReady } from "@/battle/look";
 import { nextHint, type HintStep } from "@/battle/hints";
@@ -162,6 +163,11 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   let practiceK = 0, declinedAt = -1, started = false, disposed = false;
   let wave: Wave | null = null, shownAt = 0;
   let active: TrickId | null = null, pendingLesson: Plan | null = null, lessonId = 0;
+  /**
+   * The guided first shot (FirstShotGuide in the HUD) coaches this wave: nothing else talks or moves
+   * for attention until the first shot (no briefing line, no first-sight scan, no empty-fleet line).
+   */
+  let guided = mode !== "academy" && !(s0.seen[GUIDE_FIRST_SHOT] ?? 0);
   let bs: BattleState = initialBattle();
   const dispatch = (a: BattleAction) => { bs = reduce(bs, a); };
   let ui: ArenaUi = {
@@ -328,15 +334,19 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     bus.emit("wave_started", { a: w.a, b: w.b, index, role: w.role });
     prefetchLesson(false); // Beat 1 of this fleet's Show Me How, while the cadet thinks
     const wn = bs.waveNo;
-    if (s.waves === 0 && mode === "campaign" && opts.lines?.intro) await say(opts.lines.intro, { queue: true });
-    else if (index === 0 && mode !== "academy") void say(theme.briefing);
+    if (s.waves === 0 && mode === "campaign" && opts.lines?.intro && !(s.seen[greetKey("battle")] ?? 0)) {
+      // the first battle's greeting, once ever: the keypad wakes when it is done, then the guide takes over
+      bus.emit("record", { event: { type: "seen", payload: { key: greetKey("battle") } } });
+      await say(opts.lines.intro, { queue: true });
+      if (guided) voice.hush(); // its caption goes now, so it never sits beside the guide's first line
+    } else if (index === 0 && mode !== "academy" && !guided) void say(theme.briefing);
     // an empty fleet is a strange picture the first time: Nova says what it shows (never the answer)
-    if ((w.a === 0 || w.b === 0) && mode !== "academy" && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
+    if ((w.a === 0 || w.b === 0) && mode !== "academy" && !guided && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
     // the fleet warps in squad by squad (the first structure cue); the keypad goes live as the last squad lands
     await sched.after(Math.max(0.3, fv.landed - stage.time - 0.15));
     if (disposed || bs.waveNo !== wn) return;
     ready();
-    climb(); // a fact never met: a soft, quick squad scan
+    if (!guided) climb(); // a fact never met: a soft, quick squad scan (not while the guide says "Count the ships.")
     if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });
   }
 
@@ -389,6 +399,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const w = wave, p = w.a * w.b, latency = Math.round(performance.now() - shownAt);
     const typed = bs.charge, from = log.length; // the reward is what this shot's events earn in the fold
     scan.skip(); // firing skips a scan to its end
+    guided = false; // the guide's work is done once the first shot is away
     dispatch({ type: "fire", radar: false });
     setUi({ canFire: canAim(bs), outcome: null, radar: null });
     if (typed !== null) bus.emit("charge", { n: null }); // the digits are spent
@@ -618,7 +629,20 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
   }
 
   // ---- the frame ----
-  const rocketAt = new THREE.Vector3();
+  const rocketAt = new THREE.Vector3(), rectAt = new THREE.Vector3(), rectP = new THREE.Vector3(), rectBox = new THREE.Box3();
+  /** A world box as the cadet sees it: its screen box in CSS px, or null if it is empty or off the canvas. */
+  function onScreen(box: THREE.Box3): DOMRect | null {
+    const r = stage.renderer.domElement.getBoundingClientRect();
+    if (box.isEmpty() || !r.width || !r.height) return null;
+    camera.updateMatrixWorld();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      rectP.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+      const px = r.left + ((rectP.x + 1) / 2) * r.width, py = r.top + ((1 - rectP.y) / 2) * r.height;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    return x1 > x0 && y1 > y0 ? new DOMRect(x0, y0, x1 - x0, y1 - y0) : null;
+  }
   const stop = stage.onUpdate((dt, T) => {
     sched.tick();
     fv.update(dt, T);
@@ -725,6 +749,27 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
       return jump.payload.toPlanet as PlanetId;
     },
     declineJump() { declinedAt = state().waves; setUi({ offer: null }); void startWave(); },
+    /**
+     * The fleet's box on screen in CSS px (the ships still flying, not their labels), or null with no
+     * fleet. The guided first shot rings it.
+     */
+    fleetRect(): DOMRect | null {
+      if (!wave) return null;
+      rectBox.makeEmpty();
+      for (const v of fv.views) {
+        if (!v.alive || !v.g.visible) continue;
+        v.g.getWorldPosition(rectAt);
+        const hx = (v.size.x * fv.scale) / 2, hy = (v.size.y * fv.scale) / 2;
+        rectBox.expandByPoint(rectP.set(rectAt.x - hx, rectAt.y - hy, rectAt.z)).expandByPoint(rectP.set(rectAt.x + hx, rectAt.y + hy, rectAt.z));
+      }
+      return onScreen(rectBox);
+    },
+    /** The rocket and the number on its nose, as a box on screen in CSS px (the guide keeps its captions off them). */
+    rocketRect(): DOMRect | null {
+      rectBox.setFromObject(cannon.rocket.group);
+      if (!rectBox.isEmpty()) rectBox.max.y += (rectBox.max.y - rectBox.min.y) * 0.9; // the number rides just above the nose
+      return onScreen(rectBox);
+    },
     /** The HUD's footprint in px, so the fleet is framed in the free part of the screen. */
     setSafe(s: Partial<Safe>) { cam.safe = { ...cam.safe, ...s }; },
     captionAt: (px: number, side?: "centre" | "left") => overlay.captionAt(px, side),

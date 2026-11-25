@@ -8,6 +8,8 @@ import type { Stage } from "@/engine/stage";
 import type { Bay, BayUi } from "@/worlds/space/cadetBay";
 import type { Chapter, Film, FilmCaption, FilmUi } from "@/worlds/space/intro";
 import { BattleHud, planetName } from "./battle/BattleHud";
+import { PauseMenu } from "./battle/PauseMenu";
+import { FirstShotGuide } from "./teach/FirstShotGuide";
 import { CadetSignUp } from "./hub/CadetSignUp";
 
 const CHAPTERS: [Chapter, string][] = [["orbit", "Earth"], ["dive", "Dive"], ["wake", "Classroom"], ["knock", "The knock"], ["hangar", "Hangar"]];
@@ -180,7 +182,8 @@ export function IntroFilm() {
   }
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-void text-ink-1">
+    // in Cadet Bay this is the game root (data-cockpit): the HUD gives it focus back after a card or the pause menu, so Enter fires
+    <div className="fixed inset-0 select-none overflow-hidden bg-void text-ink-1 outline-none" data-cockpit={phase === "bay" ? "" : undefined} tabIndex={-1}>
       <div ref={box} className="absolute inset-0" />
 
       {dev && (
@@ -199,7 +202,7 @@ export function IntroFilm() {
       )}
       {phase === "gate" && player && (
         <div ref={arrive} className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-7 bg-[radial-gradient(ellipse_70%_60%_at_50%_50%,var(--color-void)_0%,transparent_100%)] px-6 text-center">
-          <h1 className="type-display m-0 text-[clamp(30px,6vw,64px)] leading-none [overflow-wrap:anywhere]">{again ? "The film" : <>{inBay ? "Welcome back" : "Ready"}, {player.name}?</>}</h1>
+          <h1 className="type-display m-0 text-[clamp(30px,6vw,64px)] leading-none [overflow-wrap:anywhere]">{again ? "The film" : inBay ? <>Welcome back, {player.name}</> : <>Ready, {player.name}?</>}</h1>
           <Button variant="primary" size="lg" disabled={!filmReady} onClick={go}>{inBay ? "Continue" : "Play"}</Button>
           <p className={hint}>{again ? "The story so far, from Earth to your first launch." : inBay ? "Back to Cadet Bay." : "A short film, then your first mission. Best with sound."}</p>
           {again && <Button variant="quiet" icon="back" onClick={() => router.replace(from)}>Back</Button>}
@@ -225,8 +228,9 @@ export function IntroFilm() {
         <Caption line={{ who: "Nova", text: "." }} narrow={narrow} />
       </div>
 
+      {phase === "bay" && bayArena && <FirstShotGuide ui={bayUi} bus={bayArena.bus} fleetRect={bayArena.fleetRect} rocketRect={bayArena.rocketRect} />}
       {phase === "bay" && (
-        <BattleHud arena={bayArena} ui={bayUi} drone launch={false}
+        <BattleHud arena={bayArena} ui={bayUi} drone launch={false} menu={<PauseMenu places={false} />}
           doneActions={(d) => (
             <>
               <Button variant="primary" onClick={() => void flushed().then(() => router.push("/bay"))}>Enter the Resting Bay</Button>

@@ -7,6 +7,7 @@ import { audio } from "@/engine/audio";
 import { flushed } from "@/engine/outbox";
 import { buttonClass } from "@/components/kit/Button";
 import { Icon, RocketGlyph } from "@/components/kit/Icon";
+import { FieldManual } from "@/components/teach/FieldManual";
 import { CARD_OPEN } from "./Console";
 import { hold } from "./pause";
 import { backdrop, dialogBox } from "./ui";
@@ -28,14 +29,16 @@ export function usePauseWhenHidden() {
  * The pause menu (Escape, or the menu button): Resume, How to play, Sound, Star map, Resting Bay.
  * Pausing really pauses: the stage clock (every battle timer) and the sound stop until Resume.
  * Events still in flight are stored before leaving. `blocked`: another card is up, so Escape leaves it alone.
+ * How to play opens the Field Manual over the menu, on its "count" page; Escape then closes the manual
+ * and leaves the menu open. `places={false}` drops Star map and Resting Bay (Cadet Bay, before the bay exists).
  */
-export function PauseMenu({ label = "Paused", blocked = false, onOpenChange }: { label?: string; blocked?: boolean; onOpenChange?: (open: boolean) => void }) {
+export function PauseMenu({ label = "Paused", blocked = false, onOpenChange, places = true }: { label?: string; blocked?: boolean; onOpenChange?: (open: boolean) => void; places?: boolean }) {
   const router = useRouter();
   const [open, setOpenState] = useState(false);
   const [help, setHelp] = useState(false);
   const muted = useSyncExternalStore(audio.subscribe, () => audio.muted, () => false);
-  const openRef = useRef(open), blockedRef = useRef(blocked), cb = useRef(onOpenChange);
-  useEffect(() => { blockedRef.current = blocked; cb.current = onOpenChange; });
+  const openRef = useRef(open), blockedRef = useRef(blocked), cb = useRef(onOpenChange), helpRef = useRef(help);
+  useEffect(() => { blockedRef.current = blocked; cb.current = onOpenChange; helpRef.current = help; });
   const setOpen = (o: boolean) => {
     openRef.current = o;
     setOpenState(o);
@@ -50,6 +53,8 @@ export function PauseMenu({ label = "Paused", blocked = false, onOpenChange }: {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.repeat) return;
+      // the Field Manual is open over the menu: Escape is the manual's, and the menu stays
+      if (helpRef.current) return;
       // another card is up (a briefing, a clear): Escape is that card's business
       if (!openRef.current && (blockedRef.current || document.querySelector(CARD_OPEN))) return;
       e.preventDefault();
@@ -68,17 +73,12 @@ export function PauseMenu({ label = "Paused", blocked = false, onOpenChange }: {
       <DialogContent className={`${dialogBox} flex w-[min(92vw,400px)] flex-col gap-2.5 p-6`} initialFocus="[data-primary]">
         <DialogTitle className="mb-3 text-center type-display text-[34px]">{label}</DialogTitle>
         <DialogClose data-primary className={`${buttonClass("primary", "md", true)} mb-2 w-full justify-between`}>Resume<RocketGlyph size={34} /></DialogClose>
-        <Button className={row} aria-expanded={help} onClick={() => setHelp((h) => !h)}><Icon name="help" size={20} />How to play</Button>
-        {help && (
-          <div className="flex flex-col gap-2 px-2 py-1 type-child text-ink-2">
-            <p className="m-0">Look at the fleet. How many ships are there in all?</p>
-            <p className="m-0">Type the number, then press Fire. You fire exactly that many plasma balls.</p>
-            <p className="m-0">Stuck? Press Show me how and Nova will help.</p>
-          </div>
-        )}
+        <Button className={row} aria-haspopup="dialog" onClick={() => { helpRef.current = true; setHelp(true); }}><Icon name="help" size={20} />How to play</Button>
         <Button className={row} aria-pressed={!muted} onClick={sound}><Icon name={muted ? "sound-off" : "sound-on"} size={20} />{muted ? "Sound is off" : "Sound is on"}</Button>
-        <Button className={row} onClick={() => void go("/map")}><Icon name="map" size={20} />Star map</Button>
-        <Button className={row} onClick={() => void go("/bay")}><Icon name="bay" size={20} />Resting Bay</Button>
+        {places && <Button className={row} onClick={() => void go("/map")}><Icon name="map" size={20} />Star map</Button>}
+        {places && <Button className={row} onClick={() => void go("/bay")}><Icon name="bay" size={20} />Resting Bay</Button>}
+        {/* nested in the menu, so the manual sits on top of it and closing it comes back here */}
+        <FieldManual open={open && help} onClose={() => { helpRef.current = false; setHelp(false); }} topic="count" />
       </DialogContent>
     </Dialog>
   );

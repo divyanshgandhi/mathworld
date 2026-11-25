@@ -81,7 +81,6 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "nave", chapter: "hangar", title: "The hangar", purpose: "A cathedral for one rocket: the aisle leads to it, the window behind draws the journey", seconds: 2.4, how: [["go", "hangar"], ["wait", 1.5]] },
   { id: "briefing", chapter: "hangar", title: "The Captain's welcome", purpose: "Gold key on his face, the rocket soft behind him", seconds: 5.5, how: [["go", "hangar"], ["until", "captain_brief1"], ["wait", 2.2]] },
   { id: "ship", chapter: "hangar", title: "Your ship", purpose: "The rocket from low down, as tall as it will ever look", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief2"], ["wait", 2.4]] },
-  { id: "rule", chapter: "hangar", title: "The rule", purpose: "Too few and ships slip past, too many and fuel burns: the Captain and the ship in one frame", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief4"], ["wait", 2.2]] },
   { id: "nova", chapter: "hangar", title: "Nova", purpose: "Your co-pilot, close, with the one button under her", seconds: 9, how: [["go", "nova"], ["until", "cta"], ["wait", 0.8]] },
   { id: "countdown", chapter: "hangar", title: "The countdown", purpose: "Anticipation: the pad's lights come on one by one, then a held breath", seconds: 2.5, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 1.8]] },
   { id: "ignition", chapter: "hangar", title: "Ignition", purpose: "Release: the one glow in the film", seconds: 0.8, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 3.0]] },
@@ -342,7 +341,6 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
     /** The rocket from low down, three-quarters on. */
     ship: () => { lens(); light(null); const n = novaHead(); shoot(tall() ? [...rocketPts(7.4), P(n.x + 0.7, n.y, n.z)] : rocketPts(7.4), inHangar(tall() ? 3.2 : 5.2, 0.7, 7.6), { push: 0.05, speed: 0.15 }); },
     /** The Captain and the ship he is talking about, in one frame. */
-    rule: () => { lens(); light(() => headOf(captainH), 1.2); shoot([...figure(captainH, captainH.group.getWorldPosition(new THREE.Vector3()), 0.5), ...rocketPts(6.5)], tall() ? inHangar(-6.5, 1.5, 6.5) : inHangar(-3.0, 1.5, 9.6)); }, // on a phone he stands in front of the ship, not beside it
     /** Nova, close, the ship behind her. With `button` she sits high, clear of Launch. */
     nova: (button = false) => { lens("portrait"); light(novaHead, 0.3); // her shell is white: a little light goes a long way, and she must never bloom
       const n = novaHead(); shoot([P(n.x - 0.85, n.y + 0.62, n.z), P(n.x + 0.85, n.y - 0.6, n.z)], P(n.x + 1.5, n.y + 0.25, n.z + 4.6), { box: button ? WITH_BUTTONS : SAFE, push: button ? 0 : 0.04 }); },
@@ -763,8 +761,7 @@ export function mountIntro(stage: Stage, { onUi, onEnd, fits, colour, calm: calm
       beats: [
         { id: "captain_brief1", who: "Captain", c: CAPH, go: () => show(SETUP.hCaptain) }, // in to the Captain
         { id: "captain_brief2", who: "Captain", c: CAPH, gap: 0.6, go: () => show(SETUP.ship) }, // the ship he is talking about
-        { id: "captain_brief3", who: "Captain", c: CAPH, gap: 0.6, go: () => show(SETUP.hCaptain) },
-        { id: "captain_brief4", who: "Captain", c: CAPH, gap: 0.5, go: () => show(SETUP.rule) },
+        // the rule (too few, too many) is not told here: the first battle shows it in the world (docs/teaching.md)
         { id: "captain_nova", who: "Captain", c: CAPH, gap: 0.7, go: () => { show(SETUP.hCaptain); }, after: (t, start, len) => { if (t > start + len * 0.55) captainH.rig.look = novaHead().clone(); } },
       ] }),
     { name: "nova", env: "hangar", chapter: "hangar", d: Infinity,
