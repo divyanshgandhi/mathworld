@@ -97,7 +97,7 @@ export function useOrbReward(orbs: number, target: React.RefObject<HTMLElement |
         { transform: `translate(${sx}px, ${sy}px) scale(0.6)`, opacity: 0 },
         { transform: `translate(${sx}px, ${sy - 24}px) scale(1)`, opacity: 1, offset: 0.2 },
         { transform: `translate(${ex - 11}px, ${ey - 11}px) scale(0.8)`, opacity: 1 },
-      ], { duration: fly, delay: i * 45, easing: MOTION.ease, fill: "forwards" });
+      ], { duration: fly, delay: i * 45, easing: MOTION.ease, fill: "both" });
       anim.onfinish = () => {
         f.remove();
         if (++landed === n && !gone) tick(orbs);
