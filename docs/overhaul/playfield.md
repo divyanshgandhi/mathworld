@@ -107,10 +107,10 @@ zooms (12–120 px a world unit, which covers 360x640 to 1440x900).
 
 | Size | Fleet | A ship | Free area (from the console's `setSafe`) |
 | --- | --- | --- | --- |
-| 375x812 | 6 x 7 | 21 px (SAW) | top 173, bottom 251 |
-| 375x812 | 10 x 10 | 14.3 px (SAW; 12.7 before the band change) | top 175, bottom 251 |
-| 360x640 | 6 x 7 | 12.4 px (SAW; 8.5 before) | top 173, bottom 251: 216 px of height for fleet and rocket |
-| 812x375 | | not measured | |
+| 375x812 | 6 x 7 | 21 px (SAW with the old 108 px band; the band is 85 px now, so at least that, INFER) | top 173, bottom 251 |
+| 375x812 | 10 x 10 | 14.3 px (SAW, final; 12.7 before) | top 175, bottom 251 |
+| 360x640 | 6 x 7 | 10.1 px (SAW, final; 8.5 before) | top 173, bottom 251: 216 px of height for fleet, rocket and nose number |
+| 812x375 | 6 x 7 | 9.1 px (SAW, final); the nose number no longer crosses the fleet (it did, SAW, before) | top 110, right 221, bottom 34: 231 px of height |
 
 The 360x640 target (20 px a ship) cannot be met inside a 216 px free area. The strip's text ends at
 about 107 px and the keypad starts at 474 px; the console reports more than that (a request to the
