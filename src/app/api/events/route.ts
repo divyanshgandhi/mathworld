@@ -1,6 +1,7 @@
 import { EventBody } from "@/db/events";
 import { appendEvents, listEvents } from "@/db/store";
 import { badRequest, currentCadet } from "../cadet";
+import { freshOnly, seenIds } from "./dedupe";
 
 const noCadet = () => Response.json({ error: "no cadet" }, { status: 401 });
 
@@ -8,10 +9,12 @@ const noCadet = () => Response.json({ error: "no cadet" }, { status: 401 });
 export async function POST(req: Request) {
   const { db, player } = await currentCadet();
   if (!player) return noCadet();
-  const parsed = EventBody.safeParse(await req.json().catch(() => null));
+  const raw = (await req.json().catch(() => null)) as { ids?: unknown } | null;
+  const parsed = EventBody.safeParse(raw);
   if (!parsed.success) return badRequest(parsed.error.issues);
-  const list = "events" in parsed.data ? parsed.data.events : [parsed.data];
-  return Response.json({ events: await appendEvents(db, player.id, list) }, { status: 201 });
+  // a retried batch (same client ids) whose first try was stored is not stored twice
+  const list = freshOnly(seenIds, player.id, "events" in parsed.data ? parsed.data.events : [parsed.data], raw?.ids);
+  return Response.json({ events: list.length ? await appendEvents(db, player.id, list) : [] }, { status: 201 });
 }
 
 /**
