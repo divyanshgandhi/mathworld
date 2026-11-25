@@ -8,8 +8,13 @@ export const PLANETS = ["mercury", "venus", "earth", "moon", "mars", "asteroid-b
 export const TRICKS = ["empty-mirror", "fast-adding", "flip-it", "double-it", "easy-5-10", "jump-one-more", "split-and-add", "borrow-take-back", "big-small-split", "half-double"] as const;
 export const ERROR_TYPES = ["added_instead", "off_by_one_group", "off_by_one_unit", "place_value", "undershoot_close", "overshoot_close", "wild_guess"] as const;
 export const UPGRADE_SLOTS = ["hull", "blaster", "thruster"] as const;
-/** Where a wave sits in its mission (see src/director/next.ts). "practice": a replay of another planet, mastery only. */
-export const WAVE_ROLES = ["tutorial", "anchor", "discovery", "application", "adaptive", "transfer", "boss", "recharge", "probe", "practice"] as const;
+/**
+ * Where a wave sits in its mission (see src/director/next.ts). "practice": a replay of another planet,
+ * mastery only. "academy": a fleet in the Academy, mastery only and no orbs.
+ */
+export const WAVE_ROLES = ["tutorial", "anchor", "discovery", "application", "adaptive", "transfer", "boss", "recharge", "probe", "practice", "academy"] as const;
+/** The daily patrol reviews at most this many facts. */
+export const PATROL_SIZE = 5;
 
 /** Factors go up to 5-digit × 3-digit; the product stays well inside safe integers. */
 const factor = z.number().int().min(0).max(99_999);
@@ -36,11 +41,21 @@ export const EventInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("explanation_completed"), payload: z.object({ trickId: trick, a: factor, b: factor, mode, wedoCorrect: z.boolean() }) }),
   z.object({ type: z.literal("planet_cleared"), payload: z.object({ planetId: planet }) }),
   z.object({ type: z.literal("hyper_jump_taken"), payload: z.object({ fromPlanet: planet, toPlanet: planet }) }),
+  /**
+   * What the client thinks it paid. Stored for telemetry only: the fold works orbs out from the
+   * learning events and never reads this amount (decision 4).
+   */
   z.object({ type: z.literal("orb_earned"), payload: z.object({ amount: z.number().int().min(1), reason: z.string().max(64) }) }),
   z.object({ type: z.literal("upgrade_purchased"), payload: z.object({ slot: z.enum(UPGRADE_SLOTS), itemId: z.string().regex(/^[a-z0-9-]{1,40}$/), cost: count }) }),
   /** Mercury (addition) and Venus (subtraction) warm-ups, up to 20. */
   z.object({ type: z.literal("warmup_answered"), payload: z.object({ op: z.enum(["add", "sub"]), a: z.number().int().min(0).max(20), b: z.number().int().min(0).max(20), guess: z.number().int().min(0).max(1e6), correct: z.boolean().optional(), latencyMs: count }) }),
   z.object({ type: z.literal("flashcard_answered"), payload: z.object({ a: factor, b: factor, correct: z.boolean().optional(), latencyMs: count, guess: z.number().int().min(0).max(1e10) }) }),
+  /**
+   * The daily patrol finished. `day` is the cadet's calendar day number (see `patrolDay`); the server
+   * keeps it within a day of its own clock. `facts` are the facts reviewed, each answered right
+   * (a flashcard_answered or attempt_submitted) since the last patrol. The fold pays it once per day.
+   */
+  z.object({ type: z.literal("patrol_completed"), payload: z.object({ day: z.number().int().min(0).max(1e6), facts: z.array(z.object({ a: factor, b: factor })).min(1).max(PATROL_SIZE) }) }),
   /** The cadet has met something once: a screen's greeting, a help page, a guided step. Keys look like "greet:bay" or "guide:first-shot". */
   z.object({ type: z.literal("seen"), payload: z.object({ key: z.string().regex(/^[a-z0-9:-]{1,48}$/) }) }),
 ]);
@@ -50,8 +65,18 @@ export type EventType = EventInput["type"];
 /** One event, or a batch of up to 50 (a wave's worth of attempts). */
 export const EventBody = z.union([EventInput, z.object({ events: z.array(EventInput).min(1).max(50) })]);
 
-/** Server-side truth: correctness is recomputed from the numbers, whatever the client sent. */
-export function normalize(e: EventInput): EventInput {
+/** A time in ms as a calendar day number in the device's own time zone (the patrol's "day"). */
+export const patrolDay = (ms: number, tzOffsetMin = new Date(ms).getTimezoneOffset()) => Math.floor((ms - tzOffsetMin * 60_000) / 86_400_000);
+
+/**
+ * Server-side truth: correctness is recomputed from the numbers, whatever the client sent, and a
+ * patrol's day is kept within one day of the server's clock (every time zone is within a day of UTC).
+ */
+export function normalize(e: EventInput, now = Date.now()): EventInput {
+  if (e.type === "patrol_completed") {
+    const utc = Math.floor(now / 86_400_000);
+    return { ...e, payload: { ...e.payload, day: Math.min(utc + 1, Math.max(utc - 1, e.payload.day)) } };
+  }
   if (e.type === "attempt_submitted" || e.type === "flashcard_answered") {
     return { ...e, payload: { ...e.payload, correct: e.payload.guess === e.payload.a * e.payload.b } } as EventInput;
   }

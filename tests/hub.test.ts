@@ -13,7 +13,9 @@ import { warmupProblem, warmupRun, WARMUP_LENGTH } from "@/rig/warmup";
 const shot = (a: number, b: number, guess: number, ms = 1000, i = 1, planetId: "earth" | "moon" | "mars" = "moon"): LoggedEvent => ({
   type: "attempt_submitted", payload: { a, b, planetId, guess, latencyMs: ms, errorType: null, attemptIndex: i, usedRadar: false, powerUpUsed: null, isTransferCheck: false, waveRole: "practice" },
 });
-const orbs = (amount: number): LoggedEvent => ({ type: "orb_earned", payload: { amount, reason: "wave_clear" } });
+/** Orbs the honest way: first tries on different, careful (not Gold) facts. 7 first tries = 35 + 5 for the fifth in a row. */
+const FACTS = [[2, 3], [2, 4], [2, 6], [2, 7], [2, 8], [2, 9], [3, 3], [3, 4], [3, 6], [3, 7], [3, 8], [3, 9]] as const;
+const earn = (n: number): LoggedEvent[] => FACTS.slice(0, n).map(([a, b]) => shot(a, b, a * b, 9000));
 
 describe("Resting Bay posters", () => {
   it("colour each fact by its mastery band and the poster by the lowest band reached", () => {
@@ -74,9 +76,10 @@ describe("Solar System map", () => {
 
 describe("Hangar", () => {
   it("charges the catalogue price, never below zero, and re-equips owned items for free", () => {
-    let log: LoggedEvent[] = [orbs(40)];
+    let log: LoggedEvent[] = earn(7);
     let s = fold(log);
-    expect(purchase(s, "hull", "nebula-violet")).toBeNull(); // 60 > 40
+    expect(s.orbs).toBe(40);
+    expect(purchase(s, "hull", "nebula-violet")).toBeNull(); // 90 > 40, and the Moon is not cleared
     expect(purchase(s, "hull", "cadet-white")).toBeNull(); // already on
     const buy = purchase(s, "hull", "solar-gold")!;
     expect(buy.payload.cost).toBe(30);
@@ -89,7 +92,7 @@ describe("Hangar", () => {
     s = fold(log);
     expect(s.orbs).toBe(10);
     expect(purchase(s, "hull", "solar-gold")!.payload.cost).toBe(0);
-    // a forged event (cost 0 for a 110-Orb blaster) does nothing
+    // a forged event (cost 0 for a 240-orb blaster) does nothing
     s = fold([...log, { type: "upgrade_purchased", payload: { slot: "blaster", itemId: "nova-beam", cost: 0 } }]);
     expect(s.orbs).toBe(10);
     expect(s.equipped.blaster).toBeUndefined();
