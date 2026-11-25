@@ -3,6 +3,7 @@ import { COLOR, hex, LINE } from "@/design/tokens";
 import { add, canvasTexture, type Materials } from "@/engine/materials";
 import type { Rng } from "@/engine/util";
 import { makeNova } from "./cast";
+import { makeBody } from "./planets";
 import { makeRocket } from "./ships";
 
 /**
@@ -67,22 +68,10 @@ export function buildHangar(scene: THREE.Scene, M: Materials, rnd: Rng, at: THRE
   const space = new THREE.Group();
   space.position.set(0, 6, -36);
   g.add(space);
-  const em = canvasTexture(512, 256);
-  {
-    const x = em.ctx, grd = x.createLinearGradient(0, 0, 0, 256);
-    grd.addColorStop(0, "#3f7fc4"); grd.addColorStop(1, "#2c62a8");
-    x.fillStyle = grd; x.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 90; i++) { x.fillStyle = ["#6fb86c", "#93c76e", "#d9c58f"][i % 3]; x.beginPath(); x.ellipse(rnd() * 512, 40 + rnd() * 180, 10 + rnd() * 40, 6 + rnd() * 20, rnd() * 3, 0, 7); x.fill(); }
-    for (let i = 0; i < 80; i++) { x.fillStyle = "rgba(255,255,255,0.55)"; x.beginPath(); x.ellipse(rnd() * 512, rnd() * 256, 8 + rnd() * 30, 3 + rnd() * 8, 0, 0, 7); x.fill(); }
-    em.texture.needsUpdate = true;
-  }
-  const earth = add(space, new THREE.SphereGeometry(12, 64, 48), M.clay(0xffffff, { map: em.texture, roughness: 0.7, emissive: 0x1d4ed8, emissiveIntensity: 0.18 }), -10, 4, -8, nc);
-  const atm = new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(0x7fc4ff) } }, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    vertexShader: "varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}",
-    fragmentShader: "uniform vec3 c;varying vec3 vN;varying vec3 vV;void main(){float f=pow(1.0-max(dot(vN,vV),0.0),2.4);gl_FragColor=vec4(c*f*2.0,f);}",
-  });
-  add(space, new THREE.SphereGeometry(12.8, 64, 48), atm, -10, 4, -8, nc);
+  // the one Earth from the planet factory (the same Earth as the title, the film's opening and the battles)
+  const earth = makeBody(M, "earth", 12, { lod: "high", look: "hero" });
+  earth.group.position.set(-10, 4, -8);
+  space.add(earth.group);
   add(space, new THREE.SphereGeometry(3.2, 40, 28), M.clay(0xd8d2e2, { roughness: 0.9 }), 11, 8, -4, nc);
   const sp: number[] = [];
   for (let i = 0; i < 900; i++) sp.push((rnd() - 0.5) * 90, -5 + rnd() * 45, -24 - rnd() * 55);
@@ -127,7 +116,8 @@ export function buildHangar(scene: THREE.Scene, M: Materials, rnd: Rng, at: THRE
     launch() { launch = 0.001; },
     reset,
     update(T: number, dt: number, voice: number, novaTalking: boolean) {
-      earth.rotation.y += dt * 0.05;
+      earth.spin.rotation.y += dt * 0.05;
+      earth.update(dt);
       nova.animate(T, dt, 2.8, novaTalking ? voice : 0);
       const base = BASE;
       if (launch > 0) {
