@@ -151,6 +151,8 @@
     min-height: 180px;
   }
   .mw-cards-pad { width: 100%; max-width: 400px; margin: 0 auto; }
+  .mw-cards-eq { font-size: clamp(56px, 13vw, 136px); }
+  .mw-miss-eq { font-size: clamp(44px, 8vw, 88px); }
   .mw-cards-slot {
     display: inline-block;
     min-width: 1.3em;
@@ -159,6 +161,7 @@
   }
   .mw-cards-slot[data-empty] { color: var(--color-ink-3); }
   .mw-dots {
+    --dot: var(--dot-want, 20px);
     display: grid;
     gap: calc(var(--dot) * 0.7) calc(var(--dot) * 0.35);
     justify-content: center;
@@ -182,7 +185,15 @@
   }
   /* landscape phones: the fact and the keypad side by side */
   @media (max-height: 500px) and (min-width: 600px) {
-    .mw-cards-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 24px; }
-    .mw-cards-fact { min-height: 0; }
+    .mw-cards-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 24px; min-height: 0; padding-bottom: 12px; }
+    .mw-cards-fact { min-height: 0; min-width: 0; }
+    /* the fact is sized by the short side, so it stays inside its column, left of the keypad */
+    .mw-cards-fact .mw-cards-eq { font-size: clamp(36px, 17dvh, 72px); }
+    .mw-cards-fact .mw-cards-slot { min-width: 1.1em; }
+    /* a miss: the words first, then the dots, sized so every row is on screen */
+    .mw-miss { gap: 10px; }
+    .mw-miss .mw-miss-eq { font-size: clamp(30px, 11dvh, 52px); }
+    .mw-miss .mw-miss-words { order: 1; }
+    .mw-miss .mw-dots { order: 2; --dot: min(var(--dot-want, 20px), max(7px, calc((100dvh - 210px) / var(--rows) / 1.7))); }
   }
 }
