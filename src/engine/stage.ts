@@ -45,7 +45,7 @@ export function createStage(container: HTMLElement, { aspect = 0.58, fill = fals
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap is gone in this three.js; lights soften with shadow.radius
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.domElement.style.display = "block";
   container.prepend(renderer.domElement);
@@ -58,7 +58,10 @@ export function createStage(container: HTMLElement, { aspect = 0.58, fill = fals
   const camera = new THREE.PerspectiveCamera(48, 1.7, 0.05, 3000);
   scene.add(camera);
 
-  const composer = new EffectComposer(renderer);
+  // the post chain renders into a multisampled target so thin edges do not crawl when the camera moves
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  rt.texture.name = "EffectComposer.rt1";
+  const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), start.bloom.strength, start.bloom.radius, start.bloom.threshold);
   composer.addPass(bloom);
