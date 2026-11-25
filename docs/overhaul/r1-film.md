@@ -261,7 +261,11 @@ To change a pause, change the number in `FILM_PACE`. The test will say if it bre
 - **Timing, 1440x900.** The whole film stepped at 0.05 s in four cases: paced as heard and as read, with every invitation taken at once and with none taken. Totals 98.72, 113.20, 120.17 and 134.37 s. Every line started within 0.05 s of the schedule's time.
 - **Captions, 1440x900, sound off, nobody presses.** At every caption change the plate was measured in the page: one plate at a time, whole and inside the frame, two lines at most, 19 px, the words equal to the line. Each stayed up for its read-alone time (within one 0.05 s step). 20 captions, none failed.
 - **Captions, 375x812, sound off, every invitation taken.** The same checks, plus the plate never under the buttons: 24 captions, 17 px, none failed. Total 121.77 s.
-- **The first battle starts** after the film at both sizes (fleet 1 x 4, the keypad and Fire).
+- **Captions at three more sizes**, the same checks: 360x640 (sound off, nobody presses: 22 captions, 17 px, 135.97 s), 812x375 with less motion (`?calm`, sound off, every invitation taken: 22 captions, 19 px, 120.17 s), 768x1024 (paced as heard, every invitation taken: 22 captions, 19 px, 98.77 s). None failed.
+- **The first battle starts** after the film at all five sizes (fleet 1 x 4, the keypad and Fire).
+- **Mashing.** Six raises, Space and 1 pressed during the teacher's question: nothing showed early, and the hand was taken the moment she stopped (6.62 s into the question, whose voice is 6.59 s). Three picks and a key on the answers: only the first counted, the teacher gave the matching reply, and the second question followed.
+- **Skip under the name card** ended the film and the battle opened.
+- **The re-aimed stills** (`school`, `turn`, `door`, `names-back`, `ship`, `arrive`) each land in the step they are for; `ship` is inside "This is your rocket."
 - **Resume.** `/intro` for a cadet with `film:done` shows "Welcome back" and Continue, and Continue opens the battle with "Count the ships."
 - **Skip.** On `/intro?dev&replay&from=/bay`, Skip showed after 3 s, a double tap ended the film, and the page left for `/bay`.
 - **The door.** A frame 1.2 s into the walk: the door leaf is swung open, the principal is through the doorway mid-stride with the Captain behind him, and "Pardon the interruption, everyone." is up.
@@ -283,15 +287,15 @@ To change a pause, change the number in `FILM_PACE`. The test will say if it bre
 
 ## Not done
 
-- No sizes other than 1440x900 and 375x812 were stepped this round (360x640, 812x375 and 768x1024 were not).
-- Reduced motion (`?calm`) was not stepped again. Its only timing change is that the town's two still frames change at 3.2 s (was 3.6).
-- The break test (mashing keys during the film, refresh mid-film, rotating) was not repeated; the input code is unchanged apart from the waits.
+- Less motion (`?calm`) was stepped once, at 812x375, for captions and timing. Its pictures were not looked at. Its only timing change of its own is that the town's two still frames change at 3.2 s (was 3.6).
+- Of the break test, only mashing and Skip under the name card were repeated. Refresh in the middle of the film, the back button, rotating and a blocked sound were not; that code is unchanged.
 - The `seconds` field of each setup in the shot list is still the old rough figure. It is only shown on the contact sheet.
-- `/dev/cast` was not opened to check the six re-aimed stills.
+- `/dev/cast` was not opened: the six re-aimed stills were checked by the step they land in, not by eye.
+- With sound on, the 5 s that Launch waits starts when Nova stops talking. A slow reader with the sound on has the same 5 s. If that is too short for the film's one big button, `FILM_PACE.nova.wait` is the number.
 
 ## Requests for other tracks
 
-None. No file outside the film's was needed.
+- Integrator: add this note to the index in `docs/overhaul/README.md`, and `/intro?dev&pace=heard` and `/intro?dev&pace=read` to its review routes (the film paced as with sound on or off, while it stays muted). No code outside the film's files was needed.
 
 ## Lines to bake
 
