@@ -140,7 +140,7 @@ export function TitleScreen() {
         <p className="mw-title-line">Welcome back, Cadet <b className="mw-title-name">{name}</b></p>
         <div className="mw-title-act" data-on>
           <Button variant="primary" size="lg" autoFocus={moved} onClick={resume} disabled={leaving} focusableWhenDisabled className="mw-title-primary">Continue</Button>
-          <Button variant="quiet" onClick={() => go("switch")} className="mw-title-quiet"><span className="inline-flex min-w-0 whitespace-pre">Not <span className="max-w-[16ch] truncate">{name}</span>? Switch cadet</span></Button>
+          <Button variant="quiet" onClick={() => go("switch")} className="mw-title-quiet"><span>Not {name}? Switch cadet</span></Button>
         </div>
       </>
     );

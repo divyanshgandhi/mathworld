@@ -80,7 +80,8 @@
     min-height: 72px;
     margin-top: clamp(28px, 4.4vh, 44px);
   }
-  .mw-title-quiet { white-space: nowrap; }
+  /* a long name wraps (balanced) instead of running off the screen */
+  .mw-title-quiet { white-space: normal; text-wrap: balance; text-align: center; height: auto; padding-block: 10px; overflow-wrap: anywhere; }
   .mw-title-form { margin-top: 4px; }
 
   /* phones: the primary runs the width of the screen, the rocket at its far end */
