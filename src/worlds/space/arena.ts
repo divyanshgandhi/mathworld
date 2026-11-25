@@ -288,6 +288,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     climb(); // a fact never met: the squads label, softly
     if (s.waves === 0 && mode === "campaign" && opts.lines?.intro) await say(opts.lines.intro, { queue: true });
     else if (index === 0 && mode !== "academy") void say(theme.briefing);
+    // an empty fleet is a strange picture the first time: Nova says what it shows (never the answer)
+    if ((w.a === 0 || w.b === 0) && mode !== "academy" && factBand(w) === "unseen") void say(w.a === 0 ? "nova_zero_squads" : "nova_zero_each", { queue: true });
     await sched.after(0.75); // the fleet flies in
     ready();
     if (mode === "academy" && opts.academy?.film) void showMeHow({ auto: true, film: true });

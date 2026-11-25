@@ -79,7 +79,7 @@ export function SolarMap() {
           </div>
           <div className="pointer-events-none absolute right-16 top-3.5 z-10 flex flex-col items-end gap-1.5">
             <span className="flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="hidden text-[15px] text-ink-2 sm:inline">orbs</span></span>
-            {jump && <span className={`flex items-center gap-1.5 rounded-pill border bg-void px-3 py-1 text-xs ${jump.available ? "border-gold text-gold" : "border-line-1 text-ink-2"}`}><Icon name="jump" size={16} />{jump.available || !jump.to ? jump.label : `${jump.streak} of ${jump.need} perfect shots in a row lets you Hyper-Jump`}</span>}
+            {jump && <span className={`flex items-center gap-1.5 rounded-pill border bg-void px-3 py-1 text-xs ${jump.available ? "border-gold text-gold" : "border-line-1 text-ink-2"}`}><Icon name="jump" size={16} />{jump.available || !jump.to ? jump.label : `Hyper-Jump: ${jump.streak} of ${jump.need} perfect shots in a row`}</span>}
           </div>
 
           {stops.map((s, k) => (

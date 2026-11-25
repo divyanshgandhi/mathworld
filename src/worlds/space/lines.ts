@@ -23,6 +23,9 @@ export const BATTLE_LINES = {
   nova_invite: "Sneaky squad! Try a Power-Up, the Radar, or Show Me How.",
   nova_hold_fire: "Hold fire, cadet! Take a breath, and try a Trick Power-Up.",
   nova_misfit: "That trick doesn't fit this fleet. Try another one!",
+  // a zero fleet met for the first time: what the empty picture means, never the answer (caption until baked)
+  nova_zero_squads: "No squads at all! How many ships is that?",
+  nova_zero_each: "Every squad here is empty. Count the ships!",
   nova_sector_ok: "Sector locked!",
   nova_sector_no: "Not quite. Count that sector again.",
   nova_all_locked: "All sectors locked. Fire!",

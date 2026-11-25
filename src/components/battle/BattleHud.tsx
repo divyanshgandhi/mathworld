@@ -11,6 +11,8 @@ import { XRay } from "./XRay";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Fire"];
 const fmt = (n: number) => n.toLocaleString("en-US");
+/** Waves that do not count toward the mission (a breather, a check from another planet): the counter would stall on them. */
+const BONUS = new Set(["recharge", "probe", "transfer"]);
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /**
@@ -109,7 +111,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       {w && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-14 md:px-0">
           <div ref={plateRef} className={`${glass} max-w-full px-4 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="type-label-sm tracking-[0.08em] text-balance text-ink-2 md:whitespace-nowrap md:tracking-[0.16em]">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
+            <p className="type-label-sm tracking-[0.08em] text-balance text-ink-2 md:whitespace-nowrap md:tracking-[0.16em]">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : ui.mode !== "practice" && BONUS.has(w.role) ? "Bonus wave" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
             <p className={`mt-1 whitespace-nowrap type-display type-number md:mt-2 ${plateSize}`}>
               {fmt(ra)}<span className="mx-3 text-ink-3">×</span>{fmt(rb)}
             </p>
