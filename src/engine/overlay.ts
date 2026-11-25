@@ -60,6 +60,8 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
   css(chip, { flex: "none", fontWeight: "600", fontStretch: stretch(TYPE.label.stretch), fontSize: `${TYPE.min.label}px`, letterSpacing: "0.14em", textTransform: "uppercase", color: INK[2] });
   css(text, { fontWeight: String(TYPE.body.weight), fontSize: "clamp(17px, 0.6vw + 14px, 21px)", lineHeight: "1.4", color: INK[1], textWrap: "pretty" } as Partial<CSSStyleDeclaration>);
   cap.append(chip, text);
+  cap.setAttribute("aria-hidden", "true");
+  card.setAttribute("aria-hidden", "true");
 
   const barW = div(root, { left: "50%", bottom: "10px", transform: "translateX(-50%)", width: "200px", height: "2px", borderRadius: "1px", background: LINE[1], opacity: "0", transition: `opacity ${MOTION.quick}ms ${ease}` });
   const bar = div(barW, { position: "relative", height: "100%", width: "0", background: COLOR.approach, borderRadius: "1px" });
@@ -73,6 +75,7 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
         text.textContent = txt;
       }
       cap.style.opacity = txt ? "1" : "0"; // the words stay in place while the plate fades out
+      cap.setAttribute("aria-hidden", txt ? "false" : "true");
     },
     captionAt(px) { cap.style.bottom = `${px}px`; barW.style.bottom = `${Math.max(8, px - 10)}px`; },
     card(_kicker, m, s = "", at = "centre") {
@@ -88,6 +91,7 @@ export function createOverlay(container: HTMLElement, canvas: HTMLCanvasElement)
         sub.style.display = s ? "" : "none";
       }
       card.style.opacity = m ? "1" : "0";
+      card.setAttribute("aria-hidden", m ? "false" : "true");
     },
     fade(o, color) {
       if (color) fade.style.background = color;

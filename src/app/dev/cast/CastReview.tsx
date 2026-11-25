@@ -118,9 +118,9 @@ export function CastReview() {
         <section key={s.name} aria-label={s.name} style={{ marginTop: 44, paddingTop: 28, borderTop: `1px solid ${LINE[1]}` }}>
           <h2 style={{ margin: 0, fontWeight: 300, fontStretch: "120%", fontSize: 28, letterSpacing: "0.04em" }}>{s.name}</h2>
           <p style={{ margin: "6px 0 18px", fontSize: 17, color: INK[2] }}>{s.note}</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end" }}>
-            {s.bodies.map((src, i) => <Tile key={VIEWS[i][0]} src={src} text={VIEWS[i][0]} w={210} h={280} alt={`${s.name}, ${VIEWS[i][0].toLowerCase()} view`} />)}
-            {s.faces.map((src, i) => <Tile key={FACES[i][0]} src={src} text={FACES[i][0]} w={168} h={168} alt={`${s.name}, ${FACES[i][0].toLowerCase()}`} />)}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+            {s.bodies.map((src, i) => <Tile key={VIEWS[i][0]} src={src} text={VIEWS[i][0]} w={180} h={240} alt={`${s.name}, ${VIEWS[i][0].toLowerCase()} view`} />)}
+            {s.faces.map((src, i) => <Tile key={FACES[i][0]} src={src} text={FACES[i][0]} w={140} h={140} alt={`${s.name}, ${FACES[i][0].toLowerCase()}`} />)}
           </div>
         </section>
       ))}
