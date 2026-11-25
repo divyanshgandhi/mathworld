@@ -7,6 +7,7 @@ import { makeCarrier, makeDreadnought, makeFighterLite, makeInvader, makeTenSqua
 import { battleFleet, BIG as BIG_CELL, CELL as CELL_W, GAP as SHIP_GAP, laneBoxes, layoutFleet, PITCH as SHIP_PITCH, type Layout, type Slot } from "../formation";
 import { LOOK, reducedMotion } from "../look";
 import { holoLabel, holoWidth } from "./holo";
+import { createInstancedFleet, type InstancedFleet } from "./instanced";
 
 /**
  * Fleet view: the formation of ships for one wave, laid out by `src/battle/formation.ts` (rows ×
@@ -30,6 +31,8 @@ export interface ShipView {
   flinch: number; hold: number; back: number;
   /** Seconds since it set off on its warp-in (negative: still waiting its turn). */
   warp: number;
+  /** The squad's leader (the gold pennant). */
+  leader: boolean;
 }
 
 // layout constants: kept here too, because Power-Ups and lessons import them from this file
@@ -45,8 +48,8 @@ export type AxisShow = "on" | "soft" | "off";
 export const squadsText = (n: number) => `${fmt(n)} ${n === 1 ? "squad" : "squads"}`;
 export const eachText = (n: number) => `${fmt(n)} in each squad`;
 
-/** Fighters above this count use the cheap fighter (three draws instead of eleven). */
-export const LITE_OVER = 48;
+/** Fighters above this count are drawn instanced (a few draws for the whole fleet), and above LITE_OVER as the cheap fighter. */
+export const INSTANCE_OVER = 16, LITE_OVER = 140;
 /** Seconds a ship takes from deep space to its place, and the warp-in's whole budget. */
 const WARP_FLIGHT = 0.42, WARP_SPREAD = 0.62;
 /** A kill: the squash and pop (seconds), and the anticipation before a ball lands. */
@@ -81,6 +84,8 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
     axis: { squads: "on" as AxisShow, each: "on" as AxisShow },
     /** When this fleet's warp-in ends (stage time). */
     landed: 0,
+    /** The fleet's fighters drawn as instances (big fleets), or null. */
+    instanced: null as InstancedFleet | null,
     /** Mount the marks group (after the shield, so draw order stays what it was). */
     mountMarks() { formation.add(visuals, overlay); },
 
@@ -94,6 +99,8 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
     },
     clear() {
       for (const v of fv.views) formation.remove(v.g);
+      fv.instanced?.dispose();
+      fv.instanced = null;
       fv.views = [];
       fv.clearMarks();
       overlay.clear();
@@ -111,7 +118,7 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
       fv.scale = Math.min(1.55, 11 / Math.max(W, 1), 8 / Math.max(H, 1));
       fv.fw = Math.max(W * fv.scale, 3); fv.fh = Math.max(H * fv.scale, 2);
       formation.scale.setScalar(fv.scale);
-      const fighters = f.ships.filter((s) => s.k === 0).length, lite = fighters > LITE_OVER;
+      const fighters = f.ships.filter((s) => s.k === 0).length, lite = fighters > LITE_OVER, inst = fighters > INSTANCE_OVER;
       const perSquad = new Map<number, number>();
       for (const s of l.slots) perSquad.set(s.squad, (perSquad.get(s.squad) ?? 0) + 1);
       const reduced = reducedMotion();
@@ -125,11 +132,17 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
           gRow: slot.squad, gCol: slot.index,
           alive: true, pop: 0, enter: 0, wink: 0, ph: rnd() * 6, base: 1,
           shift: new THREE.Vector3(), shiftFrom: new THREE.Vector3(), shiftTo: new THREE.Vector3(), shiftT: -1, flinch: 0, hold: 0, back: 0,
-          warp: reduced ? -slot.row * perRow * 0.5 : -(slot.row * perRow + (slot.index === 0 ? 0 : 0.07)),
+          warp: reduced ? -slot.row * perRow * 0.5 : -(slot.row * perRow + (slot.index === 0 ? 0 : 0.07)), leader: false,
         };
         const style = squadStyle(slot.squad, slot.index);
         if ((perSquad.get(slot.squad) ?? 0) < 2) style.leader = false;
-        if (kind === "fighter") { v.g.add(lite ? makeFighterLite(M, style) : makeInvader(M, style)); v.base = 0.78; }
+        v.leader = style.leader;
+        if (kind === "fighter") {
+          // a big fleet's fighters are drawn as instances (below); the group only carries the transform
+          if (!inst) v.g.add(lite ? makeFighterLite(M, style) : makeInvader(M, style));
+          v.g.userData.style = `${style.tone}|${style.leader ? 1 : 0}`;
+          v.base = 0.78;
+        }
         else if (kind === "pod") { const p = makeTenSquadPod(M, sec.orient, style); v.g.add(p.group); v.micro = p.micro; v.podTag = p.tag; }
         else if (kind === "carrier") { v.carrier = makeCarrier(M, sec.orient, style); v.g.add(v.carrier.group); }
         else { v.dread = makeDreadnought(M, unitLabel(ship.k), sec.orient, style); v.g.add(v.dread.group); }
@@ -138,6 +151,10 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
         v.pos.copy(v.home);
         formation.add(v.g);
         fv.views.push(v);
+      }
+      if (inst) {
+        const ships = fv.views.filter((v) => v.kind === "fighter").map((v) => ({ g: v.g, style: v.g.userData.style as string, visible: () => v.g.visible }));
+        fv.instanced = createInstancedFleet(formation, ships, (key) => { const [tone, leader] = key.split("|"), o = { tone: tone as "ember" | "apricot", leader: leader === "1" }; return lite ? makeFighterLite(M, o) : makeInvader(M, o); });
       }
       fv.landed = stage.time + (reduced ? rows * perRow * 0.5 + 0.3 : WARP_SPREAD + 0.07 + WARP_FLIGHT + 0.1);
       zeroRing.visible = a === 0 || b === 0;
@@ -341,6 +358,7 @@ export function createFleetView(stage: Stage, root: THREE.Group, rnd: Rng) {
         const settle = 0.9 + 0.1 * (1 - Math.pow(1 - sk, 3));
         c.scale.setScalar(((c.userData.k as number | undefined) ?? 1) * settle * (1 + (lp < 0.8 ? Math.sin((lp / 0.8) * Math.PI) * 0.18 : 0)));
       }
+      fv.instanced?.sync();
       const sh = shield.userData.t0 as number | undefined;
       (shield.material as THREE.MeshBasicMaterial).opacity = sh === undefined ? 0 : Math.max(0, LOOK.shield.peak * (1 - (now - sh) / 0.5));
       zeroRing.rotation.z += dt * 0.6;

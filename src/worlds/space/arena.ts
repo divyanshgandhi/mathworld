@@ -243,14 +243,18 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const [ra, rb] = fv.flipped ? [wave.b, wave.a] : [wave.a, wave.b];
     scan.start(step.id === "squads" ? "squads" : "each", ra, rb, reveal, { soft: step.soft });
   }
-  /** Climb the ladder if it has a rung for now. `afterLine`: Nova's reaction (and the regroup), which rung 1 waits for. */
-  function climb(afterLine?: Promise<unknown>) {
+  /**
+   * Climb the ladder if it has a rung for now. After a miss every scan waits for the full fleet to be
+   * back (`back`), and rung 1 also waits for Nova's reaction (`afterLine`), so voice and scan never overlap.
+   */
+  function climb(afterLine?: Promise<unknown>, back?: Promise<unknown>) {
     if (structure !== "discover" || !wave) return;
     const step = nextHint(hintState(bs), factBand(wave));
     if (!step) return;
-    if (!step.afterLine || !afterLine) return showHint(step);
+    const wait = [step.afterLine ? afterLine : null, back].filter(Boolean);
+    if (!wait.length) return showHint(step);
     const wn = bs.waveNo, missed = bs.attempts;
-    void afterLine.then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && canAim(bs)) showHint(step); });
+    void Promise.all(wait).then(() => { if (!disposed && bs.waveNo === wn && bs.attempts === missed && !bs.lessonOn) showHint(step); });
   }
 
   // ---- the director: which wave comes next ----
@@ -491,7 +495,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     // the calming line matters more than a reaction, so it waits its turn instead of being dropped
     const line = say(route.mash ? "nova_hold_fire" : route.invite ? "nova_invite_v2" : errorType === "wild_guess" ? "nova_err_way_off" : errorType ? ERROR_LINE[errorType] : over ? "nova_err_over" : "nova_err_under", { queue: route.mash });
     const back = sched.after(RESTORE_AT + READY_AFTER);
-    climb(Promise.all([line, back]));
+    climb(line, back);
     await sched.after(RESTORE_AT);
     if (wave !== w) return;
     restore();
@@ -512,7 +516,7 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     const lead = row.reduce((m, v) => (v.slot.index < m.slot.index ? v : m), row[0]);
     const p = fv.formation.localToWorld(fv.placeOf(lead));
     root.worldToLocal(p);
-    const isLeader = lead.kind === "fighter" && !!lead.g.children[0]?.userData.leader;
+    const isLeader = lead.kind === "fighter" && lead.leader;
     if (isLeader) kill.pennant(p.clone().add(new THREE.Vector3(0, 0.5 * fv.scale, 0.2)), fv.scale * 0.78);
     const h = 20 * unitsPerPx() * fv.scale;
     kill.tick(p.clone().add(new THREE.Vector3(-(lead.size.x / 2 + 0.45) * fv.scale, 0, 0.6)), fmt(count), h);

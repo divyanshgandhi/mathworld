@@ -60,7 +60,7 @@ export function createMisses(stage: Stage, fv: FleetView, hooks: { unitsPerPx: (
     dot(p: THREE.Vector3) {
       const d = new THREE.Line(circle, dotMat);
       d.position.copy(p).setZ(0.6);
-      d.scale.setScalar(0.2);
+      d.scale.setScalar(0.26);
       fv.overlay.add(d);
       dots.push(d);
       const ext = (fv.overlay.userData.extent as { x: number; y: number } | undefined) ?? { x: 0, y: 0 };
@@ -97,7 +97,7 @@ export function createMisses(stage: Stage, fv: FleetView, hooks: { unitsPerPx: (
       const h = LOOK.miss.px * u * (0.8 + 0.2 * (1 - Math.pow(1 - k, 3)));
       bracket.set(box, LOOK.scan.line * u, 0.14);
       label.height(h);
-      const w = label.aspect * h, lx = Math.max(box.x - box.hx + w / 2, -(fv.layout?.W ?? 0) / 2 + w / 2);
+      const w = label.aspect * h, lx = Math.max(box.x - box.hx + 0.12 + w / 2, -(fv.layout?.W ?? 0) / 2 + w / 2);
       label.mesh.position.set(lx, below ? box.y - box.hy - 0.3 - h / 2 : box.y + box.hy + 0.3 + h / 2, 0.8);
     },
     dispose() { clearOverlay(); dotMat.dispose(); },

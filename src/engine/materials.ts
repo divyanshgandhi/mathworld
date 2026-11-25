@@ -68,9 +68,12 @@ export class Materials {
         c: { value: new THREE.Color(OUTLINE.color).multiplyScalar(OUTLINE.strength) },
       },
       // clip-space offset: the normal's screen direction, scaled to `px` device pixels at any depth
+      // (instanced meshes too: a whole fleet of drones can share one outline draw)
       vertexShader:
-        "uniform float px;uniform vec2 res;void main(){vec4 c=projectionMatrix*modelViewMatrix*vec4(position,1.0);" +
-        "vec3 n=normalize(normalMatrix*normal);vec2 d=(projectionMatrix*vec4(n,0.0)).xy*res;float l=length(d);" +
+        "uniform float px;uniform vec2 res;void main(){vec4 p=vec4(position,1.0);vec3 nn=normal;\n" +
+        "#ifdef USE_INSTANCING\np=instanceMatrix*p;nn=mat3(instanceMatrix)*nn;\n#endif\n" +
+        "vec4 c=projectionMatrix*modelViewMatrix*p;" +
+        "vec3 n=normalize(normalMatrix*nn);vec2 d=(projectionMatrix*vec4(n,0.0)).xy*res;float l=length(d);" +
         "if(l>1e-5){c.xy+=d/l*px*2.0/res*c.w;}gl_Position=c;}",
       fragmentShader: "uniform vec3 c;void main(){gl_FragColor=vec4(c,1.0);}",
       side: THREE.BackSide,

@@ -33,7 +33,8 @@ export const LOOK = {
   ghost: { color: GHOST.color, fill: 0.12, outlineFill: 0.08 },
   // every emissive stays under the space look's bloom threshold
   laser: { color: hex(COLOR.gold), intensity: 0.45 },
-  shield: { color: hex(COLOR.sky), peak: 0.2 },
+  // the old regroup shield read as a panel behind the fleet; the returning ships' pop is the cue now
+  shield: { color: hex(COLOR.sky), peak: 0 },
   dim: { color: hex(COLOR.void), opacity: 0.62 },
   /** Balls with nothing left to hit (an overshoot): the same ball, cooling to ember as it fizzes. */
   over: { color: hex(COLOR.ember), intensity: 0.45 },
@@ -46,7 +47,7 @@ export const LOOK = {
   /** Scans: the lock-on bracket, its counts, and a soft (first-sight) scan's strength. */
   scan: { color: hex(COLOR.sky), ink: COLOR.sky, soft: 0.55, line: 1.5, countPx: 22, softPx: 18 },
   /** Misses in the world: the survivors' and the extras' brackets and their words. */
-  miss: { color: hex(COLOR.sky), ink: COLOR.approach, px: 22 },
+  miss: { color: hex(COLOR.sky), ink: COLOR.approach, px: 24 },
   /** The kill: a hairline ring and matte shards, gone within about a quarter second (shards drift on). */
   kill: { ring: hex(COLOR.approach), ringOpacity: 0.7, pennant: hex(COLOR.gold), shards: 6, maxShards: 320 },
   /** The number on the rocket's nose: the display voice in cool white. */
