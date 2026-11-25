@@ -50,8 +50,36 @@ describe("database", () => {
     expect(await listEvents(db, p.id)).toHaveLength(1);
   });
 
+  it("stores a retried event once: the same client id for the same cadet is skipped by the database", async () => {
+    const a = await createPlayer(db, { name: "Ira", avatar: "cadet-2" });
+    const b = await createPlayer(db, { name: "Kabir", avatar: "cadet-5" });
+    const first = await appendEvents(db, a.id, [attempt(3, 4, 12), attempt(6, 7, 42)], ["s1", "s2"]);
+    expect(first).toHaveLength(2);
+    // the retry of a batch whose answer was lost, with one new event behind it
+    const retry = await appendEvents(db, a.id, [attempt(3, 4, 12), attempt(6, 7, 42), attempt(2, 5, 10)], ["s1", "s2", "s3"]);
+    expect(retry).toHaveLength(1);
+    expect(await listEvents(db, a.id)).toHaveLength(3);
+    // another cadet may use the same ids, and events without ids are never taken for doubles
+    expect(await appendEvents(db, b.id, [attempt(3, 4, 12)], ["s1"])).toHaveLength(1);
+    await appendEvents(db, b.id, [attempt(3, 4, 12)]);
+    await appendEvents(db, b.id, [attempt(3, 4, 12)]);
+    expect(await listEvents(db, b.id)).toHaveLength(3);
+    // ids that do not pair with the events are ignored, not guessed at
+    expect(await appendEvents(db, a.id, [attempt(1, 1, 1)], ["s1", "s2"])).toHaveLength(1);
+  });
+
   it("rejects events for a player that does not exist", async () => {
     await expect(appendEvents(db, "00000000-0000-4000-8000-000000000000", [{ type: "intro_completed", payload: {} }])).rejects.toThrow();
+  });
+});
+
+describe("database connection", () => {
+  it("goes without TLS only for a Postgres on this machine", async () => {
+    const { isLocal } = await import("@/db/index");
+    expect(isLocal("postgres://postgres:pw@127.0.0.1:54329/postgres")).toBe(true);
+    expect(isLocal("postgres://postgres:pw@localhost:5432/postgres")).toBe(true);
+    expect(isLocal("postgresql://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres")).toBe(false);
+    expect(isLocal("not a url")).toBe(false);
   });
 });
 

@@ -24,9 +24,13 @@ async function connect(): Promise<DB> {
   if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is not set: add the Supabase pooler URL in the Vercel project settings.");
   if (!url) return openPglite(process.env.PGLITE_DIR ?? ".data/pg");
   const [{ default: postgres }, { drizzle }] = await Promise.all([import("postgres"), import("drizzle-orm/postgres-js")]);
-  // prepare: false is required by Supabase's transaction pooler (port 6543)
-  return drizzle(postgres(url, { prepare: false, max: 5 }), { schema }) as unknown as DB;
+  // prepare: false is required by Supabase's transaction pooler (port 6543).
+  // A hosted database is always reached over TLS; only a Postgres on this machine may go without.
+  return drizzle(postgres(url, { prepare: false, max: 5, ssl: isLocal(url) ? false : "require" }), { schema }) as unknown as DB;
 }
+
+/** Is this connection string for a Postgres on this machine (a local test database)? */
+export const isLocal = (url: string) => { try { return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(url).hostname); } catch { return false; } };
 
 /** A PGlite database with migrations applied. No `dataDir` means in-memory (tests). */
 export async function openPglite(dataDir?: string): Promise<DB> {

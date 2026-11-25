@@ -15,6 +15,13 @@
       "when": 1795454712343,
       "tag": "0001_events_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795645879165,
+      "tag": "0002_events_client_id",
+      "breakpoints": true
     }
   ]
 }
