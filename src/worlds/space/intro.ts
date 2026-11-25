@@ -62,7 +62,7 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "turn", chapter: "wake", title: "The look to the teacher", purpose: "The eyeline that hands the scene to her", seconds: 1.8, how: [["go", "turn"], ["wait", 1.6]] },
   { id: "ask", chapter: "wake", title: "The teacher asks", purpose: "Her face and the sum she has written, both lit by the window", seconds: 7, how: [["go", "q1"], ["wait", 2.6]] },
   { id: "board", chapter: "wake", title: "The sum on the board", purpose: "On a phone the question gets the frame to itself", seconds: 3, tallOnly: true, how: [["go", "q1"], ["wait", 5.6]] },
-  { id: "invite", chapter: "wake", title: "The class waits", purpose: "The cadet among the class, the board ahead, one clear thing to do", seconds: 9, how: [["go", "q1"], ["until", "raise"], ["wait", 1.2]] },
+  { id: "invite", chapter: "wake", title: "The class waits", purpose: "The cadet among the class, the board ahead, one clear thing to do", seconds: 7.5, how: [["go", "q1"], ["until", "raise"], ["wait", 1.2]] },
   { id: "called", chapter: "wake", title: "Hand up", purpose: "The cut lands on the arm going up, in clear space", seconds: 2.5, how: [["go", "q1"], ["until", "raise"], ["wait", 0.6], ["raise"], ["wait", 0.9]] },
   { id: "choose", chapter: "wake", title: "The answer", purpose: "What the cadet is looking at: the sum, with the two answers under it", seconds: 8, how: [["go", "q1"], ["until", "raise"], ["wait", 0.6], ["raise"], ["until", "choose"], ["wait", 0.6]] },
   { id: "answer", chapter: "wake", title: "You answer", purpose: "The cadet's face as the answer comes out", seconds: 2.3, how: [["go", "q1"], ["until", "raise"], ["wait", 0.6], ["raise"], ["until", "choose"], ["wait", 0.4], ["pick", 8], ["wait", 0.9]] },
@@ -83,10 +83,10 @@ const SHOTS: (Setup & { how: Op[] })[] = [
   { id: "ship", chapter: "hangar", title: "Your ship", purpose: "The rocket from low down, as tall as it will ever look", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief2"], ["wait", 2.4]] },
   { id: "rule", chapter: "hangar", title: "The rule", purpose: "Too few and ships slip past, too many and fuel burns: the Captain and the ship in one frame", seconds: 6, how: [["go", "hangar"], ["until", "captain_brief4"], ["wait", 2.2]] },
   { id: "nova", chapter: "hangar", title: "Nova", purpose: "Your co-pilot, close, with the one button under her", seconds: 9, how: [["go", "nova"], ["until", "cta"], ["wait", 0.8]] },
-  { id: "countdown", chapter: "hangar", title: "The countdown", purpose: "Anticipation: the pad's lights come on one by one, then a held breath", seconds: 2.9, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 1.8]] },
-  { id: "ignition", chapter: "hangar", title: "Ignition", purpose: "Release: the one glow in the film", seconds: 1.4, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 3.0]] },
-  { id: "liftoff", chapter: "hangar", title: "Lift-off", purpose: "The camera tips back to follow the rocket up to the oculus", seconds: 2.2, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 4.45]] },
-  { id: "arrive", chapter: "hangar", title: "Orbit", purpose: "The last frame, and the first of the battle: the rocket at bottom centre, Earth's horizon below", seconds: 6, how: [["go", "arrive"], ["wait", 5.6]] },
+  { id: "countdown", chapter: "hangar", title: "The countdown", purpose: "Anticipation: the pad's lights come on one by one, then a held breath", seconds: 2.5, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 1.8]] },
+  { id: "ignition", chapter: "hangar", title: "Ignition", purpose: "Release: the one glow in the film", seconds: 0.8, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 3.0]] },
+  { id: "liftoff", chapter: "hangar", title: "Lift-off", purpose: "The camera tips back to follow the rocket up to the oculus, and into cloud", seconds: 2.4, how: [["go", "nova"], ["wait", 0.4], ["ignite"], ["wait", 4.45]] },
+  { id: "arrive", chapter: "hangar", title: "Orbit", purpose: "The last frame, and the first of the battle: the rocket at bottom centre, Earth's horizon below", seconds: 5.9, how: [["go", "arrive"], ["wait", 5.6]] },
 ];
 export const SETUPS: Setup[] = SHOTS.map(({ id, chapter, title, purpose, seconds, tallOnly }) => ({ id, chapter, title, purpose, seconds, tallOnly }));
 
