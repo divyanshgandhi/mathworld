@@ -89,7 +89,7 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
         </Sheet>
       )}
       {saving === "waiting" && (
-        <p role="status" className="pointer-events-none absolute top-14 left-1/2 z-40 -translate-x-1/2 rounded-pill border border-line-1 px-3 py-1 text-xs text-ink-2">Not saved yet. Trying again.</p>
+        <p role="status" className="pointer-events-none absolute left-2 top-[42%] z-40 max-w-[5.5rem] text-xs text-ink-3">Not saved yet. Trying again.</p>
       )}
       {cadet === null && (
         <Sheet className="absolute inset-0 z-30 m-auto h-fit max-h-[92dvh] w-[min(92%,520px)] overflow-y-auto p-6 md:p-8">
