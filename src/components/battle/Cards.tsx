@@ -1,7 +1,7 @@
 "use client";
 import { Dialog, DialogBackdrop, DialogContent, DialogDescription, DialogTitle } from "@ui-sdk/react/dialog";
 import type { ReactNode } from "react";
-import { Button } from "@/components/kit/Button";
+import { Button, PillLink } from "@/components/kit/Button";
 import { Icon } from "@/components/kit/Icon";
 import { PlanetSprite } from "@/components/world/PlanetSprite";
 import type { TrickId } from "@/rig/tricks";
@@ -34,14 +34,18 @@ export function Card({ open, title, children, actions, art, dismissible = false,
   );
 }
 
-/** Before launch: the planet, what it teaches, how to win, Launch. */
+/** Before launch: the planet, what it teaches, how to win, Launch (and a quiet way back to the Star map). */
 export function BriefingCard({ open, body, name, teaches, win, onLaunch }: {
   open: boolean; body: BodyId | null; name: string; teaches: string; win: string; onLaunch: () => void;
 }) {
   return (
     <Card open={open} title={name} label={`${name} briefing`}
       art={body && <PlanetSprite id={body} size={132} alt="" />}
-      actions={<Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={onLaunch}>Launch</Button>}>
+      actions={<>
+        <Button variant="primary" size="md" data-primary className="w-full justify-between" onClick={onLaunch}>Launch</Button>
+        {/* the wrong planet tapped on the map: a quiet way back that is not the browser */}
+        <PillLink href="/map" variant="quiet" size="sm" icon="map" className="w-full justify-center">Star map</PillLink>
+      </>}>
       <p className={css.cardText}>{teaches}</p>
       <p className={css.cardText}><b>{win}</b></p>
     </Card>
