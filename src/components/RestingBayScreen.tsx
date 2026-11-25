@@ -52,10 +52,10 @@ export function RestingBayScreen() {
       {ready && (
         <>
           <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2">
-            <span className="flex h-11 items-center rounded-pill bg-void px-4 type-label text-ink-2">Resting Bay</span>
-            {cadet && <span className="rounded-pill bg-void px-3 py-1 type-body-sm text-ink-2">Cadet <b className="font-semibold text-approach">{cadet.name}</b></span>}
+            <span className="flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">Resting Bay</span>
+            {cadet && <span className="hidden rounded-pill bg-void px-3 py-1 type-body-sm text-ink-2 sm:inline">Cadet <b className="font-semibold text-approach">{cadet.name}</b></span>}
           </div>
-          <div className="pointer-events-none absolute right-16 top-3 z-10 flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
+          <div className="pointer-events-none absolute right-16 top-3 z-10 flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="hidden text-[15px] text-ink-2 sm:inline">orbs</span></div>
 
           {DOORS.map((d) => (
             <Anchor key={d.id} stage={stage} scene={scene} id={`door:${d.id}`} className="hidden md:block">
@@ -83,7 +83,7 @@ export function RestingBayScreen() {
             </Button>
           </Anchor>
           <Anchor stage={stage} scene={scene} id="desk:deck" className="hidden md:block">
-            <Button aria-label="Quick Flashcards" onClick={() => setDeck(true)} className={`${ghost} mt-12 bg-void`}>
+            <Button aria-label="Quick Flashcards" onClick={() => setDeck(true)} className={`${ghost} mt-20 bg-void`}>
               <Icon name="cards" size={18} />Quick Flashcards
             </Button>
           </Anchor>

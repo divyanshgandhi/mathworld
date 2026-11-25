@@ -100,8 +100,8 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       {/* the multiplication: big, centred, both axes named */}
       {w && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-14 md:px-0">
-          <div ref={plateRef} className={`${glass} px-5 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
-            <p className="whitespace-nowrap type-label-sm text-ink-2">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
+          <div ref={plateRef} className={`${glass} max-w-full px-4 py-2 text-center md:px-7 md:py-3`} aria-live="polite">
+            <p className="type-label-sm tracking-[0.08em] text-balance text-ink-2 md:whitespace-nowrap md:tracking-[0.16em]">{ui.planetName} · {ui.mode === "academy" ? "Trick film" : `${ui.mode === "practice" ? "Practice" : "Wave"} ${Math.min(w.index + 1, w.of)} of ${w.of}`}</p>
             <p className="mt-1 type-display type-number text-5xl md:mt-2 md:text-7xl">
               {fmt(ra)}<span className="mx-3 text-ink-3">×</span>{fmt(rb)}
             </p>
@@ -123,7 +123,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
             </div>
           )}
           {o && (
-            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number transition ${o.last ? "text-[15px] text-ink-2" : "text-lg"} ${o.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}>
+            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number transition ${o.last ? "border-line-2 text-[15px] text-ink-2" : `text-lg ${o.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}`}>
               {o.kind === "exact" && <Icon name="check" size={20} />}{o.last ? "Last shot: " : ""}{o.kind === "exact" ? `Dead on${o.orbs ? ` · +${o.orbs} orbs` : ""}` : o.kind === "under" ? `${fmt(o.value)} still flying` : `+${fmt(o.value)} flew past`}
             </div>
           )}
@@ -133,7 +133,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
       <div className="pointer-events-none absolute right-16 top-3 z-10 hidden h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px] md:flex"><Icon name="orb" size={20} className="text-gold" />{ui.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
       {menu && <div className="absolute left-3 top-3 z-20">{menu}</div>}
       {dev && (
-        <div className="pointer-events-none absolute left-3 top-16 z-10 hidden type-body-sm type-number text-ink-3 [:root:has([data-xray][data-open])_&]:block">
+        <div className="pointer-events-none absolute left-3 top-16 z-10 hidden type-body-sm type-number text-ink-3 [:root:has([data-xray][data-open])_&]:left-[356px] [:root:has([data-xray][data-open])_&]:block">
           <p>shots (s): {ui.shots.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
           <p>lessons (s): {ui.lessons.map((s) => (s / 1000).toFixed(1)).join(" · ") || "none"}</p>
         </div>
@@ -146,7 +146,7 @@ export function BattleHud({ arena, ui, onFly, dev = false, drone = false, doneAc
             <Toolbar aria-label="Tactical Belt" className="-mx-1 mb-1.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {ui.belt.map((t) => (
                 <ToolbarButton key={t.id} aria-label={`Power-Up ${t.card}`} aria-pressed={t.active} onClick={() => arena?.powerUp(t.id)} disabled={!ui.canFire || !!ui.lesson}
-                  className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-3 type-name text-[15px] transition data-disabled:border-line-1 data-disabled:bg-transparent data-disabled:text-ink-3 ${t.active ? "border-gold bg-raised text-gold" : t.fits ? "border-line-3 text-approach hover:border-gold" : "border-line-1 text-ink-3 hover:border-line-2"}`}>
+                  className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 type-name text-[15px] md:min-h-9 md:text-[14px] transition data-disabled:border-line-1 data-disabled:bg-transparent data-disabled:text-ink-3 ${t.active ? "border-gold bg-raised text-gold" : t.fits ? "border-line-3 text-approach hover:border-gold" : "border-line-1 text-ink-3 hover:border-line-2"}`}>
                   <Icon name="trick" size={16} />{t.card}
                 </ToolbarButton>
               ))}

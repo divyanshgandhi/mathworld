@@ -82,6 +82,7 @@ export function KitShowcase() {
   const [won, setWon] = useState(1);
   const [table, setTable] = useState<number | null>(7);
   const [lastFire, setLastFire] = useState<number | null>(null);
+  const [signUp, setSignUp] = useState(false);
 
   return (
     <div className="min-h-dvh bg-void text-approach">
@@ -289,8 +290,9 @@ export function KitShowcase() {
                 <p className="mt-2 text-center type-body-sm text-ink-3" role="status">{lastFire === null ? "Type or tap, then Fire. 0 is a fine answer." : `Fired ${lastFire}`}</p>
               </div>
             </div>
-            <div className="relative min-h-[520px] rounded-panel border border-dashed border-line-1">
-              <CadetSignUp cta="Start" onDone={() => {}} />
+            <div className="relative grid min-h-[520px] place-items-center rounded-panel border border-dashed border-line-1">
+              {/* the card takes focus when it mounts, so it waits for a press instead of jumping the page */}
+              {signUp ? <CadetSignUp cta="Start" onDone={() => setSignUp(false)} /> : <Button onClick={() => setSignUp(true)}>Show the sign-up card</Button>}
             </div>
           </div>
           <p className="mt-4 type-body-sm text-ink-3">The sign-up card is live: submitting it creates a cadet on this device.</p>

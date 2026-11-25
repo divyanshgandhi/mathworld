@@ -75,10 +75,10 @@ export function SolarMap() {
         <>
           <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
             <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
-            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-4 type-label text-ink-2">Solar System</span>
+            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">Solar System</span>
           </div>
           <div className="pointer-events-none absolute right-16 top-3.5 z-10 flex flex-col items-end gap-1.5">
-            <span className="flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="text-[15px] text-ink-2">orbs</span></span>
+            <span className="flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="hidden text-[15px] text-ink-2 sm:inline">orbs</span></span>
             {jump && <span className={`flex items-center gap-1.5 rounded-pill border bg-void px-3 py-1 text-xs ${jump.available ? "border-gold text-gold" : "border-line-1 text-ink-2"}`}><Icon name="jump" size={16} />{jump.label}</span>}
           </div>
 
@@ -96,13 +96,13 @@ export function SolarMap() {
             <div className={`${glass} absolute bottom-3 left-1/2 z-20 flex w-[min(94vw,520px)] -translate-x-1/2 items-center gap-4 p-4`} aria-live="polite">
               <div className="min-w-0 flex-1">
                 <p className="type-label-sm text-ink-2">{stop.tier === null ? "Inner planet · warm-up" : `Planet ${stop.tier} · ${STATUS[stop.status].label}`}</p>
-                <p className="mt-1 truncate type-display text-[34px]">{STOP_NAMES[stop.id]}</p>
+                <p className="mt-1 type-display text-[24px] leading-tight md:text-[30px]">{STOP_NAMES[stop.id]}</p>
                 <p className="mt-1 type-body-sm text-ink-2">{stop.status === "locked" ? `Clear ${STOP_NAMES[stops[i - 1]?.id ?? "earth"]} to open it` : stop.teaches}</p>
               </div>
               <Button disabled={stop.status === "locked"} onClick={() => launch(stop)} className={`${lime} mw-md mw-has-glyph shrink-0`}>{stop.status === "locked" && <Icon name="lock" size={18} />}{cta}<RocketGlyph size={34} /></Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 bottom-56 z-10 md:bottom-44 flex justify-center">
             <div className="pointer-events-auto flex gap-2">
               <Button aria-label="Previous planet" disabled={i === 0} onClick={() => setSel(Math.max(0, i - 1))} className="mw-btn mw-icon bg-void"><Icon name="back" size={20} /></Button>
               <Button aria-label="Next planet" disabled={i === stops.length - 1} onClick={() => setSel(Math.min(stops.length - 1, i + 1))} className="mw-btn mw-icon bg-void"><Icon name="forward" size={20} /></Button>

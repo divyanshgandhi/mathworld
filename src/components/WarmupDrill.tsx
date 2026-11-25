@@ -103,7 +103,7 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
       {started && p && !done && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">
           <div ref={plate} className={`${glass} px-6 py-2 text-center md:px-8 md:py-3`} aria-live="polite">
-            <p className="type-label-sm text-ink-2">{NAME[planet]} · warm-up {i + 1} of {WARMUP_LENGTH}</p>
+            <p className="type-label-sm tracking-[0.08em] text-ink-2 md:tracking-[0.16em]">{NAME[planet]} · warm-up {i + 1} of {WARMUP_LENGTH}</p>
             <p className="mt-1 type-display type-number text-5xl md:mt-2 md:text-7xl">{p.a}<span className="mx-3 text-ink-3">{sign}</span>{p.b}</p>
             <p className="mt-1.5 type-body-sm text-ink-2">{op === "add" ? <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> more arrive</> : <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> fly away</>}</p>
           </div>

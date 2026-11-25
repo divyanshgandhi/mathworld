@@ -48,7 +48,7 @@ export function HangarScreen() {
         <>
           <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
             <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
-            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-4 type-label text-ink-2">The Hangar</span>
+            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">The Hangar</span>
           </div>
           {flash && <div role="status" className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-pill border border-gold bg-void px-5 py-1.5 type-name text-[15px] text-gold"><Icon name="check" size={18} />{flash}</div>}
 
@@ -58,9 +58,9 @@ export function HangarScreen() {
               <p className="flex items-center gap-2 type-name type-number text-lg" aria-label={`${state.orbs} orbs`}><Icon name="orb" size={20} className="text-gold" />{state.orbs}</p>
             </div>
             <Tabs value={slot} onValueChange={(v) => v && setSlot(v as Slot)}>
-              <TabsList aria-label="Upgrade slots" className="mb-3 grid grid-cols-3 gap-1 rounded-pill border border-line-1 p-1">
+              <TabsList aria-label="Upgrade slots" className="mb-3 grid grid-cols-3 gap-1 rounded-chip border border-line-1 p-1">
                 {UPGRADE_SLOTS.map((s) => (
-                  <TabsTab key={s} value={s} className="min-h-10 rounded-pill px-2 type-name text-[15px] text-ink-2 transition hover:text-approach data-selected:bg-raised data-selected:text-approach data-selected:ring-1 data-selected:ring-approach">{SLOT_NAMES[s]}</TabsTab>
+                  <TabsTab key={s} value={s} className="min-h-11 rounded-[10px] px-1.5 type-name text-[15px] leading-tight text-ink-2 transition hover:text-approach data-selected:bg-raised data-selected:text-approach data-selected:ring-1 data-selected:ring-approach">{SLOT_NAMES[s]}</TabsTab>
                 ))}
               </TabsList>
               {UPGRADE_SLOTS.map((s) => (

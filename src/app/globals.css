@@ -92,28 +92,31 @@
   --color-foreground: var(--foreground);
 }
 
-html,
-body {
-  background: var(--color-void);
-  color: var(--color-approach);
-}
+/* base element styles sit in the base layer, so the kit and utilities can refine them (an input's focus) */
+@layer base {
+  html,
+  body {
+    background: var(--color-void);
+    color: var(--color-approach);
+  }
 
-body {
-  font-family: var(--font-sans);
-  font-weight: 400;
-  font-stretch: 100%;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-stretch: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-::selection {
-  background: var(--color-gold);
-  color: var(--color-void);
-}
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-void);
+  }
 
-:focus-visible {
-  outline: 2px solid var(--color-gold);
-  outline-offset: 4px;
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 4px;
+  }
 }
 
 /* the three voices of TYPE (src/design/tokens.ts). Sizes never go under the voice's minimum. */

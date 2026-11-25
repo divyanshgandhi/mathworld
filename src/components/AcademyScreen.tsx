@@ -62,7 +62,7 @@ export function AcademyScreen() {
       <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
         <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
         {film ? <Button aria-label="All Trick Cards" onClick={() => setFilm(null)} className={`${ghost} bg-void`}><Icon name="trick" size={18} />Cards</Button>
-          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-4 type-label text-ink-2">The Academy</span>}
+          : <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">The Academy</span>}
       </div>
 
       {!film && state && (
