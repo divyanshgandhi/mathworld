@@ -125,6 +125,52 @@ Frozen for everyone: `src/rig/**` (except `academy.ts`), `src/components/battle/
 - **Planet art:** every 2D planet is `<PlanetSprite id size />`. Every 3D planet is `makeBody`.
 - **The film's last frame** is the rocket at bottom centre on the void with Earth's horizon below. The Earth battle opens on the same frame, so the cut is clean.
 
+## Review round (after the owner played the wave 2 build)
+
+The owner played the merged build and gave seven points. They are the brief for this round, and they win over anything above that disagrees.
+
+1. **Film pacing.** The pauses are too long. It does not feel like natural dialogue, between characters or between lines.
+2. **Power-Ups as a popup.** Tapping Power-Ups opens a popup that shows the list properly.
+3. **Phone cockpit.** On a phone the cockpit is crowded and jumbled.
+4. **Star map card.** Too much empty space, not aligned with its text. "You are here" is a chip above the title.
+5. **Star map movement.** One planet at a time, by natural scrolling or arrows, opening on the current planet. Not all the planets in one row.
+6. **Guided helpers.** A highlighted guide that shows the student what is available, like the tour of a complex interface.
+7. **The play area.** At a wave's start, squad lines and count numbers appear and collide, and the total is visible while the count runs. Everything that happens in the play area is to be dissected and put right.
+
+### Decisions for this round (closed)
+1. **Nothing is drawn on the fleet before the first answer.** No bracket, no row numbers, no "7 squads", for any fleet, met or never met, including 0 x n and 1 x n. The first-sight soft scan is retired; `ui.hint` never says `soft`.
+2. **A scan counts one thing at a time.** One squad lights, one number shows beside it, big enough to read, in a lane outside the fleet. The number before it goes. The total ("7 squads") does not exist on screen, in the world or in the strip, until the last squad has been counted. `ui.hint.squads` and `ui.hint.each` turn `on` only when their count has finished.
+3. **One voice at a time during a hint.** The strip's miss line, then the scan, then Nova's short line. Never four sources of words inside three seconds.
+4. **One Power-Ups button.** The console has a single button with the word "Power-Ups". It opens a list: glyph, name, one line of what it does, and whether it fits this fleet. Tapping a row that fits closes the list and runs it. The game holds while the list is open. No icon-only Power-Up buttons anywhere.
+5. **The phone console has three rows:** digits, digits, then Power-Ups, delete and Show me how, each with its word, each 44 px or more.
+6. **The Star map is a pager.** One planet a page, swipe or scroll sideways, arrows at the sides, arrow keys, a row of ten dots for the whole journey. It opens on the cadet's planet. Neighbours peek at the edges.
+7. **The map's card is as wide as its words.** Chip ("You are here", "Cleared", "Locked"), name, one line, the table rows, one button. A locked planet names the next planet to clear, not one two steps away.
+8. **Tours are spotlights.** A dimmed screen with a cut-out round one control, one line of ten words or fewer, dots, Next and Skip. Four steps at most, one idea a step, shown once (`tour:<id>`), replayable from the help button. A tour never runs with the guided first shot, never during a wave's action, and replaces that screen's greeting.
+9. **Dialogue has a rhythm.** A reply starts 0.15 to 0.45 s after the line before it ends; the same speaker's next thought 0.3 to 0.6 s; a change of scene 0.6 to 1.0 s. No silent hold over 1.2 s unless something is visibly happening. A heard caption leaves with its voice. Read alone (sound off), a caption holds 0.8 s plus 0.42 s a word.
+10. **No new spoken line without its clip.** A changed line is re-baked in the same commit, by the film track only. Other tracks pick an existing line or stay silent.
+
+### Tracks and what each owns (review round)
+| Track | Builds | Owns |
+| --- | --- | --- |
+| `film` | Point 1: the pacing pass, with a timeline of every gap before and after | the film's files, `src/engine/overlay.ts`, `src/worlds/space/lines.ts`, `public/vo/**`, `scripts/bake-voices.py` |
+| `cockpit` | Points 2 and 3: the Power-Ups list, the phone console, plus the orb counter that lags its "+N orbs" line and a card for a mission that was not won | `src/components/battle/**` (not `ui.tsx`), `src/components/WaveArena.tsx`, `src/components/WarmupDrill.tsx` |
+| `map` | Points 4 and 5: the Star map as a pager with a compact card | `src/components/SolarMap.tsx`, `src/components/world/**`, `src/app/map/**` |
+| `tour` | Point 6: the spotlight tour and its tours | `src/teach/**`, `src/components/teach/**`, `src/app/dev/teach/**`, `docs/teaching.md`; attribute-only edits (`data-guide`) in `RestingBayScreen.tsx`, `HangarScreen.tsx`, `AcademyScreen.tsx` and the kit's `TopBar` |
+| `playfield` | Point 7: the dissection (`docs/overhaul/playfield.md`), the scan, labels that cannot collide, fleet size on phones | `src/battle/**` (not `rewards.ts`), `src/worlds/space/{arena,warmup,skies,cadetBay,ships}.ts`, `src/engine/**` (not `overlay.ts`, not `outbox.ts`), `src/director/next.ts` |
+
+Frozen for every track: `src/rig/**`, `src/director/{fold,hub,hangar}.ts`, `src/db/**`, `src/app/api/**`, `package.json`, the lockfile, `OVERHAUL.md`, `PRODUCT.md`, `CLAUDE.md`, `STATE.md`.
+
+### Contracts (review round)
+- **Arena and console:** unchanged. `arena.powerUp(id)`, `ui.belt`, `ui.hint.powerUp`, `arena.setSafe`, `arena.captionAt`, `hold.on(reason)` and `hold.off(reason)`.
+- **Hints:** `ui.hint.squads` and `ui.hint.each` are `'on' | 'off'`; `on` arrives when the count has finished. The console prints structure words only from `ui.hint`.
+- **Guide anchors** (`data-guide`), which the tour finds by name:
+  - battle: `question`, `keypad`, `fire`, `help`, `powerups` (the one button), `orbs`, `dots` (the mission's wave dots), `pause`;
+  - Star map: `map-planet`, `map-card`, `map-prev`, `map-next`, `map-dots`, `map-launch`;
+  - Resting Bay: `bay-launch`, `bay-tables`, `bay-places`, `orbs`, `help`;
+  - Hangar: `hangar-list`, `hangar-rocket`, `hangar-buy`; Academy: `academy-list`.
+- **Tour:** `<Tour id steps />` from `src/components/teach`, where a step is `{ anchor, line }`. Seen key `tour:<id>`. `hold.on('tour')` while it runs in a battle.
+- **Handoff notes:** `docs/overhaul/r1-<track>.md`.
+
 ## Working rules for every track
 - Work only inside your own worktree and commit only to your own branch. Never switch branches, never push, never edit another worktree or the `main` checkout.
 - Edit only the files your track owns. If you need a change in a file you do not own, write it down in your handoff note; do not make it.
