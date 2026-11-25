@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { EventInput } from "@/db/events";
 import type { Stage } from "@/engine/stage";
 import type { LoggedEvent } from "@/director/fold";
+import { themeOf } from "@/battle/planets";
 import { mountArena, type ArenaUi } from "./arena";
 import { SPACE_AT } from "./intro";
 
@@ -14,7 +15,7 @@ export type BayUi = ArenaUi;
 const BAY = SPACE_AT.clone().add(new THREE.Vector3(0, 34, 46));
 
 export function mountCadetBay(stage: Stage, opts: { onUi?: (ui: BayUi) => void; onEvent?: (e: EventInput) => void; history?: LoggedEvent[]; seed?: number; dev?: boolean } = {}) {
-  const arena = mountArena(stage, { ...opts, planet: "earth", origin: BAY, sky: false, lines: { intro: "nova_l0_intro", clear: "nova_l0_clear" } });
+  const arena = mountArena(stage, { ...opts, planet: "earth", origin: BAY, sky: false, lines: { intro: themeOf("earth").intro, clear: themeOf("earth").introClear } });
   arena.start();
   return arena;
 }
