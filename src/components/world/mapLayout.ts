@@ -11,6 +11,7 @@ export interface MapLayout {
   mode: "side" | "stack";
   /** The page's width. */
   w: number;
+  /** A short page: the card sets itself tighter (and, on its side, the dots move under the planet). */
   short: boolean;
   /** The hero planet's size and centre, in page pixels. */
   hero: number; heroCx: number; heroCy: number;
@@ -62,13 +63,15 @@ export function mapLayout(w: number, h: number, cardH: number): MapLayout {
   }
   const cardMaxW = Math.min(CARD_MAX, w - 32);
   const stageH = h - cardH - DOTS_H - 12;
-  const hero = step(clamp(Math.min(stageH - 32, w * 0.56), 88, 320));
-  const heroCx = Math.round(w / 2), heroCy = Math.round(Math.max(hero / 2 + 12, stageH / 2));
-  const cardTop = Math.round(Math.max(heroCy + hero / 2 + 16, stageH));
+  const hero = step(clamp(Math.min(stageH - 32, w * 0.56), 88, 360));
+  // the planet and the tallest card centred as one column above the dots
+  const top = Math.max(12, (h - DOTS_H - 12 - (hero + 24 + cardH)) / 2);
+  const heroCx = Math.round(w / 2), heroCy = Math.round(top + hero / 2);
+  const cardTop = Math.round(top + hero + 24);
   const peek = step(clamp(hero * 0.26, 32, 56));
   const arrowLeftX = Math.max(8, Math.round(heroCx - hero / 2 - ARROW - 10));
   return {
-    mode: "stack", w, short: false, hero, heroCx, heroCy,
+    mode: "stack", w, short: h < 600, hero, heroCx, heroCy,
     cardLeft: Math.round((w - cardMaxW) / 2), cardMaxW, cardCy: 0, cardTop,
     peek, peekLeftCx: 0, peekRightCx: w,
     arrowY: heroCy, arrowLeftX, arrowRightX: w - arrowLeftX - ARROW,

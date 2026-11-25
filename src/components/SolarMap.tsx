@@ -163,7 +163,7 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
     if (!stops) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector("dialog[open], [role=dialog]")) return;
-      const t = e.target as HTMLElement | null;
+      const t = e.target instanceof HTMLElement ? e.target : null;
       if (t && t !== document.body && !t.closest("[data-pager]") && !t.closest("[data-map-control]")) return;
       if (e.key === "ArrowRight") { e.preventDefault(); go(atRef.current + 1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); go(atRef.current - 1); }
