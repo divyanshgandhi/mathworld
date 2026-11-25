@@ -12,6 +12,7 @@ import { PLANET_NAMES } from "@/worlds/space/lines";
 import { BattleHud } from "./battle/BattleHud";
 import { PauseMenu } from "./battle/PauseMenu";
 import { CadetSignUp, ghost, lime, type Cadet } from "./battle/ui";
+import { RocketGlyph } from "./kit/Icon";
 
 declare global { interface Window { __mw?: { stage: Stage; arena?: Arena; [k: string]: unknown } } }
 
@@ -66,13 +67,13 @@ export function WaveArena({ planet }: { planet: PlanetId }) {
   const fly = async (to: PlanetId) => { await flushed(); router.push(`/play/${to}${dev ? "?dev" : ""}`); };
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-[#030612] text-white">
+    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
-      {cadet === null && <CadetSignUp cta="▶ Enlist" onDone={setCadet} />}
+      {cadet === null && <CadetSignUp cta="Enlist" onDone={setCadet} />}
       <BattleHud arena={arena} ui={ui} onFly={(to) => void fly(to)} dev={dev} drone={planet === "earth"} menu={<PauseMenu />}
         doneActions={(d) => (
           <>
-            {d.next && <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void fly(d.next!)}>🚀 Fly to {PLANET_NAMES[d.next]}</Button>}
+            {d.next && <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => void fly(d.next!)}>Fly to {PLANET_NAMES[d.next]}<RocketGlyph size={34} /></Button>}
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Solar map</Button>
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/bay"))}>Resting Bay</Button>
           </>

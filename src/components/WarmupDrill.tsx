@@ -10,6 +10,7 @@ import { warmupRun, WARMUP_LENGTH, WARMUP_OF } from "@/rig/warmup";
 import type { Warmup } from "@/worlds/space/warmup";
 import { PauseMenu } from "./battle/PauseMenu";
 import { ghost, glass, Keypad, lime } from "./battle/ui";
+import { Icon, RocketGlyph } from "./kit/Icon";
 import { useCadet } from "./hub/useCadet";
 import { useScene } from "./hub/Scene";
 
@@ -21,7 +22,7 @@ const NAME = { mercury: "Mercury", venus: "Venus" } as const;
  */
 export function WarmupDrill({ planet }: { planet: "mercury" | "venus" }) {
   const cadet = useCadet();
-  if (!cadet.state) return <div className="fixed inset-0 bg-[#030612]" />;
+  if (!cadet.state) return <div className="fixed inset-0 bg-void" />;
   return <Drill planet={planet} state={cadet.state} emit={cadet.emit} />;
 }
 
@@ -94,21 +95,21 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
 
   const sign = op === "add" ? "+" : "−", done = i >= WARMUP_LENGTH;
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-[#030612] text-white">
+    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
       <div className="absolute left-3 top-3 z-20"><PauseMenu label="Warm-up paused" /></div>
-      <div className="pointer-events-none absolute right-16 top-3.5 z-10 hidden rounded-full bg-black/40 px-3 py-1 font-mono text-xs text-amber-200 md:block">✦ {state.orbs} orbs</div>
+      <div className="pointer-events-none absolute right-16 top-3 z-10 hidden h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px] md:flex"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="text-[15px] text-ink-2">orbs</span></div>
 
       {started && p && !done && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2">
           <div ref={plate} className={`${glass} px-6 py-2 text-center md:px-8 md:py-3`} aria-live="polite">
-            <p className="font-mono text-[11px] tracking-[0.3em] text-lime-200/80">{NAME[planet].toUpperCase()} · WARM-UP {i + 1}/{WARMUP_LENGTH}</p>
-            <p className="mt-0.5 font-mono text-5xl font-semibold tabular-nums md:text-7xl">{p.a}<span className="mx-3 text-lime-300">{sign}</span>{p.b}</p>
-            <p className="mt-1 text-sm text-white/75">{op === "add" ? <><b className="text-white">{p.a}</b> drones · <b className="text-white">{p.b}</b> more arrive</> : <><b className="text-white">{p.a}</b> drones · <b className="text-white">{p.b}</b> fly away</>}</p>
+            <p className="type-label-sm text-ink-2">{NAME[planet]} · warm-up {i + 1} of {WARMUP_LENGTH}</p>
+            <p className="mt-1 type-display type-number text-5xl md:mt-2 md:text-7xl">{p.a}<span className="mx-3 text-ink-3">{sign}</span>{p.b}</p>
+            <p className="mt-1.5 type-body-sm text-ink-2">{op === "add" ? <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> more arrive</> : <><b className="font-semibold text-approach">{p.a}</b> drones · <b className="font-semibold text-approach">{p.b}</b> fly away</>}</p>
           </div>
           {outcome && (
-            <div role="status" className={`rounded-full px-5 py-1 font-mono text-lg font-semibold shadow-lg ${outcome.kind === "exact" ? "bg-lime-300 text-[#0d0e1a]" : "bg-[#ff8f70] text-[#1a0d0d]"}`}>
-              {outcome.kind === "exact" ? "✓ Dead on" : outcome.kind === "under" ? `${outcome.value} still flying` : `+${outcome.value} flew past`}
+            <div role="status" className={`flex items-center gap-2 rounded-pill border bg-void px-5 py-1.5 type-name type-number text-lg ${outcome.kind === "exact" ? "border-gold text-gold" : "border-ember text-ember"}`}>
+              {outcome.kind === "exact" && <Icon name="check" size={20} />}{outcome.kind === "exact" ? "Dead on" : outcome.kind === "under" ? `${outcome.value} still flying` : `+${outcome.value} flew past`}
             </div>
           )}
         </div>
@@ -122,16 +123,17 @@ function Drill({ planet, state, emit }: { planet: "mercury" | "venus"; state: Pl
 
       {!started && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-fit flex-col items-center gap-3 p-6 text-center`}>
-          <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{NAME[planet].toUpperCase()} · {op === "add" ? "ADDITION" : "SUBTRACTION"} WARM-UP</p>
-          <p className="text-white/80">Five quick ones, up to 20.</p>
-          <Button className={`${lime} px-7 py-3 text-base`} onClick={() => void start()}>🚀 Launch (sound on)</Button>
+          <p className="type-display text-4xl">{NAME[planet]}</p>
+          <p className="type-label-sm text-ink-2">{op === "add" ? "Addition" : "Subtraction"} warm-up</p>
+          <p className="type-child text-ink-2">Five quick ones, up to 20.</p>
+          <Button className={`${lime} mw-md mw-has-glyph`} onClick={() => void start()}>Launch (sound on)<RocketGlyph size={34} /></Button>
         </div>
       )}
       {done && (
         <div className={`${glass} absolute inset-0 z-20 m-auto flex h-fit w-[min(92%,420px)] flex-col items-center gap-3 p-6 text-center`}>
-          <p className="font-mono text-xs tracking-[0.3em] text-lime-300">{NAME[planet].toUpperCase()}</p>
-          <p className="text-3xl font-semibold tracking-wide">WARM-UP DONE</p>
-          <p className="text-white/75">{score}/{WARMUP_LENGTH} first try · ✦ {state.orbs} orbs</p>
+          <p className="type-label-sm text-ink-2">{NAME[planet]}</p>
+          <p className="type-display text-4xl">Warm-up done</p>
+          <p className="flex items-center gap-2 type-child text-ink-2">{score} of {WARMUP_LENGTH} first try · <Icon name="orb" size={20} className="text-gold" />{state.orbs} orbs</p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button className={`${lime} px-6 py-3 text-base`} onClick={() => void flushed().then(() => router.push("/map"))}>Solar map</Button>
             <Button className={`${ghost} px-5 py-3 text-base`} onClick={() => { setSeed((x) => x + 7); setI(0); setScore(0); setOutcome(null); }}>Again</Button>

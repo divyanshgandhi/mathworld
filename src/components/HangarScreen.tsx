@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { UPGRADE_SLOTS } from "@/db/events";
 import { CATALOG, priceFor, purchase, SLOT_NAMES, STARTER, type Slot } from "@/director/hangar";
 import type { HangarBay, ShipStyle } from "@/worlds/space/hangarBay";
-import { ghost, glass, lime } from "./battle/ui";
+import { ghost, glass } from "./battle/ui";
+import { Icon } from "./kit/Icon";
 import { useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
 
@@ -41,25 +42,25 @@ export function HangarScreen() {
   };
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-[#060a16] text-white">
+    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
       <div ref={box} className="absolute inset-0" />
       {state && scene && (
         <>
           <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
-            <Button aria-label="Resting Bay" onClick={() => router.push("/bay")} className={`${ghost} grid size-10 place-items-center bg-black/45 p-0 text-lg`}>⌂</Button>
-            <span className={`${glass} pointer-events-none px-4 py-2 font-mono text-xs tracking-[0.25em] text-lime-200`}>THE HANGAR</span>
+            <Button aria-label="Resting Bay" title="Resting Bay" onClick={() => router.push("/bay")} className="mw-btn mw-icon bg-void"><Icon name="home" size={20} /></Button>
+            <span className="pointer-events-none flex h-11 items-center rounded-pill bg-void px-4 type-label text-ink-2">The Hangar</span>
           </div>
-          {flash && <div role="status" className="absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-full bg-lime-300 px-5 py-1.5 font-mono text-sm font-semibold text-[#0d0e1a] shadow-lg">✓ {flash}</div>}
+          {flash && <div role="status" className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-pill border border-gold bg-void px-5 py-1.5 type-name text-[15px] text-gold"><Icon name="check" size={18} />{flash}</div>}
 
           <div className={`${glass} absolute bottom-2 left-1/2 z-10 w-[min(96vw,380px)] -translate-x-1/2 p-3 md:bottom-auto md:left-auto md:right-5 md:top-1/2 md:w-[360px] md:-translate-y-1/2 md:translate-x-0 md:p-4`}>
             <div className="mb-3 flex items-baseline justify-between">
-              <p className="font-mono text-[11px] tracking-[0.25em] text-white/55">SHIP UPGRADES</p>
-              <p className="font-mono text-lg text-amber-200" aria-label={`${state.orbs} orbs`}>✦ {state.orbs}</p>
+              <p className="type-label-sm text-ink-2">Ship upgrades</p>
+              <p className="flex items-center gap-2 type-name type-number text-lg" aria-label={`${state.orbs} orbs`}><Icon name="orb" size={20} className="text-gold" />{state.orbs}</p>
             </div>
             <Tabs value={slot} onValueChange={(v) => v && setSlot(v as Slot)}>
-              <TabsList aria-label="Upgrade slots" className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-black/35 p-1">
+              <TabsList aria-label="Upgrade slots" className="mb-3 grid grid-cols-3 gap-1 rounded-pill border border-line-1 p-1">
                 {UPGRADE_SLOTS.map((s) => (
-                  <TabsTab key={s} value={s} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-white/70 outline-none data-selected:bg-lime-300 data-selected:text-[#0d0e1a] focus-visible:ring-2 focus-visible:ring-lime-300">{SLOT_NAMES[s]}</TabsTab>
+                  <TabsTab key={s} value={s} className="min-h-10 rounded-pill px-2 type-name text-[15px] text-ink-2 transition hover:text-approach data-selected:bg-raised data-selected:text-approach data-selected:ring-1 data-selected:ring-approach">{SLOT_NAMES[s]}</TabsTab>
                 ))}
               </TabsList>
               {UPGRADE_SLOTS.map((s) => (
@@ -68,21 +69,21 @@ export function HangarScreen() {
                     const price = priceFor(s, item.id, state.owned) ?? item.cost, on = equipped(s) === item.id, looking = shown(s) === item.id;
                     const afford = price <= state.orbs;
                     return (
-                      <div key={item.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition ${looking ? "border-lime-300/70 bg-lime-300/10" : "border-white/10 bg-white/[.03]"}`}>
-                        <Button aria-label={`Preview ${item.name}`} aria-pressed={looking} onClick={() => setPreview((p) => ({ ...p, [s]: item.id }))} className="min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-lime-300">
-                          <span className="block truncate text-sm font-semibold">{item.name}</span>
-                          <span className="block truncate text-[11px] text-white/55">{item.blurb}</span>
+                      <div key={item.id} className={`flex items-center gap-2 rounded-chip border px-3 py-2 transition ${looking ? "border-line-3 bg-raised" : "border-line-1"}`}>
+                        <Button aria-label={`Preview ${item.name}`} aria-pressed={looking} onClick={() => setPreview((p) => ({ ...p, [s]: item.id }))} className="min-w-0 flex-1 rounded-[8px] text-left">
+                          <span className="block truncate type-name text-[16px]">{item.name}</span>
+                          <span className="block truncate text-xs text-ink-2">{item.blurb}</span>
                         </Button>
-                        {on ? <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-mono text-[11px] text-lime-200">ON</span>
+                        {on ? <span className="flex shrink-0 items-center gap-1 rounded-pill border border-line-2 px-2.5 py-1 type-label-sm text-approach"><Icon name="check" size={14} />On</span>
                           : price === 0 ? <Button aria-label={`Equip ${item.name}`} onClick={() => buy(s, item.id)} className={`${ghost} shrink-0 px-3 py-1 text-xs`}>Equip</Button>
-                            : <Button aria-label={`Buy ${item.name} for ${price} orbs`} disabled={!afford} onClick={() => buy(s, item.id)} className={`${lime} shrink-0 px-3 py-1 text-xs`}>✦ {price}</Button>}
+                            : <Button aria-label={`Buy ${item.name} for ${price} orbs`} disabled={!afford} onClick={() => buy(s, item.id)} className={`${ghost} shrink-0 px-3 py-1 type-number text-[15px]`}><Icon name="orb" size={16} className={afford ? "text-gold" : ""} />{price}</Button>}
                       </div>
                     );
                   })}
                 </TabsPanel>
               ))}
             </Tabs>
-            <p className="mt-3 text-center text-[11px] text-white/45">Earn Orbs by clearing waves. They are never lost.</p>
+            <p className="mt-3 text-center text-xs text-ink-3">Earn Orbs by clearing waves. They are never lost.</p>
           </div>
         </>
       )}
