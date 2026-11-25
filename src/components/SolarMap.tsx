@@ -118,7 +118,9 @@ export function SolarMap({ onHelp }: { onHelp?: () => void } = {}) {
       const u = new URL(location.href);
       u.searchParams.set("at", stops[at].id);
       u.searchParams.delete("locked");
-      if (u.href !== location.href) history.replaceState(history.state, "", u.href);
+      // URLSearchParams writes a bare flag as "dev=": keep it bare
+      const href = u.href.replace(/([?&][a-z]+)=(?=&|$)/g, "$1");
+      if (href !== location.href) history.replaceState(history.state, "", href);
     }, 200);
     return () => window.clearTimeout(t);
   }, [stops, at]);
