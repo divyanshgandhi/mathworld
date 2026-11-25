@@ -34,19 +34,20 @@ const mixed = (a: string, b: string, pct: number) => `color-mix(in oklab, ${v(a)
 /** The registry: one entry per thing a cadet can put on their rocket. Starters first in each slot. */
 export const ITEMS: Item[] = [
   // ---- Paint ----
-  { id: "cadet-white", slot: "hull", name: "Cadet White", cost: 0, blurb: "Your first paint, fresh from the hangar", swatch: { kind: "paint", main: v("approach"), second: v("sky") } },
+  { id: "cadet-white", slot: "hull", name: "Cadet White", cost: 0, blurb: "Your very first paint", swatch: { kind: "paint", main: v("approach"), second: v("sky") } },
   { id: "solar-gold", slot: "hull", name: "Solar Gold", cost: 30, blurb: "Gold all over, like the Sun", swatch: { kind: "paint", main: v("gold"), second: v("ember") } },
-  { id: "nebula-violet", slot: "hull", name: "Nebula Violet", cost: 100, blurb: "Deep purple with gold trim", unlock: { cleared: "moon" }, swatch: { kind: "paint", main: mixed("disk", "recede", 22), second: v("gold") } },
-  { id: "obsidian-stealth", slot: "hull", name: "Obsidian Stealth", cost: 160, blurb: "Almost black, with sky-blue trim", unlock: { cleared: "mars" }, swatch: { kind: "paint", main: v("horizon"), second: v("sky") } },
+  { id: "nebula-violet", slot: "hull", name: "Nebula Violet", cost: 110, blurb: "Deep purple with gold trim", unlock: { cleared: "moon" }, swatch: { kind: "paint", main: mixed("disk", "recede", 22), second: v("gold") } },
+  { id: "obsidian-stealth", slot: "hull", name: "Obsidian Stealth", cost: 170, blurb: "Near black, sky-blue trim", unlock: { cleared: "mars" }, swatch: { kind: "paint", main: v("horizon"), second: v("sky") } },
   // ---- Blasters ----
-  { id: "plasma-ball", slot: "blaster", name: "Plasma Ball", cost: 0, blurb: "One white ball for every ship", swatch: { kind: "ball", main: v("approach"), second: v("approach"), shape: "one" } },
-  { id: "twin-plasma", slot: "blaster", name: "Twin Plasma", cost: 60, blurb: "Two small blue balls side by side", swatch: { kind: "ball", main: v("sky"), second: v("sky"), shape: "twin" } },
-  { id: "ion-arc", slot: "blaster", name: "Ion Arc", cost: 120, blurb: "Long blue bolts", unlock: { cleared: "moon" }, swatch: { kind: "ball", main: mixed("sky", "disk", 35), second: v("sky"), shape: "bolt" } },
-  { id: "nova-beam", slot: "blaster", name: "Nova Beam", cost: 200, blurb: "Thin gold streaks of light", unlock: { cleared: "asteroid-belt" }, swatch: { kind: "ball", main: v("gold"), second: v("gold"), shape: "beam" } },
+  // Twin Plasma ("twin-plasma" in ships.ts) is not sold: it draws two balls a shot, so a 7 would show
+  // 14 balls and the answer would no longer be the count. It comes back once it reads as one ball.
+  { id: "plasma-ball", slot: "blaster", name: "Plasma Ball", cost: 0, blurb: "One white ball per ship", swatch: { kind: "ball", main: v("approach"), second: v("approach"), shape: "one" } },
+  { id: "ion-arc", slot: "blaster", name: "Ion Arc", cost: 70, blurb: "Long blue bolts", swatch: { kind: "ball", main: mixed("sky", "disk", 35), second: v("sky"), shape: "bolt" } },
+  { id: "nova-beam", slot: "blaster", name: "Nova Beam", cost: 210, blurb: "Thin gold streaks of light", unlock: { cleared: "asteroid-belt" }, swatch: { kind: "ball", main: v("gold"), second: v("gold"), shape: "beam" } },
   // ---- Thrusters ----
   { id: "amber-flame", slot: "thruster", name: "Amber Flame", cost: 0, blurb: "A short orange flame", swatch: { kind: "flame", main: v("ember"), second: v("gold"), shape: "short" } },
-  { id: "cyan-ion", slot: "thruster", name: "Cyan Ion", cost: 80, blurb: "A long, cool blue jet", swatch: { kind: "flame", main: v("sky"), second: v("approach"), shape: "long" } },
-  { id: "starlight-comet", slot: "thruster", name: "Starlight Comet", cost: 140, blurb: "A white comet tail with gold sparks", unlock: { cleared: "mars" }, swatch: { kind: "flame", main: v("approach"), second: v("gold"), shape: "comet" } },
+  { id: "cyan-ion", slot: "thruster", name: "Cyan Ion", cost: 90, blurb: "A long, cool blue jet", swatch: { kind: "flame", main: v("sky"), second: v("approach"), shape: "long" } },
+  { id: "starlight-comet", slot: "thruster", name: "Starlight Comet", cost: 140, blurb: "White tail, gold sparks", unlock: { cleared: "mars" }, swatch: { kind: "flame", main: v("approach"), second: v("gold"), shape: "comet" } },
 ];
 
 /** The slots, in tab order, with their one-word names (three tabs fit one row on any screen). */

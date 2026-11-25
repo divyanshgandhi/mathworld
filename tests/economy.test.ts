@@ -142,7 +142,7 @@ describe("the catalogue (src/director/hangar.ts)", () => {
     }
     expect(new Set(ITEMS.map((i) => `${i.slot}:${i.id}`)).size).toBe(ITEMS.length);
     for (const i of ITEMS) {
-      expect(i.blurb.length).toBeLessThanOrEqual(40);
+      expect(i.blurb.length).toBeLessThanOrEqual(28); // one line on a 360 px phone
       expect(i.blurb[0]).toBe(i.blurb[0].toUpperCase());
       expect(i.swatch.main + i.swatch.second).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i); // token variables only
     }
@@ -152,6 +152,8 @@ describe("the catalogue (src/director/hangar.ts)", () => {
     const { BLASTERS, HULLS, THRUSTERS } = await import("@/worlds/space/ships");
     const styles = { hull: HULLS, blaster: BLASTERS, thruster: THRUSTERS };
     for (const i of ITEMS) expect(Object.keys(styles[i.slot]), i.id).toContain(i.id);
+    // a blaster that draws more than one ball a shot would break "the answer is the count"
+    for (const i of CATALOG.blaster) expect(BLASTERS[i.id as keyof typeof BLASTERS].twin, i.id).toBe(false);
   });
 
   it("ties the dearer looks to planets, and the shop always shows a goal", () => {
@@ -166,11 +168,11 @@ describe("the catalogue (src/director/hangar.ts)", () => {
     const s = fold(rich);
     expect(s.orbs).toBeGreaterThan(100);
     expect(purchase(s, "hull", "nebula-violet")).toBeNull();
-    expect(fold([...rich, { type: "upgrade_purchased", payload: { slot: "hull", itemId: "nebula-violet", cost: 100 } }]).equipped.hull).toBeUndefined();
+    expect(fold([...rich, { type: "upgrade_purchased", payload: { slot: "hull", itemId: "nebula-violet", cost: 110 } }]).equipped.hull).toBeUndefined();
     // after the Moon, it opens
     const moon = { ...s, cleared: [0, 1] };
     expect(isUnlocked(violet, moon)).toBe(true);
-    expect(purchase(moon, "hull", "nebula-violet")?.payload.cost).toBe(100);
+    expect(purchase(moon, "hull", "nebula-violet")?.payload.cost).toBe(110);
   });
 
   it("buying twice charges once (a double tap sends the same event twice)", () => {

@@ -81,7 +81,7 @@ describe("Hangar", () => {
     let log: LoggedEvent[] = earn(7);
     let s = fold(log);
     expect(s.orbs).toBe(40);
-    expect(purchase(s, "hull", "nebula-violet")).toBeNull(); // 90 > 40, and the Moon is not cleared
+    expect(purchase(s, "hull", "nebula-violet")).toBeNull(); // 110 > 40, and the Moon is not cleared
     expect(purchase(s, "hull", "cadet-white")).toBeNull(); // already on
     const buy = purchase(s, "hull", "solar-gold")!;
     expect(buy.payload.cost).toBe(30);
@@ -94,7 +94,7 @@ describe("Hangar", () => {
     s = fold(log);
     expect(s.orbs).toBe(10);
     expect(purchase(s, "hull", "solar-gold")!.payload.cost).toBe(0);
-    // a forged event (cost 0 for a 240-orb blaster) does nothing
+    // a forged event (cost 0 for a 210-orb blaster) does nothing
     s = fold([...log, { type: "upgrade_purchased", payload: { slot: "blaster", itemId: "nova-beam", cost: 0 } }]);
     expect(s.orbs).toBe(10);
     expect(s.equipped.blaster).toBeUndefined();
