@@ -2,152 +2,189 @@
 import { Button } from "@ui-sdk/react/button";
 import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@ui-sdk/react/dialog";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TRICKS } from "@/db/events";
 import { posters as postersOf, type Poster } from "@/director/hub";
+import { missionLength, solvesToClear, type Band } from "@/rig/adaptive";
+import { MAX_TIER, PLANETS_BY_TIER } from "@/rig/pools";
 import { CARD, type TrickId } from "@/rig/tricks";
-import { BAND_COLOURS, type RestingBay } from "@/worlds/space/restingBay";
-import { backdrop, dialogBox, ghost, glass, lime } from "./battle/ui";
-import { Icon, RocketGlyph } from "./kit/Icon";
+import { COLOR, MASTERY, type MasteryKey } from "@/design/tokens";
+import { PLANET_NAMES } from "@/worlds/space/lines";
+import { backdrop, dialogBox, ghost, lime } from "./battle/ui";
+import { Button as KitButton, MasteryKeyLegend, MasteryMark, NovaLine, PillLink, Pips, RingLogo, TopBar, WaveDots } from "./kit";
+import { Icon } from "./kit/Icon";
 import { Flashcards } from "./hub/Flashcards";
-import { Anchor, useScene } from "./hub/Scene";
 import { useCadet } from "./hub/useCadet";
+import { PlanetSprite } from "./world/PlanetSprite";
 
-const BAND_NAME = { unseen: "Not met yet", practicing: "Practising", understood: "Understood", gold: "Gold: instant" } as const;
-const DOORS = [
-  { id: "hangar", to: "/hangar", label: "The Hangar", sub: "Spend Orbs on your ship" },
-  { id: "launch", to: "/map", label: "Launch to Space", sub: "The Solar System map" },
-  { id: "academy", to: "/academy", label: "The Academy", sub: "Watch any Trick Film" },
-] as const;
+/** The internal mastery bands, in the words and marks the player sees. */
+const LEVEL: Record<Band, MasteryKey> = { gold: "gold", understood: "got", practicing: "learn", unseen: "new" };
+
+/** A quiet field of stars on the void, drawn once per resize (no animation to compete with the page). */
+function Stars() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const stars = Array.from({ length: 240 }, () => ({ x: rnd(), y: rnd(), r: rnd() < 0.12 ? 1.2 : 0.7, a: 0.15 + rnd() * 0.55 }));
+    const draw = () => {
+      const dpr = Math.min(2, devicePixelRatio || 1), g = c.getContext("2d");
+      c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+      if (!g) return;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = COLOR.approach;
+      for (const s of stars) { g.globalAlpha = s.a; g.fillRect(s.x * innerWidth, s.y * innerHeight, s.r, s.r); }
+    };
+    draw();
+    addEventListener("resize", draw);
+    return () => removeEventListener("resize", draw);
+  }, []);
+  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 size-full" />;
+}
 
 /**
- * The Resting Bay (/bay): the cadet's cabin hub. Everything is in the room: doors, wall posters,
- * the desk. React pins named buttons to the 3D scene, so the room stays the interface.
+ * The Resting Bay (/bay): the cadet's home between missions, drawn in 2D (design/bay-accretion.html).
+ * The next mission owns the screen: its planet from the same planet factory the battle uses, the
+ * waves won so far, and the one primary action, Launch. Below it, the ten times tables as rows of
+ * mastery marks (open one to see its facts and practise them) and the places to go.
  */
 export function RestingBayScreen() {
   const router = useRouter();
   const { cadet, state, emit } = useCadet();
   const ps = useMemo(() => (state ? postersOf(state) : null), [state]);
-  const cards = useMemo(() => (state ? TRICKS.filter((t) => (state.seenTricks[t] ?? 0) > 0) : []), [state]);
-  const { box, stage, scene } = useScene<RestingBay>(async (s) => {
-    const { mountRestingBay } = await import("@/worlds/space/restingBay");
-    return mountRestingBay(s, { posters: [], cards: [] });
-  });
-  const [poster, setPoster] = useState<Poster | null>(null);
-  const [cardsOpen, setCardsOpen] = useState(false);
+  const tricks = useMemo(() => (state ? TRICKS.filter((t) => (state.seenTricks[t] ?? 0) > 0) : []), [state]);
+  const [open, setOpen] = useState<Poster | null>(null);
+  const [tricksOpen, setTricksOpen] = useState(false);
+  const [help, setHelp] = useState(false);
   const [deck, setDeck] = useState(false);
 
-  useEffect(() => { if (scene && ps) scene.setPosters(ps); }, [scene, ps]);
-  useEffect(() => { if (scene && state) scene.setCards(cards.map((t) => CARD[t])); }, [scene, state, cards]);
   useEffect(() => { void import("@/engine/audio").then(({ audio }) => audio.mood("hangar")); }, []);
-  useEffect(() => { for (const d of DOORS) router.prefetch(d.to); }, [router]);
+  useEffect(() => { for (const to of ["/map", "/hangar", "/academy"]) router.prefetch(to); }, [router]);
 
+  if (!state || !ps) return <div className="fixed inset-0 bg-void" />;
+
+  const tier = Math.min(state.tier, MAX_TIER), planet = PLANETS_BY_TIER[tier], name = planet === "earth" ? "Cadet Bay" : PLANET_NAMES[planet];
+  const next = tier < MAX_TIER ? PLANET_NAMES[PLANETS_BY_TIER[tier + 1]] : null;
+  const waves = missionLength(tier) - 1, need = solvesToClear(tier), won = Math.min(state.mission.solved, waves);
+  // Nova points at the table closest to Gold that is not there yet, if there is one
+  const near = ps.filter((p) => p.gold > 0 && p.gold < 10).sort((a, b) => b.gold - a.gold)[0];
   const switchCadet = async () => { await fetch("/api/player", { method: "DELETE" }); router.push("/"); };
-  const ready = !!(scene && state);
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-void text-approach">
-      <div ref={box} className="absolute inset-0" />
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-void text-approach">
+      <Stars />
+      <TopBar className="relative z-10" left={<RingLogo className="hidden sm:block" />} title="Resting Bay" orbs={state.orbs} onHelp={() => setHelp(true)} />
 
-      {ready && (
-        <>
-          <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2">
-            <span className="flex h-11 items-center rounded-pill bg-void px-3 type-label text-[13px] tracking-[0.1em] text-ink-2 sm:px-4 sm:text-[15px] sm:tracking-[0.18em]">Resting Bay</span>
-            {cadet && <span className="hidden rounded-pill bg-void px-3 py-1 type-body-sm text-ink-2 sm:inline">Cadet <b className="font-semibold text-approach">{cadet.name}</b></span>}
+      <main className="relative z-10 mx-auto flex max-w-[1280px] flex-col gap-10 px-5 pb-8 md:px-[clamp(24px,5.2vw,88px)]">
+        <section aria-labelledby="next" className="grid items-center gap-2 md:min-h-[calc(100dvh-76px-260px)] md:grid-cols-[minmax(340px,46%)_1fr]">
+          <div className="order-2 md:order-1">
+            <h2 id="next" className="m-0 type-display text-[clamp(44px,7vw,96px)] leading-[0.95]">{name}</h2>
+            <p className="mt-5 max-w-[30ch] type-child text-ink-2">
+              {state.mission.passed && next ? <>Mission won. Launch to fly on to <b className="font-semibold text-approach">{next}</b>.</>
+                : next ? <>Your next mission. Win <b className="font-semibold text-approach">{need} of {waves} waves</b> to unlock {next}.</>
+                : <>The fleets out here keep growing. How far can you go?</>}
+            </p>
+            {next && <WaveDots total={waves} won={won} current className="mt-3.5" />}
+            <PillLink href={`/play/${planet}`} variant="primary" size="lg" className="mt-8 w-full justify-between md:w-auto">
+              Launch<span className="hidden md:inline">&nbsp;to {name}</span>
+            </PillLink>
+            <NovaLine className="mt-8">
+              Welcome back, {cadet?.name ?? "cadet"}! {near ? <>Your {near.table}s are {near.gold >= 7 ? "nearly Gold" : "coming along"}.</> : <>Open a times table below to see your facts.</>}
+            </NovaLine>
           </div>
-          <div className="pointer-events-none absolute right-16 top-3 z-10 flex h-11 items-center gap-2 rounded-pill bg-void px-3 type-name type-number text-[17px]"><Icon name="orb" size={20} className="text-gold" />{state.orbs} <span className="hidden text-[15px] text-ink-2 sm:inline">orbs</span></div>
+          <div className="order-1 flex justify-center md:order-2">
+            <PlanetSprite id={planet} size={360} alt="" className="max-h-[min(62vw,360px)] max-w-[min(62vw,360px)] md:max-h-none md:max-w-none" />
+          </div>
+        </section>
 
-          {DOORS.map((d) => (
-            <Anchor key={d.id} stage={stage} scene={scene} id={`door:${d.id}`} className="hidden md:block">
-              <Button aria-label={d.label} onClick={() => router.push(d.to)}
-                className={`${d.id === "launch" ? lime : `${ghost} bg-void`} flex flex-col items-center rounded-panel px-4 py-2.5 text-center md:px-5 md:py-3`}>
-                <span className="flex items-center gap-2 text-[15px] md:text-base"><Icon name={d.id === "launch" ? "rocket" : d.id === "hangar" ? "hangar" : "academy"} size={18} />{d.label}</span>
-                <span className="hidden text-xs font-normal normal-case tracking-normal text-ink-2 [font-stretch:100%] md:block">{d.sub}</span>
-              </Button>
-            </Anchor>
-          ))}
-
-          {ps?.map((p) => (
-            <Anchor key={p.table} stage={stage} scene={scene} id={`poster:${p.table}`} className="hidden md:block">
-              <Button aria-label={`Poster ×${p.table}: ${BAND_NAME[p.band]}`} onClick={() => setPoster(p)}
-                className="group grid h-14 w-11 place-items-center rounded-[10px] border-2 border-transparent type-number text-[15px] font-semibold transition hover:border-(--c) focus-visible:border-(--c)"
-                style={{ "--c": BAND_COLOURS[p.band].edge, color: BAND_COLOURS[p.band].edge } as CSSProperties}>
-                <span className="rounded-[6px] bg-void px-1 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">×{p.table}</span>
-              </Button>
-            </Anchor>
-          ))}
-
-          <Anchor stage={stage} scene={scene} id="desk:cards" className="hidden md:block">
-            <Button aria-label={`Trick Cards: ${cards.length} collected`} onClick={() => setCardsOpen(true)} className={`${ghost} bg-void`}>
-              <Icon name="trick" size={18} />Trick Cards · {cards.length}
-            </Button>
-          </Anchor>
-          <Anchor stage={stage} scene={scene} id="desk:deck" className="hidden md:block">
-            <Button aria-label="Quick Flashcards" onClick={() => setDeck(true)} className={`${ghost} mt-20 bg-void`}>
-              <Icon name="cards" size={18} />Quick Flashcards
-            </Button>
-          </Anchor>
-
-          {/* phones: the room is too small to tap, so the same places sit in a cockpit dock */}
-          <nav aria-label="Resting Bay" className={`${glass} absolute inset-x-2 bottom-10 z-10 flex flex-col gap-2 p-3 md:hidden`}>
-            <Button className={`${lime} mw-md mw-has-glyph justify-between`} onClick={() => router.push("/map")}>Launch to Space<RocketGlyph size={34} /></Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button className={`${ghost} py-2.5`} onClick={() => router.push("/hangar")}><Icon name="hangar" size={18} />The Hangar</Button>
-              <Button className={`${ghost} py-2.5`} onClick={() => router.push("/academy")}><Icon name="academy" size={18} />The Academy</Button>
-              <Button className={`${ghost} py-2.5`} onClick={() => setCardsOpen(true)}><Icon name="trick" size={18} />Trick Cards · {cards.length}</Button>
-              <Button className={`${ghost} py-2.5`} onClick={() => setDeck(true)}><Icon name="cards" size={18} />Flashcards</Button>
+        <section className="grid gap-8 2xl:grid-cols-[1fr_auto] 2xl:items-end">
+          <div className="order-1">
+            <h2 id="tables" className="m-0 mb-3 type-label text-ink-2">Your times tables</h2>
+            <div role="group" aria-labelledby="tables" className="grid grid-cols-5 gap-2 lg:grid-cols-10">
+              {ps.map((p) => {
+                const marks = p.cells.map((c) => LEVEL[c.band]);
+                return (
+                  <Button key={p.table} aria-expanded={open?.table === p.table} aria-label={`The ${p.table}s: ${p.gold} of 10 Gold`}
+                    onClick={() => setOpen((o) => (o?.table === p.table ? null : p))}
+                    className="mw-tile flex min-h-11 min-w-0 flex-col items-center gap-2.5 px-0 pb-3.5 pt-3">
+                    <b className="type-number text-[20px] font-medium">×{p.table}</b>
+                    <Pips marks={marks} size={8} columns={5} />
+                  </Button>
+                );
+              })}
             </div>
-            <div className="grid grid-cols-5 gap-1.5" role="group" aria-label="Times-table posters">
-              {ps?.map((p) => (
-                <Button key={p.table} aria-label={`Poster ×${p.table}: ${BAND_NAME[p.band]}`} onClick={() => setPoster(p)} className="min-h-11 rounded-[10px] border-2 type-number text-[15px] font-semibold"
-                  style={{ borderColor: BAND_COLOURS[p.band].edge, background: BAND_COLOURS[p.band].bg, color: BAND_COLOURS[p.band].ink }}>×{p.table}</Button>
-              ))}
+          </div>
+          <nav aria-label="Places" className="order-3 flex flex-col gap-3">
+            <h2 className="m-0 type-label text-ink-2">Go to</h2>
+            <div className="flex flex-wrap gap-2.5">
+              <PillLink href="/map" icon="map">Star map</PillLink>
+              <PillLink href="/hangar" icon="hangar">Hangar</PillLink>
+              <PillLink href="/academy" icon="academy">Academy</PillLink>
+              <KitButton variant="secondary" icon="trick" onClick={() => setTricksOpen(true)}>Tricks · {tricks.length}</KitButton>
             </div>
           </nav>
 
-          <Button onClick={() => void switchCadet()} className="absolute bottom-3 left-3 z-10 rounded-pill px-3 py-1 text-xs text-ink-3 transition hover:text-approach">Switch Cadet</Button>
-        </>
-      )}
-
-      <Dialog open={!!poster} onOpenChange={(o) => { if (!o) setPoster(null); }}>
-        <DialogBackdrop className={backdrop} />
-        <DialogContent className={`${dialogBox} w-[min(92vw,380px)] p-5`}>
-          {poster && (
-            <>
-              <DialogTitle className="type-display type-number text-4xl" style={{ color: BAND_COLOURS[poster.band].edge }}>×{poster.table} table</DialogTitle>
-              <DialogDescription className="mt-2 type-body text-ink-2">{BAND_NAME[poster.band]} · {poster.gold}/10 Gold</DialogDescription>
-              <ol className="mt-4 grid grid-cols-2 gap-1.5 type-number text-[15px]">
-                {poster.cells.map((c) => (
-                  <li key={c.n} className="rounded-[10px] px-3 py-1.5" style={{ background: BAND_COLOURS[c.band].bg, color: BAND_COLOURS[c.band].ink }}>{poster.table} × {c.n} = {poster.table * c.n}</li>
-                ))}
+          {open && (
+            <div className="order-2 rounded-panel border border-line-1 bg-panel p-5 2xl:col-span-2" aria-live="polite">
+              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+                <h3 className="m-0 type-display text-[26px]">The {open.table}s</h3>
+                <MasteryKeyLegend />
+              </div>
+              <ol className="m-0 grid list-none grid-cols-5 gap-2 p-0 lg:grid-cols-10">
+                {open.cells.map((c) => {
+                  const lv = LEVEL[c.band];
+                  return (
+                    <li key={c.n} className="flex flex-col items-center gap-1.5 py-2" aria-label={`${open.table} times ${c.n}: ${MASTERY[lv].word}`}>
+                      <span className="type-body-sm text-ink-2">{open.table} × {c.n}</span>
+                      <span className={`type-number text-[22px] font-medium ${lv === "gold" ? "text-gold" : lv === "new" ? "text-ink-3" : ""}`}>{lv === "new" ? "?" : open.table * c.n}</span>
+                      <MasteryMark level={lv} size={10} />
+                    </li>
+                  );
+                })}
               </ol>
-              <ul className="mt-4 flex flex-wrap gap-3 text-xs text-ink-2" aria-label="Colour key">
-                {(["unseen", "practicing", "understood", "gold"] as const).map((b) => <li key={b} className="flex items-center gap-1"><span className="size-2.5 rounded-sm" style={{ background: BAND_COLOURS[b].edge }} />{BAND_NAME[b]}</li>)}
-              </ul>
-              <DialogClose className={`${lime} mt-5 w-full py-2.5`}>Done</DialogClose>
-            </>
+              <div className="mt-4 flex justify-end">
+                <KitButton variant="secondary" icon="cards" onClick={() => setDeck(true)}>Practise with flashcards</KitButton>
+              </div>
+            </div>
           )}
+        </section>
+
+        <KitButton variant="quiet" className="self-start" onClick={() => void switchCadet()}>Switch cadet</KitButton>
+      </main>
+
+      <Dialog open={help} onOpenChange={setHelp}>
+        <DialogBackdrop className={backdrop} />
+        <DialogContent className={`${dialogBox} w-[min(92vw,440px)] p-6`}>
+          <DialogTitle className="type-display text-[30px]">How to play</DialogTitle>
+          <div className="mt-3 flex flex-col gap-2 type-body text-ink-2">
+            <p className="m-0">Launch flies you to your next mission. Each fleet is squads of ships: count the squads and the ships in one squad, then fire that many plasma balls.</p>
+            <p className="m-0">Your times tables fill with marks as you go: <MasteryMark level="gold" size={9} /> Gold, <MasteryMark level="got" size={9} /> Got it, <MasteryMark level="learn" size={9} /> Learning, <MasteryMark level="new" size={9} /> New.</p>
+            <p className="m-0">Spend orbs in the Hangar. Watch any trick in the Academy.</p>
+          </div>
+          <DialogClose className={`${lime} mt-5 w-full py-2.5`}>Got it</DialogClose>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={cardsOpen} onOpenChange={setCardsOpen}>
+      <Dialog open={tricksOpen} onOpenChange={setTricksOpen}>
         <DialogBackdrop className={backdrop} />
         <DialogContent className={`${dialogBox} w-[min(92vw,440px)] p-5`}>
-          <DialogTitle className="type-display text-[30px]">Your trick cards</DialogTitle>
-          <DialogDescription className="mt-2 type-body text-ink-2">{cards.length ? "Tap a card to watch its film in the Academy." : "Win a Show Me How in battle to collect your first card."}</DialogDescription>
+          <DialogTitle className="type-display text-[30px]">Your tricks</DialogTitle>
+          <DialogDescription className="mt-2 type-body text-ink-2">{tricks.length ? "Tap a trick to watch it in the Academy." : "Win a Show Me How in battle to earn your first trick."}</DialogDescription>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {cards.map((t: TrickId) => (
+            {tricks.map((t: TrickId) => (
               <Button key={t} aria-label={`Watch ${CARD[t]}`} onClick={() => router.push(`/academy?trick=${t}`)} className="mw-tile flex min-h-12 items-center gap-2 px-3 py-3 text-left type-name text-[15px]"><Icon name="trick" size={18} className="text-gold" />{CARD[t]}</Button>
             ))}
           </div>
           <div className="mt-4 flex gap-2">
-            <Button className={`${ghost} flex-1 py-2.5`} onClick={() => router.push("/academy")}>The Academy</Button>
+            <Button className={`${ghost} flex-1 py-2.5`} onClick={() => router.push("/academy")}>Academy</Button>
             <DialogClose className={`${lime} flex-1 py-2.5`}>Done</DialogClose>
           </div>
         </DialogContent>
       </Dialog>
 
-      {deck && state && <Flashcards state={state} emit={emit} onClose={() => setDeck(false)} />}
+      {deck && <Flashcards state={state} emit={emit} onClose={() => setDeck(false)} />}
     </div>
   );
 }

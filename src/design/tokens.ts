@@ -43,7 +43,7 @@ export const MASTERY = {
   gold: { word: "Gold", mark: "filled", color: COLOR.gold },
   got: { word: "Got it", mark: "filled", color: COLOR.approach },
   learn: { word: "Learning", mark: "outline", color: COLOR.sky },
-  new: { word: "New", mark: "dim", color: "rgba(230,241,255,0.18)" },
+  new: { word: "New", mark: "dim", color: "rgba(230,241,255,0.4)" }, // about 3:1 on the void: dim, but a mark you can still see
 } as const;
 export type MasteryKey = keyof typeof MASTERY;
 

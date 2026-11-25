@@ -48,7 +48,7 @@
   --color-mastery-gold: #ffc857;
   --color-mastery-got: #e6f1ff;
   --color-mastery-learn: #8fb4ec;
-  --color-mastery-new: rgba(230,241,255,0.18);
+  --color-mastery-new: rgba(230,241,255,0.4);
 
   /* shapes */
   --radius-panel: 16px;

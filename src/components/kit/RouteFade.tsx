@@ -14,9 +14,14 @@ const isSkippedTransition = (r: unknown) =>
 function Fade({ children }: { children: ReactNode }) {
   const path = usePathname();
   useEffect(() => {
-    const quiet = (e: PromiseRejectionEvent) => { if (isSkippedTransition(e.reason)) e.preventDefault(); };
-    window.addEventListener("unhandledrejection", quiet);
-    return () => window.removeEventListener("unhandledrejection", quiet);
+    // React reports a skipped transition both ways: as a rejected promise and as a thrown error.
+    // Capture phase, so the dev overlay (registered earlier) never counts it as an issue either.
+    const quiet = (e: PromiseRejectionEvent | ErrorEvent) => {
+      if (isSkippedTransition("reason" in e ? e.reason : e.error)) { e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    window.addEventListener("unhandledrejection", quiet, true);
+    window.addEventListener("error", quiet, true);
+    return () => { window.removeEventListener("unhandledrejection", quiet, true); window.removeEventListener("error", quiet, true); };
   }, []);
   // keyed by route: a new screen exits the old one and enters itself, both with the `mw-route`
   // class (globals.css). Updates inside one screen never animate (`default="none"`).
