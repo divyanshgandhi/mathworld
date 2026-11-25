@@ -706,6 +706,9 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
     kill.update(dt);
     scan.update();
     misses.update();
+    // Show me how: its plates and tags say the squads and the each, so the axis words step back while it
+    // runs (the play area holds the fleet, its plates, the divide, the two tags and the rocket)
+    fv.labels.visible = !bs.lessonOn;
     // the camera frames the fleet (and the labels on show) in the HUD's free area, above the rocket's band
     const m = measure(fv);
     const nv = nova.update(dt, T, m.w, (m.top - FLEET_Y) * 2, bs.lessonOn); // she hovers at the fleet's top edge
@@ -876,6 +879,8 @@ export function mountArena(stage: Stage, opts: ArenaOpts) {
         if (p.x < q.x + q.w - 1 && q.x < p.x + p.w - 1 && p.y < q.y + q.h - 1 && q.y < p.y + p.h - 1) {
           // a scan's bracket and the visual marks are meant to sit on the fleet
           if ((p.id === "fleet" || q.id === "fleet") && /bracket|visual|dot/.test(p.id + q.id)) continue;
+          // a lesson's tags sit on its own plates by design
+          if (/^visual/.test(p.id) && /^visual/.test(q.id)) continue;
           // lines crossing lines (a bracket round its fizz dots) are not words colliding
           if (!p.text && !q.text && p.id !== "fleet" && q.id !== "fleet") continue;
           hit.push([`${p.id}${p.text ? ` "${p.text}"` : ""}`, `${q.id}${q.text ? ` "${q.text}"` : ""}`]);
