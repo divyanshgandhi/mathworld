@@ -5,6 +5,7 @@ import { seeded } from "@/engine/util";
 import { fold, orbLedger, orbsBetween, type LoggedEvent, type WaveRole } from "@/director/fold";
 import { CATALOG, isUnlocked, ITEMS, itemState, nextGoal, purchase, SLOTS, STARTER } from "@/director/hangar";
 import { FLASHCARD_ORBS, patrol, patrolDone, TEACHES } from "@/director/hub";
+import { STOP_WORDS } from "@/components/world/words";
 import { housekeeping } from "@/director/next";
 import { BOTS } from "../sim/bots";
 import { simulate } from "../sim/run";
@@ -259,7 +260,7 @@ describe("the earning rate (the maths behind the prices)", () => {
 
 describe("the Star map words (TEACHES)", () => {
   it("say what each planet teaches in plain words", () => {
-    expect(TEACHES.moon).toBe("Times 2, 5 and 10");
+    expect(TEACHES.moon).toBe(STOP_WORDS.moon.teaches); // one source: the Star map's words
     for (const t of Object.values(TEACHES)) expect(t).not.toMatch(/·|digit|armada/i);
   });
 });

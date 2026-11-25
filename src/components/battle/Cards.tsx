@@ -9,20 +9,10 @@ import type { BodyId } from "@/worlds/space/bodies";
 import { backdrop, dialogBox } from "./ui";
 import { POWERUP_DOES, PowerUpGlyph, SECTOR_LOCK_DOES } from "./PowerUpGlyph";
 import { css } from "./cockpit";
+import { STOP_WORDS } from "@/components/world/words";
 
-/** What each planet teaches, in a child's words (the briefing card). */
-export const PLANET_TEACHES: Record<string, string> = {
-  earth: "Squads of zero and squads of one.",
-  mercury: "Adding, up to 20.",
-  venus: "Taking away, up to 20.",
-  moon: "Times 2, times 5 and times 10.",
-  mars: "Times 3 and times 4.",
-  "asteroid-belt": "The tricky ones: 6s, 7s, 8s and 9s.",
-  jupiter: "A big number times a small one, like 6 × 24.",
-  saturn: "Two big numbers, like 16 × 24.",
-  uranus: "Three-digit fleets, like 4 × 125.",
-  "deep-space": "Giant fleets, as big as they come.",
-};
+/** What each planet teaches, in a child's words (the briefing card): the Star map's words, one source. */
+export const PLANET_TEACHES: Record<string, string> = Object.fromEntries(Object.entries(STOP_WORDS).map(([id, w]) => [id, w.long]));
 
 /**
  * One designed moment over the battle: a scrim (no blur), a sheet, a title, a few plain words and

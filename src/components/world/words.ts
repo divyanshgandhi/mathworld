@@ -4,6 +4,8 @@ import type { TrickId } from "@/rig/tricks";
 /**
  * The words of the Star map and the Academy, in a child's language (Grade 3 reading, sentence case).
  * Copy lives here so a copy pass touches one file. Glossary: docs/glossary.md.
+ * `STOP_WORDS` is the one place that says what a planet teaches: the battle's briefing card
+ * (`PLANET_TEACHES`) and the hub's `TEACHES` read it.
  */
 export type StopId = Stop["id"];
 
@@ -14,7 +16,8 @@ export interface StopWords {
   inSentence: string;
   /** What the stop teaches, short enough to sit under its planet. */
   teaches: string;
-  /** The same, as a sentence for the stop's panel. */
+  /** The same, as a sentence for the stop's panel and the battle's briefing card. Examples are written
+   * rows first, as the battle draws them (6 × 24 is 6 squads of 24). */
   long: string;
   /** The times tables the stop trains, when it has tables (Earth to the Asteroid Belt). */
   tables: number[] | null;
@@ -27,9 +30,9 @@ export const STOP_WORDS: Record<StopId, StopWords> = {
   moon: { name: "The Moon", inSentence: "the Moon", teaches: "×2, ×5 and ×10", long: "The 2s, the 5s and the 10s.", tables: [2, 5, 10] },
   mars: { name: "Mars", inSentence: "Mars", teaches: "×3 and ×4", long: "The 3s and the 4s.", tables: [3, 4] },
   "asteroid-belt": { name: "The Asteroid Belt", inSentence: "the Asteroid Belt", teaches: "×6, ×7, ×8 and ×9", long: "The 6s, 7s, 8s and 9s: the last of the times tables.", tables: [6, 7, 8, 9] },
-  jupiter: { name: "Jupiter", inSentence: "Jupiter", teaches: "Big numbers times small numbers", long: "Big numbers times small numbers, like 24 × 6.", tables: null },
-  saturn: { name: "Saturn", inSentence: "Saturn", teaches: "Big numbers times big numbers", long: "Big numbers times big numbers, like 23 × 14.", tables: null },
-  uranus: { name: "Uranus", inSentence: "Uranus", teaches: "Huge numbers times smaller ones", long: "Huge numbers times smaller ones, like 245 × 12.", tables: null },
+  jupiter: { name: "Jupiter", inSentence: "Jupiter", teaches: "Big numbers times small numbers", long: "Big numbers times small numbers, like 6 × 24.", tables: null },
+  saturn: { name: "Saturn", inSentence: "Saturn", teaches: "Big numbers times big numbers", long: "Big numbers times big numbers, like 14 × 23.", tables: null },
+  uranus: { name: "Uranus", inSentence: "Uranus", teaches: "Huge numbers times smaller ones", long: "Huge numbers times smaller ones, like 12 × 245.", tables: null },
   "deep-space": { name: "Deep Space", inSentence: "Deep Space", teaches: "Giant numbers that keep growing", long: "Giant numbers. The fleets out here keep growing.", tables: null },
 };
 

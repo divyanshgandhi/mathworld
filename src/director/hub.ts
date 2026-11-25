@@ -3,6 +3,7 @@ import { band, GOLD_STREAK_FOR_JUMP, JUMP, type Band } from "@/rig/adaptive";
 import { ENUMERABLE_TIERS, factKey, factsOf, MAX_TIER, parseKey, PLANETS_BY_TIER, tierOf, type Fact, type PlanetId } from "@/rig/pools";
 import type { Rng } from "@/engine/util";
 import type { PlayerState } from "./fold";
+import { STOP_WORDS } from "@/components/world/words";
 
 /**
  * What the Resting Bay and the Solar System map show, read from the folded state: the times-table
@@ -93,19 +94,8 @@ export const patrolDone = (s: PlayerState, day: number) => s.patrol.lastDay !== 
 export type StopStatus = "warmup" | "cleared" | "ace" | "frontier" | "open" | "locked";
 export interface Stop { id: "mercury" | "venus" | PlanetId; tier: number | null; status: StopStatus; teaches: string }
 
-/** What each planet teaches, in a child's words (the Star map and the briefing read this). */
-export const TEACHES: Record<Stop["id"], string> = {
-  mercury: "Adding, up to 20",
-  venus: "Taking away, up to 20",
-  earth: "Times 0 and times 1",
-  moon: "Times 2, 5 and 10",
-  mars: "Times 3 and 4",
-  "asteroid-belt": "Times 6, 7, 8 and 9",
-  jupiter: "Big numbers times small ones, like 23 × 4",
-  saturn: "Two big numbers, like 23 × 45",
-  uranus: "Hundreds, like 234 × 56",
-  "deep-space": "As big as you like",
-};
+/** What each planet teaches, in a child's words: the Star map's words (`STOP_WORDS`), the one source. */
+export const TEACHES: Record<Stop["id"], string> = Object.fromEntries(Object.entries(STOP_WORDS).map(([id, w]) => [id, w.teaches])) as Record<Stop["id"], string>;
 
 /** Mercury and Venus first (always open), then the multiplication frontier, Earth outward. */
 export function mapStops(s: PlayerState): Stop[] {
